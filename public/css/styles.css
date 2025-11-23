@@ -1,0 +1,83 @@
+/* Left side illustration background */
+.bg-illustration {
+    background: linear-gradient(135deg, #0d6efd 0%, #6610f2 100%);
+}
+
+/* Improve readability on gradient side */
+.text-light-emphasis {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/* Card polish */
+.card .form-control {
+    padding: 0.65rem 0.9rem;
+}
+
+.card .btn {
+    padding: 0.6rem 0.9rem;
+    font-weight: 600;
+}
+
+/* Smaller screens: add spacing */
+@media (max-width: 991.98px) {
+    body {
+        background: #f8f9fa;
+    }
+}
+
+/* --- Dashboard layout --- */
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 260px;
+    padding-top: 56px; /* navbar height */
+    overflow-y: auto;
+    z-index: 1020;
+}
+
+.sidebar .nav-link {
+    color: var(--bs-body-color);
+    border-radius: 8px;
+    margin-bottom: 6px;
+}
+.sidebar .nav-link.active {
+    background-color: rgba(13, 110, 253, 0.12);
+    color: var(--bs-primary);
+    font-weight: 600;
+}
+
+.main {
+    margin-left: 260px;
+    padding-top: 72px; /* navbar height + spacing */
+    padding-bottom: 24px;
+}
+
+/* Collapsible sub navigation styling */
+.sidebar .sub-nav {
+    padding-left: 1rem;
+    border-left: 1px dashed var(--bs-border-color);
+    margin: 6px 0 10px;
+}
+.sidebar .sub-nav .nav-link {
+    margin-bottom: 4px;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    /* Make collapsible headers clearly clickable */
+    cursor: pointer;
+    font-weight: 600;
+}
+
+@media (max-width: 991.98px) {
+    .sidebar {
+        position: static;
+        width: 100%;
+        padding-top: 0;
+        border-bottom: 1px solid var(--bs-border-color);
+    }
+    .main {
+        margin-left: 0;
+        padding-top: 88px;
+    }
+}

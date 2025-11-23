@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="500" viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#0d6efd"/>
+      <stop offset="100%" stop-color="#6610f2"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background wave -->
+  <path d="M0,420 C200,360 300,520 500,480 C650,450 700,420 800,440 L800,500 L0,500 Z" fill="url(#bg)" opacity="0.25"/>
+
+  <!-- Payroll: dollar coin -->
+  <circle cx="570" cy="180" r="70" fill="#ffe082" stroke="#d4b75c" stroke-width="4"/>
+  <text x="570" y="195" text-anchor="middle" font-size="48" font-family="Arial" fill="#7a5e00">$</text>
+
+  <!-- HR: two people -->
+  <!-- Person 1 -->
+  <circle cx="250" cy="170" r="40" fill="#e0f2ff"/>
+  <rect x="210" y="210" width="80" height="110" rx="16" fill="#9ec5fe"/>
+  <!-- Person 2 -->
+  <circle cx="360" cy="170" r="40" fill="#ffe0e6"/>
+  <rect x="320" y="210" width="80" height="110" rx="16" fill="#f7a1b3"/>
+
+  <!-- Connection line -->
+  <line x1="290" y1="265" x2="360" y2="265" stroke="#ffffff" stroke-width="6" stroke-linecap="round" opacity="0.8"/>
+
+  <!-- Title -->
+  <text x="400" y="360" text-anchor="middle" font-size="28" font-family="Arial" fill="#ffffff" opacity="0.9">
+    HR & Payroll
+  </text>
+</svg>
