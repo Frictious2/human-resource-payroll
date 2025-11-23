@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Companies · List</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link href="/css/styles.css" rel="stylesheet" />
+  <link href="https://cdn.datatables.net/v/bs5/dt-1.13.8/b-2.4.2/b-html5-2.4.2/b-print-2.4.2/datatables.min.css" rel="stylesheet"/>
+</head>
+<body>
+  <%- include('partials/topbar', { user }) %>
+  <%- include('partials/sidebar') %>
+
+  <main class="main">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center justify-content-between mb-4">
+        <h2 class="mb-0">Companies</h2>
+        <a class="btn btn-primary" href="/developer/companies/new"><i class="bi bi-plus-circle me-2"></i>Add Company</a>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <table id="companiesTable" class="table table-striped table-hover w-100">
+            <thead>
+              <tr>
+                <th>CompanyID</th>
+                <th>Name</th>
+                <th>TIN</th>
+                <th>Address</th>
+                <th>Town</th>
+                <th>City</th>
+                <th>Country</th>
+                <th>AccNo</th>
+                <th>Phone</th>
+                <th>Bank</th>
+                <th>PayingBank</th>
+                <th>Logo Path</th>
+                <th>Email</th>
+                <th>Manager</th>
+                <th>Date Created</th>
+                <th>Subscription Type</th>
+                <th>Plan Type</th>
+                <th>No Of Staff Left</th>
+                <th>Staff Capacity</th>
+              </tr>
+            </thead>
+          </table>
+        </div>
+      </div>
+
+      <footer class="mt-4 py-3 text-center text-muted border-top">
+        <%- include('partials/footer') %>
+      </footer>
+    </div>
+  </main>
+
+  <script src="/vendor/bootstrap.bundle.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.datatables.net/v/bs5/dt-1.13.8/b-2.4.2/b-html5-2.4.2/b-print-2.4.2/datatables.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+  <script>
+    $(function () {
+      $('#companiesTable').DataTable({
+        ajax: { url: '/developer/api/companies', dataSrc: 'data' },
+        columns: [
+          { data: 'CompanyID' },
+          { data: 'Com_Name' },
+          { data: 'TinNo' },
+          { data: 'Address' },
+          { data: 'Town' },
+          { data: 'City' },
+          { data: 'Country' },
+          { data: 'AccNo' },
+          { data: 'Phone' },
+          { data: 'Bank' },
+          { data: 'PayingBank' },
+          { data: 'Logopath' },
+          { data: 'Email' },
+          { data: 'Manager' },
+          { data: 'DateCreated' },
+          { data: 'SubscriptionType' },
+          { data: 'SubscriptionPlanType' },
+          { data: 'NoOfStaffLeft' },
+          { data: 'StaffCapacity' },
+        ],
+        dom: 'Bfrtip',
+        buttons: [
+          { extend: 'excelHtml5', title: 'Companies' },
+          { extend: 'pdfHtml5', title: 'Companies', orientation: 'landscape', pageSize: 'A4' },
+          { extend: 'csv', title: 'Companies' },
+          { extend: 'print', title: 'Companies' }
+        ],
+        responsive: true,
+      });
+    });
+  </script>
+</body>
+</html>

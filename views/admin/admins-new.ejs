@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Admin</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container py-4">
+        <h3 class="mb-3">Add Admin</h3>
+        <form action="/admin/admins" method="post">
+            <div class="mb-3">
+                <label class="form-label">Username</label>
+                <input name="Username" type="text" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Email</label>
+                <input name="Email" type="email" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Full Name</label>
+                <input name="FullName" type="text" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Company</label>
+                <select name="CompanyID" class="form-select">
+                    <option value="">-- None --</option>

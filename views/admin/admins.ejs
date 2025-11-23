@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admins</title>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container py-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3>Admins</h3>
+            <a class="btn btn-primary" href="/admin/admins/new">Add Admin</a>
+        </div>
+
+        <table id="adminsTable" class="table table-striped table-bordered" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Picture</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Company</th>
+                    <th>Date Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+        </table>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="/vendor/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
+    <script>
+        $(function() {
+            const table = $('#adminsTable').DataTable({
+                ajax: '/admin/api/admins',
+                columns: [
+                    {
+                        data: 'PFNo',
+                        render: function(pfno) {
+                            const src = `https://picsum.photos/seed/admin-${pfno}/64/64`;
+                            return `<img src="${src}" alt="avatar" class="rounded-circle" width="40" height="40">`;
+                        },
+                        orderable: false
+                    },
+                    { data: 'FullName' },
+                    { data: 'Email' },
+                    { data: 'Com_Name', defaultContent: '' },
+                    {
+                        data: 'DateCreated',
+                        render: function(val) {
+                            if (!val) return '';
+                            return new Date(val).toLocaleString();
+                        }
+                    },
+                    {
+                        data: 'PFNo',
+                        render: function(pfno, type, row) {
+                            return `
+                                <button class="btn btn-sm btn-outline-primary me-1 resend-link" data-id="${pfno}">Resend Link</button>
+                                <button class="btn btn-sm btn-outline-danger delete-admin" data-id="${pfno}">Delete</button>
+                            `;
+                        },
+                        orderable: false
+                    }
+                ],
+                dom: 'Bfrtip',
+                buttons: ['excel', 'pdf', 'csv', 'print']
+            });
+
+            $('#adminsTable').on('click', '.resend-link', function() {
+                const id = $(this).data('id');
+                $.post(`/admin/api/admins/${id}/resend-link`)
+                    .done(() => alert('Link resent'))
+                    .fail(() => alert('Failed to resend link'));
+            });
+
+            $('#adminsTable').on('click', '.delete-admin', function() {
+                const id = $(this).data('id');
+                if (!confirm('Delete this admin?')) return;
+                $.ajax({ url: `/admin/api/admins/${id}`, method: 'DELETE' })
+                    .done(() => table.ajax.reload(null, false))
+                    .fail(() => alert('Failed to delete admin'));
+            });
+        });
+    </script>
+</body>
+</html>
