@@ -12,6 +12,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Body parsing for form POSTs
 app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
 // Routes
 app.get('/', (req, res) => {

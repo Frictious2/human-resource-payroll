@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Developers · List</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link href="/css/styles.css" rel="stylesheet" />
+  <link href="https://cdn.datatables.net/v/bs5/dt-1.13.8/b-2.4.2/b-html5-2.4.2/b-print-2.4.2/datatables.min.css" rel="stylesheet"/>
+</head>
+<body>
+  <%- include('partials/topbar', { user }) %>
+  <%- include('partials/sidebar') %>
+
+  <main class="main">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center justify-content-between mb-4">
+        <h2 class="mb-0">Developers</h2>
+        <a class="btn btn-primary" href="/developer/developers/new"><i class="bi bi-plus-circle me-2"></i>Add Developer</a>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <table id="developersTable" class="table table-striped table-hover w-100">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Full Name</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Date Created</th>
+                <th>Created By</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+          </table>
+        </div>
+      </div>
+
+      <footer class="mt-4 py-3 text-center text-muted border-top">
+        <%- include('partials/footer') %>
+      </footer>
+    </div>
+  </main>
+
+  <script src="/vendor/bootstrap.bundle.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.datatables.net/v/bs5/dt-1.13.8/b-2.4.2/b-html5-2.4.2/b-print-2.4.2/datatables.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+
+  <script>
+    $(function () {
+      const table = $('#developersTable').DataTable({
+        ajax: { url: '/developer/api/developers', dataSrc: 'data' },
+        columns: [
+          { data: 'ID' },
+          { data: 'FullName' },
+          { data: 'username' },
+          { data: 'email' },
+          { data: 'dateCreated' },
+          { data: 'createdBy' },
+          {
+            data: null,
+            orderable: false,
+            searchable: false,
+            render: (row) => `
+              <a href="/developer/developers/${row.ID}/edit" class="btn btn-sm btn-outline-secondary me-1">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <button class="btn btn-sm btn-outline-danger" data-id="${row.ID}" data-action="delete">
+                <i class="bi bi-trash"></i>
+              </button>
+            `,
+          },
+        ],
+        dom: 'Bfrtip',
+        buttons: [
+          { extend: 'excelHtml5', title: 'Developers' },
+          { extend: 'pdfHtml5', title: 'Developers', orientation: 'landscape', pageSize: 'A4' },
+          { extend: 'csv', title: 'Developers' },
+          { extend: 'print', title: 'Developers' }
+        ],
+        responsive: true,
+      });
+
+      $('#developersTable').on('click', 'button[data-action="delete"]', function () {
+        const id = this.getAttribute('data-id');
+        if (!id) return;
+        if (!confirm('Delete this developer?')) return;
+        fetch(`/developer/api/developers/${id}`, { method: 'DELETE' })
+          .then((res) => {
+            if (!res.ok) throw new Error('Delete failed');
+            table.ajax.reload(null, false);
+          })
+          .catch(() => alert('Failed to delete developer'));
+      });
+    });
+  </script>
+</body>
+</html>
