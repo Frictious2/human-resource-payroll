@@ -28,6 +28,7 @@ async function adminsListJson(req, res) {
             `SELECT p.PFNo, p.Username, p.FullName, p.Email, p.CompanyID, p.DateCreated, c.Com_Name
              FROM tblpassword p
              LEFT JOIN tblcominfo c ON p.CompanyID = c.CompanyID
+             WHERE p.Level = 'Admin'
              ORDER BY p.PFNo DESC`
         );
         res.json({ data: rows });

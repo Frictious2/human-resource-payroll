@@ -48,7 +48,14 @@ router.post('/admins/:pfno/set-password', developerController.setAdminPasswordUp
 
 // Admin delete (AJAX)
 router.delete('/api/admins/:pfno', developerController.deleteAdmin);
-router.get('/licenses', developerController.comingSoon('Licenses', 'License'));
-router.get('/licenses/new', developerController.comingSoon('Add License', 'License'));
+
+// Licenses
+router.get('/licenses', developerController.licensesListPage);
+router.get('/api/licenses', developerController.licensesListJson);
+router.get('/licenses/new', developerController.licensesNewPage);
+router.post('/licenses', developerController.createLicense);
+router.get('/licenses/:id/edit', developerController.licensesEditPage);
+router.post('/licenses/:id', developerController.updateLicense);
+router.delete('/api/licenses/:id', developerController.deleteLicense);
 
 module.exports = router;

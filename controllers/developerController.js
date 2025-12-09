@@ -204,6 +204,7 @@ async function adminsListJson(req, res) {
       `SELECT p.PFNo, p.Username, p.FullName, p.Email, p.CompanyID, p.DateCreated, c.Com_Name
        FROM tblpassword p
        LEFT JOIN tblcominfo c ON c.CompanyID = p.CompanyID
+       WHERE p.Level = 'Admin'
        ORDER BY p.PFNo DESC`
     );
 
@@ -317,6 +318,157 @@ async function deleteAdmin(req, res) {
   }
 }
 
+// License handlers
+async function licensesListPage(req, res) {
+  res.render('developer/licenses', { user: { name: 'David' } });
+}
+
+async function licensesListJson(req, res) {
+  try {
+    const [rows] = await pool.query(
+      `SELECT l.id, l.start_date, l.expiry_date, l.updated_by, l.CompanyID, c.Com_Name
+       FROM license l
+       LEFT JOIN tblcominfo c ON c.CompanyID = l.CompanyID
+       ORDER BY l.id DESC`
+    );
+
+    const data = rows.map(r => {
+      const now = new Date();
+      const expiry = r.expiry_date ? new Date(r.expiry_date) : null;
+      const start = r.start_date ? new Date(r.start_date) : null;
+      
+      let status = 'Unknown';
+      let timeRemaining = 'N/A';
+      
+      if (expiry) {
+        if (now > expiry) {
+          status = '<span class="badge bg-danger">Expired</span>';
+          timeRemaining = 'Expired';
+        } else if (start && now < start) {
+          status = '<span class="badge bg-secondary">Pending</span>';
+          const daysUntilStart = Math.ceil((start - now) / (1000 * 60 * 60 * 24));
+          timeRemaining = `Starts in ${daysUntilStart} days`;
+        } else {
+          status = '<span class="badge bg-success">Active</span>';
+          const daysLeft = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+          timeRemaining = `${daysLeft} days`;
+        }
+      }
+
+      return {
+        id: r.id,
+        company: r.Com_Name || `Company ID: ${r.CompanyID || 'N/A'}`,
+        companyID: r.CompanyID || 'N/A',
+        startDate: start ? start.toLocaleDateString() : 'N/A',
+        expiryDate: expiry ? expiry.toLocaleDateString() : 'N/A',
+        timeRemaining,
+        status,
+        updatedBy: r.updated_by || 'N/A',
+        actions: `
+          <a href="/developer/licenses/${r.id}/edit" class="btn btn-sm btn-warning">Edit</a>
+          <button data-id="${r.id}" class="btn btn-sm btn-danger btn-delete-license">Delete</button>
+        `
+      };
+    });
+
+    res.json({ data });
+  } catch (err) {
+    console.error(err);
+    res.json({ data: [] });
+  }
+}
+
+async function licensesNewPage(req, res) {
+  try {
+    const [companies] = await pool.query(`SELECT CompanyID, Com_Name FROM tblcominfo ORDER BY Com_Name`);
+    res.render('developer/licenses-new', { 
+      user: { name: 'David' }, 
+      companies, 
+      error: null,
+      license: null 
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Failed to load form');
+  }
+}
+
+async function licensesEditPage(req, res) {
+  try {
+    const [companies] = await pool.query(`SELECT CompanyID, Com_Name FROM tblcominfo ORDER BY Com_Name`);
+    const [licenses] = await pool.query(`SELECT * FROM license WHERE id = ?`, [req.params.id]);
+    
+    if (!licenses.length) {
+      return res.status(404).send('License not found');
+    }
+
+    res.render('developer/licenses-new', { 
+      user: { name: 'David' }, 
+      companies, 
+      error: null,
+      license: licenses[0]
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Failed to load license');
+  }
+}
+
+async function createLicense(req, res) {
+  try {
+    const { CompanyID, start_date, expiry_date, updated_by } = req.body;
+    
+    await pool.query(
+      `INSERT INTO license (CompanyID, start_date, expiry_date, updated_by) VALUES (?, ?, ?, ?)`,
+      [CompanyID, start_date || null, expiry_date || null, updated_by || 'Developer']
+    );
+    
+    res.redirect('/developer/licenses');
+  } catch (err) {
+    console.error(err);
+    const [companies] = await pool.query(`SELECT CompanyID, Com_Name FROM tblcominfo ORDER BY Com_Name`);
+    res.status(500).render('developer/licenses-new', {
+      user: { name: 'David' },
+      companies,
+      error: 'Failed to create license',
+      license: null
+    });
+  }
+}
+
+async function updateLicense(req, res) {
+  try {
+    const { CompanyID, start_date, expiry_date, updated_by } = req.body;
+    
+    await pool.query(
+      `UPDATE license SET CompanyID = ?, start_date = ?, expiry_date = ?, updated_by = ? WHERE id = ?`,
+      [CompanyID, start_date || null, expiry_date || null, updated_by || 'Developer', req.params.id]
+    );
+    
+    res.redirect('/developer/licenses');
+  } catch (err) {
+    console.error(err);
+    const [companies] = await pool.query(`SELECT CompanyID, Com_Name FROM tblcominfo ORDER BY Com_Name`);
+    const [licenses] = await pool.query(`SELECT * FROM license WHERE id = ?`, [req.params.id]);
+    res.status(500).render('developer/licenses-new', {
+      user: { name: 'David' },
+      companies,
+      error: 'Failed to update license',
+      license: licenses[0] || null
+    });
+  }
+}
+
+async function deleteLicense(req, res) {
+  try {
+    await pool.query(`DELETE FROM license WHERE id = ?`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false });
+  }
+}
+
 // exports block
 module.exports = {
   renderDashboard,
@@ -338,5 +490,12 @@ module.exports = {
   createAdmin,
   setAdminPasswordPage,
   setAdminPasswordUpdate,
-  deleteAdmin
+  deleteAdmin,
+  licensesListPage,
+  licensesListJson,
+  licensesNewPage,
+  licensesEditPage,
+  createLicense,
+  updateLicense,
+  deleteLicense
 };
