@@ -488,11 +488,11 @@ const jobTitlesListJson = async (req, res) => {
 const createJobTitle = async (req, res) => {
     try {
         const [lastItem] = await pool.query('SELECT Code FROM tbljobtitle ORDER BY Code DESC LIMIT 1');
-        let nextCode = '00001'; // Job titles are varchar(5)
+        let nextCode = '0001';
         if (lastItem.length > 0) {
             const lastCodeInt = parseInt(lastItem[0].Code, 10);
             if (!isNaN(lastCodeInt)) {
-                nextCode = (lastCodeInt + 1).toString().padStart(5, '0');
+                nextCode = (lastCodeInt + 1).toString().padStart(4, '0');
             }
         }
 
@@ -538,6 +538,298 @@ const deleteJobTitle = async (req, res) => {
     }
 };
 
+// Grades
+const gradesPage = async (req, res) => {
+    try {
+        const [jobTitles] = await pool.query('SELECT Code, JobTitle FROM tbljobtitle ORDER BY JobTitle');
+        res.render('admin/parameters/grades', {
+            title: 'Grades',
+            group: 'Parameters',
+            user: { name: 'David' }, // Hardcoded for now as per previous pattern
+            jobTitles
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+};
+
+const gradesListJson = async (req, res) => {
+    try {
+        const sql = `
+            SELECT g.GradeCode, g.Grade, g.JobTitle AS JobTitleCode, j.JobTitle AS JobTitleName,
+                   g.LDays, g.Medical, g.Confirm, g.NotchIncr, g.Notice, g.PromPeriod
+            FROM tblgrade g 
+            LEFT JOIN tbljobtitle j ON g.JobTitle = j.Code 
+            ORDER BY g.GradeCode
+        `;
+        const [rows] = await pool.query(sql);
+        res.json({ data: rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch grades' });
+    }
+};
+
+const createGrade = async (req, res) => {
+    try {
+        const [lastItem] = await pool.query('SELECT GradeCode FROM tblgrade ORDER BY GradeCode DESC LIMIT 1');
+        let nextCode = '0001';
+        if (lastItem.length > 0) {
+            const lastCodeInt = parseInt(lastItem[0].GradeCode, 10);
+            if (!isNaN(lastCodeInt)) {
+                nextCode = (lastCodeInt + 1).toString().padStart(4, '0');
+            }
+        }
+
+        const { Grade, JobTitle, LDays, Medical, Confirm, NotchIncr, Notice, PromPeriod } = req.body;
+        
+        if (!Grade) return res.status(400).json({ error: 'Grade Name is required' });
+        if (!JobTitle) return res.status(400).json({ error: 'Job Title is required' });
+
+        const sql = `INSERT INTO tblgrade (GradeCode, Grade, JobTitle, LDays, Medical, Confirm, NotchIncr, Notice, PromPeriod, CompanyID) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        await pool.query(sql, [nextCode, Grade, JobTitle, LDays || 0, Medical || 0, Confirm || 0, NotchIncr || 0, Notice || 0, PromPeriod || 0, 1]);
+        
+        // Return the new row with JobTitle name
+        const fetchSql = `
+            SELECT g.GradeCode, g.Grade, g.JobTitle AS JobTitleCode, j.JobTitle AS JobTitleName,
+                   g.LDays, g.Medical, g.Confirm, g.NotchIncr, g.Notice, g.PromPeriod
+            FROM tblgrade g 
+            LEFT JOIN tbljobtitle j ON g.JobTitle = j.Code 
+            WHERE g.GradeCode = ?
+        `;
+        const [newRow] = await pool.query(fetchSql, [nextCode]);
+        res.json({ success: true, item: newRow[0] });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to create grade' });
+    }
+};
+
+const updateGrade = async (req, res) => {
+    const { code } = req.params;
+    const { Grade, JobTitle, LDays, Medical, Confirm, NotchIncr, Notice, PromPeriod } = req.body;
+
+    try {
+        // Build dynamic update query
+        const fields = [];
+        const values = [];
+
+        if (Grade !== undefined) { fields.push('Grade = ?'); values.push(Grade); }
+        if (JobTitle !== undefined) { fields.push('JobTitle = ?'); values.push(JobTitle); }
+        if (LDays !== undefined) { fields.push('LDays = ?'); values.push(LDays); }
+        if (Medical !== undefined) { fields.push('Medical = ?'); values.push(Medical); }
+        if (Confirm !== undefined) { fields.push('Confirm = ?'); values.push(Confirm); }
+        if (NotchIncr !== undefined) { fields.push('NotchIncr = ?'); values.push(NotchIncr); }
+        if (Notice !== undefined) { fields.push('Notice = ?'); values.push(Notice); }
+        if (PromPeriod !== undefined) { fields.push('PromPeriod = ?'); values.push(PromPeriod); }
+
+        if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
+
+        const sql = `UPDATE tblgrade SET ${fields.join(', ')} WHERE GradeCode = ?`;
+        values.push(code);
+
+        await pool.query(sql, values);
+        
+        // Fetch updated row to return correct data
+        const fetchSql = `
+            SELECT g.GradeCode, g.Grade, g.JobTitle AS JobTitleCode, j.JobTitle AS JobTitleName,
+                   g.LDays, g.Medical, g.Confirm, g.NotchIncr, g.Notice, g.PromPeriod
+            FROM tblgrade g 
+            LEFT JOIN tbljobtitle j ON g.JobTitle = j.Code 
+            WHERE g.GradeCode = ?
+        `;
+        const [updatedRow] = await pool.query(fetchSql, [code]);
+        
+        res.json({ success: true, item: updatedRow[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to update grade' });
+    }
+};
+
+const deleteGrade = async (req, res) => {
+    const { code } = req.params;
+    try {
+        await pool.query('DELETE FROM tblgrade WHERE GradeCode = ?', [code]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to delete grade' });
+    }
+};
+
+// Banks
+const banksPage = async (req, res) => {
+    res.render('admin/parameters/banks', {
+        title: 'Banks',
+        group: 'Parameters',
+        user: { name: 'David' }
+    });
+};
+
+const banksListJson = async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM tblbanks ORDER BY Code');
+        res.json({ data: rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch banks' });
+    }
+};
+
+const createBank = async (req, res) => {
+    try {
+        const [lastItem] = await pool.query('SELECT Code FROM tblbanks ORDER BY Code DESC LIMIT 1');
+        let nextCode = '01';
+        if (lastItem.length > 0) {
+            const lastCodeInt = parseInt(lastItem[0].Code, 10);
+            if (!isNaN(lastCodeInt)) {
+                nextCode = (lastCodeInt + 1).toString().padStart(2, '0');
+            }
+        }
+
+        const { Bank, Short, BankCode, Street_Address, Town_Address } = req.body;
+        
+        if (!Bank) return res.status(400).json({ error: 'Bank Name is required' });
+
+        const sql = `INSERT INTO tblbanks (Code, Bank, Short, BankCode, Street_Address, Town_Address, CompanyID) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+        await pool.query(sql, [nextCode, Bank, Short || null, BankCode || null, Street_Address || null, Town_Address || null, 1]);
+        
+        const [newRow] = await pool.query('SELECT * FROM tblbanks WHERE Code = ?', [nextCode]);
+        res.json({ success: true, item: newRow[0] });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to create bank' });
+    }
+};
+
+const updateBank = async (req, res) => {
+    const { code } = req.params;
+    const { Bank, Short, BankCode, Street_Address, Town_Address } = req.body;
+
+    try {
+        const fields = [];
+        const values = [];
+
+        if (Bank !== undefined) { fields.push('Bank = ?'); values.push(Bank); }
+        if (Short !== undefined) { fields.push('Short = ?'); values.push(Short); }
+        if (BankCode !== undefined) { fields.push('BankCode = ?'); values.push(BankCode); }
+        if (Street_Address !== undefined) { fields.push('Street_Address = ?'); values.push(Street_Address); }
+        if (Town_Address !== undefined) { fields.push('Town_Address = ?'); values.push(Town_Address); }
+
+        if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
+
+        const sql = `UPDATE tblbanks SET ${fields.join(', ')} WHERE Code = ?`;
+        values.push(code);
+
+        await pool.query(sql, values);
+        
+        const [updatedRow] = await pool.query('SELECT * FROM tblbanks WHERE Code = ?', [code]);
+        res.json({ success: true, item: updatedRow[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to update bank' });
+    }
+};
+
+const deleteBank = async (req, res) => {
+    const { code } = req.params;
+    try {
+        await pool.query('DELETE FROM tblbanks WHERE Code = ?', [code]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to delete bank' });
+    }
+};
+
+// Company BBAN
+const companyBBANPage = async (req, res) => {
+    res.render('admin/parameters/company-bban', {
+        title: 'Company BBAN',
+        group: 'Parameters',
+        user: { name: 'David' }
+    });
+};
+
+const companyBBANListJson = async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM tblpayingbank ORDER BY Code');
+        res.json({ data: rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch company bbans' });
+    }
+};
+
+const createCompanyBBAN = async (req, res) => {
+    try {
+        const [lastItem] = await pool.query('SELECT Code FROM tblpayingbank ORDER BY Code DESC LIMIT 1');
+        let nextCode = '01';
+        if (lastItem.length > 0) {
+            const lastCodeInt = parseInt(lastItem[0].Code, 10);
+            if (!isNaN(lastCodeInt)) {
+                nextCode = (lastCodeInt + 1).toString().padStart(2, '0');
+            }
+        }
+
+        const { Bank, BBAN, Short } = req.body;
+        
+        if (!Bank) return res.status(400).json({ error: 'Bank Name is required' });
+
+        const sql = `INSERT INTO tblpayingbank (Code, Bank, BBAN, Short, CompanyID) VALUES (?, ?, ?, ?, ?)`;
+        await pool.query(sql, [nextCode, Bank, BBAN || null, Short || null, 1]);
+        
+        const [newRow] = await pool.query('SELECT * FROM tblpayingbank WHERE Code = ?', [nextCode]);
+        res.json({ success: true, item: newRow[0] });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to create company bban' });
+    }
+};
+
+const updateCompanyBBAN = async (req, res) => {
+    const { code } = req.params;
+    const { Bank, BBAN, Short } = req.body;
+
+    try {
+        const fields = [];
+        const values = [];
+
+        if (Bank !== undefined) { fields.push('Bank = ?'); values.push(Bank); }
+        if (BBAN !== undefined) { fields.push('BBAN = ?'); values.push(BBAN); }
+        if (Short !== undefined) { fields.push('Short = ?'); values.push(Short); }
+
+        if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
+
+        const sql = `UPDATE tblpayingbank SET ${fields.join(', ')} WHERE Code = ?`;
+        values.push(code);
+
+        await pool.query(sql, values);
+        
+        const [updatedRow] = await pool.query('SELECT * FROM tblpayingbank WHERE Code = ?', [code]);
+        res.json({ success: true, item: updatedRow[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to update company bban' });
+    }
+};
+
+const deleteCompanyBBAN = async (req, res) => {
+    const { code } = req.params;
+    try {
+        await pool.query('DELETE FROM tblpayingbank WHERE Code = ?', [code]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to delete company bban' });
+    }
+};
+
 module.exports = {
   renderDashboard,
   comingSoon,
@@ -574,4 +866,19 @@ module.exports = {
   createJobTitle,
   updateJobTitle,
   deleteJobTitle,
+  gradesPage,
+  gradesListJson,
+  createGrade,
+  updateGrade,
+  deleteGrade,
+  banksPage,
+  banksListJson,
+  createBank,
+  updateBank,
+  deleteBank,
+  companyBBANPage,
+  companyBBANListJson,
+  createCompanyBBAN,
+  updateCompanyBBAN,
+  deleteCompanyBBAN,
 };

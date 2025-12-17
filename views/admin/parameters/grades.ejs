@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · <%= group %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+    <style>
+        .editable-cell {
+            padding: 0.25rem;
+        }
+        .editable-cell input, .editable-cell select {
+            width: 100%;
+            border: 1px solid transparent;
+            background: transparent;
+            padding: 2px 4px;
+        }
+        .editable-cell input:focus, .editable-cell select:focus {
+            border: 1px solid #0d6efd;
+            background: #fff;
+            outline: none;
+        }
+        .cell-updated {
+            animation: highlight 1s ease-out;
+        }
+        @keyframes highlight {
+            0% { background-color: #d1e7dd; }
+            100% { background-color: transparent; }
+        }
+        .cell-error {
+            animation: highlight-error 1s ease-out;
+            border: 1px solid red !important;
+        }
+        @keyframes highlight-error {
+            0% { background-color: #f8d7da; }
+            100% { background-color: transparent; }
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <h2 class="mb-0">Grades</h2>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addGradeModal">
+                    <i class="bi bi-plus-circle me-2"></i>Add Grade
+                </button>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" id="gradesTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 5%">No.</th>
+                                    <th style="width: 20%">Grade</th>
+                                    <th style="width: 20%">Job Title</th>
+                                    <th style="width: 8%">LDays</th>
+                                    <th style="width: 10%">Med Limit</th>
+                                    <th style="width: 8%">C-Days</th>
+                                    <th style="width: 7%">Notch</th>
+                                    <th style="width: 7%">Notice</th>
+                                    <th style="width: 7%">PromPeriod</th>
+                                    <th class="text-end" style="width: 8%">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Rows will be populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="mt-4 py-3 text-center text-muted border-top">
+                <%- include('../partials/footer') %>
+            </footer>
+        </div>
+    </main>
+
+    <!-- Add Grade Modal -->
+    <div class="modal fade" id="addGradeModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Grade</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addGradeForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Grade Name *</label>
+                                <input type="text" class="form-control" name="Grade" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Job Title *</label>
+                                <select class="form-select" name="JobTitle" required>
+                                    <option value="">Select Job Title</option>
+                                    <% jobTitles.forEach(job => { %>
+                                        <option value="<%= job.Code %>"><%= job.JobTitle %></option>
+                                    <% }); %>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">LDays</label>
+                                <input type="number" class="form-control" name="LDays" value="0">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Med Limit</label>
+                                <input type="number" class="form-control" name="Medical" value="0" step="0.01">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">C-Days</label>
+                                <input type="number" class="form-control" name="Confirm" value="0" step="0.01">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Notch</label>
+                                <input type="number" class="form-control" name="NotchIncr" value="0">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Notice</label>
+                                <input type="number" class="form-control" name="Notice" value="0">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">PromPeriod</label>
+                                <input type="number" class="form-control" name="PromPeriod" value="0">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="saveNewGradeBtn">Save Grade</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const jobTitlesData = JSON.parse('<%- JSON.stringify(jobTitles || []).replace(/\\/g, "\\\\").replace(/\'/g, "\\\'").replace(/\"/g, "\\\"") %>');
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const tableBody = document.querySelector('#gradesTable tbody');
+            const addGradeModal = new bootstrap.Modal(document.getElementById('addGradeModal'));
+            const addGradeForm = document.getElementById('addGradeForm');
+
+            // Load Data
+            loadGrades();
+
+            async function loadGrades() {
+                try {
+                    const res = await fetch('/admin/api/parameters/grades');
+                    const json = await res.json();
+                    renderTable(json.data);
+                } catch (err) {
+                    console.error('Failed to load grades', err);
+                    alert('Error loading grades');
+                }
+            }
+
+            function generateJobTitleOptions(selectedCode) {
+                let options = '<option value="">Select Job Title</option>';
+                jobTitlesData.forEach(job => {
+                    const selected = job.Code === selectedCode ? 'selected' : '';
+                    options += `<option value="${job.Code}" ${selected}>${job.JobTitle}</option>`;
+                });
+                return options;
+            }
+
+            function renderTable(items) {
+                tableBody.innerHTML = '';
+                items.forEach((item, index) => {
+                    const tr = document.createElement('tr');
+                    tr.dataset.code = item.GradeCode;
+                    tr.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td class="editable-cell"><input type="text" name="Grade" value="${item.Grade || ''}" required></td>
+                        <td class="editable-cell">
+                            <select name="JobTitle" required>
+                                ${generateJobTitleOptions(item.JobTitleCode)}
+                            </select>
+                        </td>
+                        <td class="editable-cell"><input type="number" name="LDays" value="${item.LDays || 0}"></td>
+                        <td class="editable-cell"><input type="number" name="Medical" value="${item.Medical || 0}" step="0.01"></td>
+                        <td class="editable-cell"><input type="number" name="Confirm" value="${item.Confirm || 0}" step="0.01"></td>
+                        <td class="editable-cell"><input type="number" name="NotchIncr" value="${item.NotchIncr || 0}"></td>
+                        <td class="editable-cell"><input type="number" name="Notice" value="${item.Notice || 0}"></td>
+                        <td class="editable-cell"><input type="number" name="PromPeriod" value="${item.PromPeriod || 0}"></td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-danger delete-btn"><i class="bi bi-trash"></i></button>
+                        </td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+            }
+
+            // Inline Editing
+            tableBody.addEventListener('change', async (e) => {
+                const target = e.target;
+                if (target.tagName === 'INPUT' || target.tagName === 'SELECT') {
+                    handleUpdate(target);
+                }
+            });
+
+            tableBody.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && e.target.tagName !== 'SELECT') { // Don't blur on enter for select as it might toggle dropdown
+                    e.target.blur(); 
+                }
+            });
+
+            // Delete Button
+            tableBody.addEventListener('click', async (e) => {
+                const btn = e.target.closest('.delete-btn');
+                if (btn) {
+                    const row = btn.closest('tr');
+                    const code = row.dataset.code;
+                    if (confirm('Are you sure you want to delete this grade?')) {
+                        try {
+                            const res = await fetch(`/admin/api/parameters/grades/${code}`, { method: 'DELETE' });
+                            const json = await res.json();
+                            if (json.success) {
+                                row.remove();
+                                // Re-index rows
+                                Array.from(tableBody.children).forEach((tr, idx) => {
+                                    tr.cells[0].textContent = idx + 1;
+                                });
+                            } else {
+                                alert('Failed to delete');
+                            }
+                        } catch (err) {
+                            console.error(err);
+                            alert('Error deleting grade');
+                        }
+                    }
+                }
+            });
+
+            async function handleUpdate(input) {
+                const row = input.closest('tr');
+                const code = row.dataset.code;
+                const fieldName = input.name;
+                const value = input.value;
+
+                if (!value) {
+                    showError(input);
+                    alert(`${fieldName} is required`);
+                    return; 
+                }
+
+                input.disabled = true;
+
+                try {
+                    const payload = {};
+                    payload[fieldName] = value;
+
+                    const res = await fetch(`/admin/api/parameters/grades/${code}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const json = await res.json();
+                    
+                    input.disabled = false;
+                    input.focus(); 
+                    
+                    if (json.success) {
+                        input.parentElement.classList.add('cell-updated');
+                        setTimeout(() => input.parentElement.classList.remove('cell-updated'), 1000);
+                    } else {
+                        showError(input);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    input.disabled = false;
+                    showError(input);
+                }
+            }
+
+            function showError(input) {
+                input.parentElement.classList.add('cell-error');
+                setTimeout(() => input.parentElement.classList.remove('cell-error'), 1000);
+            }
+
+            // Add New Grade
+            document.getElementById('saveNewGradeBtn').addEventListener('click', async () => {
+                const formData = new FormData(addGradeForm);
+                const data = Object.fromEntries(formData.entries());
+
+                if (!data.Grade || !data.JobTitle) {
+                    alert('Grade Name and Job Title are required');
+                    return;
+                }
+
+                try {
+                    const res = await fetch('/admin/api/parameters/grades', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    const json = await res.json();
+
+                    if (json.success) {
+                        addGradeModal.hide();
+                        addGradeForm.reset();
+                        
+                        // Reload or Append
+                        const tr = document.createElement('tr');
+                        tr.dataset.code = json.item.GradeCode;
+                        const newIndex = tableBody.children.length + 1;
+                        tr.innerHTML = `
+                            <td>${newIndex}</td>
+                            <td class="editable-cell"><input type="text" name="Grade" value="${json.item.Grade || ''}" required></td>
+                            <td class="editable-cell">
+                                <select name="JobTitle" required>
+                                    ${generateJobTitleOptions(json.item.JobTitleCode)}
+                                </select>
+                            </td>
+                            <td class="editable-cell"><input type="number" name="LDays" value="${json.item.LDays || 0}"></td>
+                            <td class="editable-cell"><input type="number" name="Medical" value="${json.item.Medical || 0}" step="0.01"></td>
+                            <td class="editable-cell"><input type="number" name="Confirm" value="${json.item.Confirm || 0}" step="0.01"></td>
+                            <td class="editable-cell"><input type="number" name="NotchIncr" value="${json.item.NotchIncr || 0}"></td>
+                            <td class="editable-cell"><input type="number" name="Notice" value="${json.item.Notice || 0}"></td>
+                            <td class="editable-cell"><input type="number" name="PromPeriod" value="${json.item.PromPeriod || 0}"></td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-danger delete-btn"><i class="bi bi-trash"></i></button>
+                            </td>
+                        `;
+                        tableBody.appendChild(tr);
+                    } else {
+                        alert(json.error || 'Failed to add grade');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert('Error adding grade');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
