@@ -3,8 +3,8 @@
 
 -- Seed Companies (if not exists)
 INSERT INTO tblcominfo (CompanyID, Com_Name, Email, Address, Town, City, Country, Phone, Manager) VALUES
-(1, 'Acme Corporation', 'admin@acme.com', '123 Main St', 'Downtown', 'New York', 'USA', '+1234567890', 'John Doe'),
-(2, 'Tech Solutions Ltd', 'admin@techsol.com', '456 Tech Ave', 'Silicon Valley', 'San Francisco', 'USA', '+0987654321', 'Jane Smith')
+(3, 'Acme Corporation', 'admin@acme.com', '123 Main St', 'Downtown', 'New York', 'USA', '+1234567890', 'John Doe'),
+(4, 'Tech Solutions Ltd', 'admin@techsol.com', '456 Tech Ave', 'Silicon Valley', 'San Francisco', 'USA', '+0987654321', 'Jane Smith')
 ON DUPLICATE KEY UPDATE Com_Name = VALUES(Com_Name);
 
 -- Seed Admin Users with hashed passwords
