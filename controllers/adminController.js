@@ -748,11 +748,18 @@ const deleteBank = async (req, res) => {
 
 // Company BBAN
 const companyBBANPage = async (req, res) => {
-    res.render('admin/parameters/company-bban', {
-        title: 'Company BBAN',
-        group: 'Parameters',
-        user: { name: 'David' }
-    });
+    try {
+        const [banks] = await pool.query('SELECT Code, Bank, Short FROM tblbanks ORDER BY Short');
+        res.render('admin/parameters/company-bban', {
+            title: 'Company BBAN',
+            group: 'Parameters',
+            user: { name: 'David' },
+            banks
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
 };
 
 const companyBBANListJson = async (req, res) => {

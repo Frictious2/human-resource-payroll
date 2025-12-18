@@ -11,13 +11,13 @@
         .editable-cell {
             padding: 0.25rem;
         }
-        .editable-cell input {
+        .editable-cell input, .editable-cell select {
             width: 100%;
             border: 1px solid transparent;
             background: transparent;
             padding: 2px 4px;
         }
-        .editable-cell input:focus {
+        .editable-cell input:focus, .editable-cell select:focus {
             border: 1px solid #0d6efd;
             background: #fff;
             outline: none;
@@ -99,7 +99,12 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Short Name</label>
-                            <input type="text" class="form-control" name="Short">
+                            <select class="form-select" name="Short">
+                                <option value="">Select Bank Short Name</option>
+                                <% banks.forEach(function(bank) { %>
+                                    <option value="<%= bank.Short %>"><%= bank.Short %></option>
+                                <% }); %>
+                            </select>
                         </div>
                     </form>
                 </div>
@@ -117,6 +122,18 @@
             const tableBody = document.querySelector('#companyBBANTable tbody');
             const addCompanyBBANModal = new bootstrap.Modal(document.getElementById('addCompanyBBANModal'));
             const addCompanyBBANForm = document.getElementById('addCompanyBBANForm');
+
+            // Pass banks data from server
+            const banksData = JSON.parse('<%- JSON.stringify(banks || []).replace(/\\/g, "\\\\").replace(/\'/g, "\\\'").replace(/\"/g, "\\\"") %>');
+
+            function getBankOptions(selectedShort) {
+                let options = '<option value="">Select</option>';
+                banksData.forEach(bank => {
+                    const selected = bank.Short === selectedShort ? 'selected' : '';
+                    options += `<option value="${bank.Short}" ${selected}>${bank.Short}</option>`;
+                });
+                return options;
+            }
 
             // Load Data
             loadCompanyBBANs();
@@ -141,7 +158,11 @@
                         <td>${index + 1}</td>
                         <td class="editable-cell"><input type="text" name="Bank" value="${item.Bank || ''}" required></td>
                         <td class="editable-cell"><input type="text" name="BBAN" value="${item.BBAN || ''}"></td>
-                        <td class="editable-cell"><input type="text" name="Short" value="${item.Short || ''}"></td>
+                        <td class="editable-cell">
+                            <select name="Short">
+                                ${getBankOptions(item.Short)}
+                            </select>
+                        </td>
                         <td class="text-end">
                             <button class="btn btn-sm btn-outline-danger delete-btn"><i class="bi bi-trash"></i></button>
                         </td>
@@ -153,7 +174,7 @@
             // Inline Editing
             tableBody.addEventListener('change', async (e) => {
                 const target = e.target;
-                if (target.tagName === 'INPUT') {
+                if (target.tagName === 'INPUT' || target.tagName === 'SELECT') {
                     handleUpdate(target);
                 }
             });
@@ -267,7 +288,11 @@
                             <td>${newIndex}</td>
                             <td class="editable-cell"><input type="text" name="Bank" value="${json.item.Bank || ''}" required></td>
                             <td class="editable-cell"><input type="text" name="BBAN" value="${json.item.BBAN || ''}"></td>
-                            <td class="editable-cell"><input type="text" name="Short" value="${json.item.Short || ''}"></td>
+                            <td class="editable-cell">
+                                <select name="Short">
+                                    ${getBankOptions(json.item.Short)}
+                                </select>
+                            </td>
                             <td class="text-end">
                                 <button class="btn btn-sm btn-outline-danger delete-btn"><i class="bi bi-trash"></i></button>
                             </td>
