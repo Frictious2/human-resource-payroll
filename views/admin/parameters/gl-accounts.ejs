@@ -11,19 +11,16 @@
         .editable-cell {
             padding: 0.25rem;
         }
-        .editable-cell input, .editable-cell select {
+        .editable-cell input {
             width: 100%;
             border: 1px solid transparent;
             background: transparent;
             padding: 2px 4px;
         }
-        .editable-cell input:focus, .editable-cell select:focus {
+        .editable-cell input:focus {
             border: 1px solid #0d6efd;
             background: #fff;
             outline: none;
-        }
-        .editable-cell input[type="checkbox"] {
-            width: auto;
         }
         .cell-updated {
             animation: highlight 1s ease-out;
@@ -49,9 +46,9 @@
     <main class="main">
         <div class="container-fluid">
             <div class="d-flex align-items-center justify-content-between mb-4">
-                <h2 class="mb-0">Payroll Items</h2>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addItemModal">
-                    <i class="bi bi-plus-circle me-2"></i>Add Item
+                <h2 class="mb-0">GL Accounts</h2>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addGLAccountModal">
+                    <i class="bi bi-plus-circle me-2"></i>Add GL Account
                 </button>
             </div>
 
@@ -59,27 +56,19 @@
                 <div class="card-body p-3 border-bottom">
                     <div class="row">
                         <div class="col-md-4">
-                            <input type="text" id="searchInput" class="form-control" placeholder="Search payroll items...">
+                            <input type="text" id="searchInput" class="form-control" placeholder="Search GL accounts...">
                         </div>
                     </div>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0" id="payrollItemsTable">
+                        <table class="table table-hover align-middle mb-0" id="glAccountsTable">
                             <thead class="table-light">
                                 <tr>
-                                    <th>No.</th>
-                                    <th>Description</th>
-                                    <th class="text-center">Taxable</th>
-                                    <th class="text-center">Thresh</th>
-                                    <th class="text-center">T%</th>
-                                    <th>T% Val</th>
-                                    <th>T Amt</th>
-                                    <th>Mode</th>
-                                    <th class="text-center">Fixed</th>
-                                    <th>%</th>
-                                    <th>Freq</th>
-                                    <th class="text-end">Actions</th>
+                                    <th style="width: 5%">No.</th>
+                                    <th style="width: 50%">Account Head</th>
+                                    <th style="width: 35%">Code</th>
+                                    <th class="text-end" style="width: 10%">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -103,79 +92,29 @@
         </div>
     </main>
 
-    <!-- Add Item Modal -->
-    <div class="modal fade" id="addItemModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+    <!-- Add GL Account Modal -->
+    <div class="modal fade" id="addGLAccountModal" tabindex="-1">
+        <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Add Payroll Item</h5>
+                    <h5 class="modal-title">Add GL Account</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="addItemForm">
+                    <form id="addGLAccountForm">
                         <div class="mb-3">
-                            <label class="form-label">Description (Income) *</label>
-                            <input type="text" class="form-control" name="Income" required>
+                            <label class="form-label">Account Head *</label>
+                            <input type="text" class="form-control" name="AccountsHead" required>
                         </div>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-3">
-                                <div class="form-check mt-4">
-                                    <input class="form-check-input" type="checkbox" name="Taxable" id="checkTaxable">
-                                    <label class="form-check-label" for="checkTaxable">Taxable</label>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="form-check mt-4">
-                                    <input class="form-check-input" type="checkbox" name="Threshhold" id="checkThresh">
-                                    <label class="form-check-label" for="checkThresh">Threshhold</label>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="form-check mt-4">
-                                    <input class="form-check-input" type="checkbox" name="TPercent" id="checkTPercent">
-                                    <label class="form-check-label" for="checkTPercent">TPercent</label>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="form-check mt-4">
-                                    <input class="form-check-input" type="checkbox" name="Fixed" id="checkFixed">
-                                    <label class="form-check-label" for="checkFixed">Fixed</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-4">
-                                <label class="form-label">TPercentage</label>
-                                <input type="number" step="0.01" class="form-control" name="TPercentage" min="0" max="100">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">TAmount</label>
-                                <input type="number" step="0.01" class="form-control" name="TAmount" min="0">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Percent</label>
-                                <input type="number" step="0.01" class="form-control" name="Percent" min="0" max="100">
-                            </div>
-                        </div>
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <label class="form-label">Mode</label>
-                                <input type="text" class="form-control" name="Mode" maxlength="2">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Freq</label>
-                                <select class="form-select" name="Freq">
-                                    <option value="">Select...</option>
-                                    <option value="M">Monthly (M)</option>
-                                    <option value="Y">Yearly (Y)</option>
-                                </select>
-                            </div>
+                        <div class="mb-3">
+                            <label class="form-label">Code</label>
+                            <input type="text" class="form-control" name="Code">
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary" id="saveNewItemBtn">Save Item</button>
+                    <button type="button" class="btn btn-primary" id="saveNewGLAccountBtn">Save</button>
                 </div>
             </div>
         </div>
@@ -190,24 +129,24 @@
         const rowsPerPage = 10;
 
         document.addEventListener('DOMContentLoaded', () => {
-            const tableBody = document.querySelector('#payrollItemsTable tbody');
-            const addItemModal = new bootstrap.Modal(document.getElementById('addItemModal'));
-            const addItemForm = document.getElementById('addItemForm');
+            const tableBody = document.querySelector('#glAccountsTable tbody');
+            const addGLAccountModal = new bootstrap.Modal(document.getElementById('addGLAccountModal'));
+            const addGLAccountForm = document.getElementById('addGLAccountForm');
             const searchInput = document.getElementById('searchInput');
             const paginationContainer = document.getElementById('pagination');
 
             // Load Data
-            loadItems();
+            loadGLAccounts();
 
-            async function loadItems() {
+            async function loadGLAccounts() {
                 try {
-                    const res = await fetch('/admin/api/parameters/payroll-items');
+                    const res = await fetch('/admin/api/parameters/gl-accounts');
                     const json = await res.json();
                     allData = json.data;
                     filterData();
                 } catch (err) {
-                    console.error('Failed to load items', err);
-                    alert('Error loading payroll items');
+                    console.error('Failed to load gl accounts', err);
+                    alert('Error loading gl accounts');
                 }
             }
 
@@ -275,30 +214,16 @@
             function renderTable(items, startIndex) {
                 tableBody.innerHTML = '';
                 if (items.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="12" class="text-center py-3">No payroll items found</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="4" class="text-center py-3">No gl accounts found</td></tr>';
                     return;
                 }
                 items.forEach((item, index) => {
                     const tr = document.createElement('tr');
-                    tr.dataset.code = item.Code;
+                    tr.dataset.glno = item.GLNo;
                     tr.innerHTML = `
                         <td>${startIndex + index + 1}</td>
-                        <td class="editable-cell"><input type="text" name="Income" value="${item.Income || ''}" required style="min-width: 150px;"></td>
-                        <td class="text-center editable-cell"><input type="checkbox" name="Taxable" ${item.Taxable ? 'checked' : ''}></td>
-                        <td class="text-center editable-cell"><input type="checkbox" name="Threshhold" ${item.Threshhold ? 'checked' : ''}></td>
-                        <td class="text-center editable-cell"><input type="checkbox" name="TPercent" ${item.TPercent ? 'checked' : ''}></td>
-                        <td class="editable-cell"><input type="number" step="0.01" name="TPercentage" value="${item.TPercentage !== null ? item.TPercentage : ''}" min="0" max="100"></td>
-                        <td class="editable-cell"><input type="number" step="0.01" name="TAmount" value="${item.TAmount !== null ? item.TAmount : ''}" min="0"></td>
-                        <td class="editable-cell"><input type="text" name="Mode" value="${item.Mode || ''}" maxlength="2"></td>
-                        <td class="text-center editable-cell"><input type="checkbox" name="Fixed" ${item.Fixed ? 'checked' : ''}></td>
-                        <td class="editable-cell"><input type="number" step="0.01" name="Percent" value="${item.Percent !== null ? item.Percent : ''}" min="0" max="100"></td>
-                        <td class="editable-cell">
-                            <select name="Freq">
-                                <option value=""></option>
-                                <option value="M" ${item.Freq === 'M' ? 'selected' : ''}>M</option>
-                                <option value="Y" ${item.Freq === 'Y' ? 'selected' : ''}>Y</option>
-                            </select>
-                        </td>
+                        <td class="editable-cell"><input type="text" name="AccountsHead" value="${item.AccountsHead || ''}" required></td>
+                        <td class="editable-cell"><input type="text" name="Code" value="${item.Code || ''}"></td>
                         <td class="text-end">
                             <button class="btn btn-sm btn-outline-danger delete-btn"><i class="bi bi-trash"></i></button>
                         </td>
@@ -307,10 +232,10 @@
                 });
             }
 
-            // Event Delegation for Inline Editing
+            // Inline Editing
             tableBody.addEventListener('change', async (e) => {
                 const target = e.target;
-                if (target.tagName === 'INPUT' || target.tagName === 'SELECT') {
+                if (target.tagName === 'INPUT') {
                     handleUpdate(target);
                 }
             });
@@ -320,27 +245,27 @@
                     e.target.blur(); 
                 }
             });
-            
+
             // Delete Button
             tableBody.addEventListener('click', async (e) => {
                 const btn = e.target.closest('.delete-btn');
                 if (btn) {
                     const row = btn.closest('tr');
-                    const code = row.dataset.code;
-                    if (confirm('Are you sure you want to delete this item?')) {
+                    const glNo = row.dataset.glno;
+                    if (confirm('Are you sure you want to delete this gl account?')) {
                         try {
-                            const res = await fetch(`/admin/api/parameters/payroll-items/${code}`, { method: 'DELETE' });
+                            const res = await fetch(`/admin/api/parameters/gl-accounts/${glNo}`, { method: 'DELETE' });
                             const json = await res.json();
                             if (json.success) {
                                 // Remove from allData and re-render
-                                allData = allData.filter(i => i.Code != code);
+                                allData = allData.filter(i => i.GLNo != glNo);
                                 filterData();
                             } else {
                                 alert('Failed to delete');
                             }
                         } catch (err) {
                             console.error(err);
-                            alert('Error deleting item');
+                            alert('Error deleting gl account');
                         }
                     }
                 }
@@ -348,43 +273,26 @@
 
             async function handleUpdate(input) {
                 const row = input.closest('tr');
-                const code = row.dataset.code;
-                const field = input.name;
-                let value;
+                const glNo = row.dataset.glno;
+                const fieldName = input.name;
+                const value = input.value;
 
-                if (input.type === 'checkbox') {
-                    value = input.checked ? 1 : 0;
-                } else {
-                    value = input.value;
-                }
-
-                // Validation
-                if (field === 'Income' && !value) {
+                if (fieldName === 'AccountsHead' && !value) {
                     showError(input);
+                    alert('Account Head is required');
                     return; 
-                }
-                if ((field === 'Percent' || field === 'TPercentage') && value !== '') {
-                    if (value < 0 || value > 100) {
-                        showError(input);
-                        alert('Percentage must be between 0 and 100');
-                        return;
-                    }
-                }
-                if (field === 'TAmount' && value !== '') {
-                    if (value < 0) {
-                        showError(input);
-                        alert('Amount must be positive');
-                        return;
-                    }
                 }
 
                 input.disabled = true;
 
                 try {
-                    const res = await fetch(`/admin/api/parameters/payroll-items/${code}`, {
+                    const payload = {};
+                    payload[fieldName] = value;
+
+                    const res = await fetch(`/admin/api/parameters/gl-accounts/${glNo}`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ field, value })
+                        body: JSON.stringify(payload)
                     });
                     const json = await res.json();
                     
@@ -396,9 +304,9 @@
                         setTimeout(() => input.parentElement.classList.remove('cell-updated'), 1000);
                         
                         // Update local data
-                        const itemIndex = allData.findIndex(i => i.Code == code);
+                        const itemIndex = allData.findIndex(i => i.GLNo == glNo);
                         if (itemIndex > -1) {
-                            allData[itemIndex][field] = value;
+                            allData[itemIndex][fieldName] = value;
                         }
                     } else {
                         showError(input);
@@ -415,26 +323,18 @@
                 setTimeout(() => input.parentElement.classList.remove('cell-error'), 1000);
             }
 
-            // Add New Item
-            document.getElementById('saveNewItemBtn').addEventListener('click', async () => {
-                const formData = new FormData(addItemForm);
+            // Add New GL Account
+            document.getElementById('saveNewGLAccountBtn').addEventListener('click', async () => {
+                const formData = new FormData(addGLAccountForm);
                 const data = Object.fromEntries(formData.entries());
 
-                ['Taxable', 'Threshhold', 'TPercent', 'Fixed'].forEach(key => {
-                    data[key] = addItemForm.querySelector(`[name="${key}"]`).checked ? 1 : 0;
-                });
-
-                if (!data.Income) {
-                    alert('Description is required');
-                    return;
-                }
-                if (data.Percent && (data.Percent < 0 || data.Percent > 100)) {
-                    alert('Percent must be 0-100');
+                if (!data.AccountsHead) {
+                    alert('Account Head is required');
                     return;
                 }
 
                 try {
-                    const res = await fetch('/admin/api/parameters/payroll-items', {
+                    const res = await fetch('/admin/api/parameters/gl-accounts', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(data)
@@ -442,18 +342,18 @@
                     const json = await res.json();
 
                     if (json.success) {
-                        addItemModal.hide();
-                        addItemForm.reset();
+                        addGLAccountModal.hide();
+                        addGLAccountForm.reset();
                         
                         // Add to allData and re-render
                         allData.push(json.item);
                         filterData();
                     } else {
-                        alert(json.error || 'Failed to add item');
+                        alert(json.error || 'Failed to add gl account');
                     }
                 } catch (err) {
                     console.error(err);
-                    alert('Error adding item');
+                    alert('Error adding gl account');
                 }
             });
         });

@@ -837,6 +837,307 @@ const deleteCompanyBBAN = async (req, res) => {
     }
 };
 
+// GL Accounts
+const glAccountsPage = async (req, res) => {
+    try {
+        res.render('admin/parameters/gl-accounts', {
+            title: 'GL Accounts',
+            group: 'Parameters',
+            user: { name: 'David' }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+};
+
+const glAccountsListJson = async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM tblglaccounts ORDER BY GLNo');
+        res.json({ data: rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch gl accounts' });
+    }
+};
+
+const createGLAccount = async (req, res) => {
+    try {
+        const [lastItem] = await pool.query('SELECT GLNo FROM tblglaccounts ORDER BY GLNo DESC LIMIT 1');
+        let nextCode = '01';
+        if (lastItem.length > 0) {
+            const lastCodeInt = parseInt(lastItem[0].GLNo, 10);
+            if (!isNaN(lastCodeInt)) {
+                nextCode = (lastCodeInt + 1).toString().padStart(2, '0');
+            }
+        }
+
+        const { AccountsHead, Code } = req.body;
+        
+        if (!AccountsHead) return res.status(400).json({ error: 'Account Head is required' });
+
+        const sql = `INSERT INTO tblglaccounts (GLNo, AccountsHead, Code, CompanyID) VALUES (?, ?, ?, ?)`;
+        await pool.query(sql, [nextCode, AccountsHead, Code || null, 1]);
+        
+        const [newRow] = await pool.query('SELECT * FROM tblglaccounts WHERE GLNo = ?', [nextCode]);
+        res.json({ success: true, item: newRow[0] });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to create gl account' });
+    }
+};
+
+const updateGLAccount = async (req, res) => {
+    const { glNo } = req.params;
+    const { AccountsHead, Code } = req.body;
+
+    try {
+        const fields = [];
+        const values = [];
+
+        if (AccountsHead !== undefined) { fields.push('AccountsHead = ?'); values.push(AccountsHead); }
+        if (Code !== undefined) { fields.push('Code = ?'); values.push(Code); }
+
+        if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
+
+        const sql = `UPDATE tblglaccounts SET ${fields.join(', ')} WHERE GLNo = ?`;
+        values.push(glNo);
+
+        await pool.query(sql, values);
+        
+        const [updatedRow] = await pool.query('SELECT * FROM tblglaccounts WHERE GLNo = ?', [glNo]);
+        res.json({ success: true, item: updatedRow[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to update gl account' });
+    }
+};
+
+const deleteGLAccount = async (req, res) => {
+    const { glNo } = req.params;
+    try {
+        await pool.query('DELETE FROM tblglaccounts WHERE GLNo = ?', [glNo]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to delete gl account' });
+    }
+};
+
+// Discipline Reasons
+const disciplineReasonsPage = async (req, res) => {
+    try {
+        res.render('admin/parameters/discipline-reasons', {
+            title: 'Discipline Reasons',
+            group: 'Parameters',
+            user: { name: 'David' }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+};
+
+const disciplineReasonsListJson = async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM tblreason ORDER BY ReasonCode');
+        console.log('Discipline Reasons Data:', rows);
+        res.json({ data: rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch discipline reasons' });
+    }
+};
+
+const createDisciplineReason = async (req, res) => {
+    try {
+        const [lastItem] = await pool.query('SELECT ReasonCode FROM tblreason ORDER BY ReasonCode DESC LIMIT 1');
+        let nextCode = '01';
+        if (lastItem.length > 0) {
+            const lastCodeInt = parseInt(lastItem[0].ReasonCode, 10);
+            if (!isNaN(lastCodeInt)) {
+                nextCode = (lastCodeInt + 1).toString().padStart(2, '0');
+            }
+        }
+
+        const { Reason } = req.body;
+        if (!Reason) return res.status(400).json({ error: 'Reason is required' });
+
+        await pool.query('INSERT INTO tblreason (ReasonCode, Reason, CompanyID) VALUES (?, ?, ?)', [nextCode, Reason, 1]);
+        const [newRow] = await pool.query('SELECT * FROM tblreason WHERE ReasonCode = ?', [nextCode]);
+        res.json({ success: true, item: newRow[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to create discipline reason' });
+    }
+};
+
+const updateDisciplineReason = async (req, res) => {
+    const { code } = req.params;
+    const { Reason } = req.body;
+    try {
+        await pool.query('UPDATE tblreason SET Reason = ? WHERE ReasonCode = ?', [Reason, code]);
+        const [updatedRow] = await pool.query('SELECT * FROM tblreason WHERE ReasonCode = ?', [code]);
+        res.json({ success: true, item: updatedRow[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to update discipline reason' });
+    }
+};
+
+const deleteDisciplineReason = async (req, res) => {
+    const { code } = req.params;
+    try {
+        await pool.query('DELETE FROM tblreason WHERE ReasonCode = ?', [code]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to delete discipline reason' });
+    }
+};
+
+// Queries (tblQType)
+const queriesPage = async (req, res) => {
+    try {
+        res.render('admin/parameters/queries', {
+            title: 'Queries',
+            group: 'Parameters',
+            user: { name: 'David' }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+};
+
+const queriesListJson = async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM tblqtype ORDER BY Code');
+        res.json({ data: rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch queries' });
+    }
+};
+
+const createQuery = async (req, res) => {
+    try {
+        const [lastItem] = await pool.query('SELECT Code FROM tblqtype ORDER BY Code DESC LIMIT 1');
+        let nextCode = '01';
+        if (lastItem.length > 0) {
+            const lastCodeInt = parseInt(lastItem[0].Code, 10);
+            if (!isNaN(lastCodeInt)) {
+                nextCode = (lastCodeInt + 1).toString().padStart(2, '0');
+            }
+        }
+
+        const { QType } = req.body;
+        if (!QType) return res.status(400).json({ error: 'Query Type is required' });
+
+        await pool.query('INSERT INTO tblqtype (Code, QType, CompanyID) VALUES (?, ?, ?)', [nextCode, QType, 1]);
+        const [newRow] = await pool.query('SELECT * FROM tblqtype WHERE Code = ?', [nextCode]);
+        res.json({ success: true, item: newRow[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to create query' });
+    }
+};
+
+const updateQuery = async (req, res) => {
+    const { code } = req.params;
+    const { QType } = req.body;
+    try {
+        await pool.query('UPDATE tblqtype SET QType = ? WHERE Code = ?', [QType, code]);
+        const [updatedRow] = await pool.query('SELECT * FROM tblqtype WHERE Code = ?', [code]);
+        res.json({ success: true, item: updatedRow[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to update query' });
+    }
+};
+
+const deleteQuery = async (req, res) => {
+    const { code } = req.params;
+    try {
+        await pool.query('DELETE FROM tblqtype WHERE Code = ?', [code]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to delete query' });
+    }
+};
+
+const disciplineOutcomesPage = async (req, res) => {
+    try {
+        res.render('admin/parameters/discipline-outcomes', {
+            title: 'Discipline Outcomes',
+            group: 'Parameters',
+            user: { name: 'David' }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+};
+
+const disciplineOutcomesListJson = async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM tblmreaction ORDER BY Code');
+        res.json({ data: rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch discipline outcomes' });
+    }
+};
+
+const createDisciplineOutcome = async (req, res) => {
+    try {
+        const [lastItem] = await pool.query('SELECT Code FROM tblmreaction ORDER BY Code DESC LIMIT 1');
+        let nextCode = '01';
+        if (lastItem.length > 0) {
+            const lastCodeInt = parseInt(lastItem[0].Code, 10);
+            if (!isNaN(lastCodeInt)) {
+                nextCode = (lastCodeInt + 1).toString().padStart(2, '0');
+            }
+        }
+
+        const { Reaction } = req.body;
+        if (!Reaction) return res.status(400).json({ error: 'Reaction is required' });
+
+        await pool.query('INSERT INTO tblmreaction (Code, Reaction, CompanyID) VALUES (?, ?, ?)', [nextCode, Reaction, 1]);
+        const [newRow] = await pool.query('SELECT * FROM tblmreaction WHERE Code = ?', [nextCode]);
+        res.json({ success: true, item: newRow[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to create discipline outcome' });
+    }
+};
+
+const updateDisciplineOutcome = async (req, res) => {
+    const { code } = req.params;
+    const { Reaction } = req.body;
+    try {
+        await pool.query('UPDATE tblmreaction SET Reaction = ? WHERE Code = ?', [Reaction, code]);
+        const [updatedRow] = await pool.query('SELECT * FROM tblmreaction WHERE Code = ?', [code]);
+        res.json({ success: true, item: updatedRow[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to update discipline outcome' });
+    }
+};
+
+const deleteDisciplineOutcome = async (req, res) => {
+    const { code } = req.params;
+    try {
+        await pool.query('DELETE FROM tblmreaction WHERE Code = ?', [code]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to delete discipline outcome' });
+    }
+};
+
 module.exports = {
   renderDashboard,
   comingSoon,
@@ -888,4 +1189,24 @@ module.exports = {
   createCompanyBBAN,
   updateCompanyBBAN,
   deleteCompanyBBAN,
+  glAccountsPage,
+  glAccountsListJson,
+  createGLAccount,
+  updateGLAccount,
+  deleteGLAccount,
+  disciplineReasonsPage,
+  disciplineReasonsListJson,
+  createDisciplineReason,
+  updateDisciplineReason,
+  deleteDisciplineReason,
+  queriesPage,
+  queriesListJson,
+  createQuery,
+  updateQuery,
+  deleteQuery,
+  disciplineOutcomesPage,
+  disciplineOutcomesListJson,
+  createDisciplineOutcome,
+  updateDisciplineOutcome,
+  deleteDisciplineOutcome,
 };
