@@ -85,7 +85,21 @@ router.get('/api/parameters/queries', adminController.queriesListJson);
 router.post('/api/parameters/queries', adminController.createQuery);
 router.patch('/api/parameters/queries/:code', adminController.updateQuery);
 router.delete('/api/parameters/queries/:code', adminController.deleteQuery);
-router.get('/parameters/emp-status', adminController.comingSoon('EMP Status', 'Parameters'));
+
+// Courses
+router.get('/parameters/courses', adminController.coursesPage);
+router.get('/api/parameters/courses', adminController.coursesListJson);
+router.post('/api/parameters/courses', adminController.createCourse);
+router.patch('/api/parameters/courses/:code', adminController.updateCourse);
+router.delete('/api/parameters/courses/:code', adminController.deleteCourse);
+
+// EMP Status
+router.get('/parameters/emp-status', adminController.empStatusPage);
+router.get('/api/parameters/emp-status', adminController.empStatusListJson);
+router.post('/api/parameters/emp-status', adminController.createEmpStatus);
+router.patch('/api/parameters/emp-status/:code', adminController.updateEmpStatus);
+router.delete('/api/parameters/emp-status/:code', adminController.deleteEmpStatus);
+
 router.get('/parameters/service-benefit', adminController.comingSoon('Service Benefit', 'Parameters'));
 router.get('/parameters/global-params', adminController.comingSoon('Global Params', 'Parameters'));
 router.get('/parameters/work-days', adminController.comingSoon('Work Days', 'Parameters'));

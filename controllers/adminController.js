@@ -942,7 +942,6 @@ const disciplineReasonsPage = async (req, res) => {
 const disciplineReasonsListJson = async (req, res) => {
     try {
         const [rows] = await pool.query('SELECT * FROM tblreason ORDER BY ReasonCode');
-        console.log('Discipline Reasons Data:', rows);
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -1138,6 +1137,148 @@ const deleteDisciplineOutcome = async (req, res) => {
     }
 };
 
+// Courses (tblcoursetype)
+const coursesPage = async (req, res) => {
+    try {
+        res.render('admin/parameters/courses', {
+            title: 'Courses',
+            group: 'Parameters',
+            user: { name: 'David' }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+};
+
+const coursesListJson = async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM tblcoursetype ORDER BY CourseCode');
+        res.json({ data: rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch courses' });
+    }
+};
+
+const createCourse = async (req, res) => {
+    try {
+        const [lastItem] = await pool.query('SELECT CourseCode FROM tblcoursetype ORDER BY CourseCode DESC LIMIT 1');
+        let nextCode = '01';
+        if (lastItem.length > 0) {
+            const lastCodeInt = parseInt(lastItem[0].CourseCode, 10);
+            if (!isNaN(lastCodeInt)) {
+                nextCode = (lastCodeInt + 1).toString().padStart(2, '0');
+            }
+        }
+
+        const { CType } = req.body;
+        if (!CType) return res.status(400).json({ error: 'Course Type is required' });
+
+        await pool.query('INSERT INTO tblcoursetype (CourseCode, CType, CompanyID) VALUES (?, ?, ?)', [nextCode, CType, 1]);
+        const [newRow] = await pool.query('SELECT * FROM tblcoursetype WHERE CourseCode = ?', [nextCode]);
+        res.json({ success: true, item: newRow[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to create course' });
+    }
+};
+
+const updateCourse = async (req, res) => {
+    const { code } = req.params;
+    const { CType } = req.body;
+    try {
+        await pool.query('UPDATE tblcoursetype SET CType = ? WHERE CourseCode = ?', [CType, code]);
+        const [updatedRow] = await pool.query('SELECT * FROM tblcoursetype WHERE CourseCode = ?', [code]);
+        res.json({ success: true, item: updatedRow[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to update course' });
+    }
+};
+
+const deleteCourse = async (req, res) => {
+    const { code } = req.params;
+    try {
+        await pool.query('DELETE FROM tblcoursetype WHERE CourseCode = ?', [code]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to delete course' });
+    }
+};
+
+// EMP Status (tblempstatus)
+const empStatusPage = async (req, res) => {
+    try {
+        res.render('admin/parameters/emp-status', {
+            title: 'EMP Status',
+            group: 'Parameters',
+            user: { name: 'David' }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+};
+
+const empStatusListJson = async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM tblempstatus ORDER BY Code');
+        res.json({ data: rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch emp status' });
+    }
+};
+
+const createEmpStatus = async (req, res) => {
+    try {
+        const [lastItem] = await pool.query('SELECT Code FROM tblempstatus ORDER BY Code DESC LIMIT 1');
+        let nextCode = '01';
+        if (lastItem.length > 0) {
+            const lastCodeInt = parseInt(lastItem[0].Code, 10);
+            if (!isNaN(lastCodeInt)) {
+                nextCode = (lastCodeInt + 1).toString().padStart(2, '0');
+            }
+        }
+
+        const { EmpStatus } = req.body;
+        if (!EmpStatus) return res.status(400).json({ error: 'Status is required' });
+
+        await pool.query('INSERT INTO tblempstatus (Code, EmpStatus, CompanyID) VALUES (?, ?, ?)', [nextCode, EmpStatus, 1]);
+        const [newRow] = await pool.query('SELECT * FROM tblempstatus WHERE Code = ?', [nextCode]);
+        res.json({ success: true, item: newRow[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to create emp status' });
+    }
+};
+
+const updateEmpStatus = async (req, res) => {
+    const { code } = req.params;
+    const { EmpStatus } = req.body;
+    try {
+        await pool.query('UPDATE tblempstatus SET EmpStatus = ? WHERE Code = ?', [EmpStatus, code]);
+        const [updatedRow] = await pool.query('SELECT * FROM tblempstatus WHERE Code = ?', [code]);
+        res.json({ success: true, item: updatedRow[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to update emp status' });
+    }
+};
+
+const deleteEmpStatus = async (req, res) => {
+    const { code } = req.params;
+    try {
+        await pool.query('DELETE FROM tblempstatus WHERE Code = ?', [code]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to delete emp status' });
+    }
+};
+
 module.exports = {
   renderDashboard,
   comingSoon,
@@ -1209,4 +1350,14 @@ module.exports = {
   createDisciplineOutcome,
   updateDisciplineOutcome,
   deleteDisciplineOutcome,
+  coursesPage,
+  coursesListJson,
+  createCourse,
+  updateCourse,
+  deleteCourse,
+  empStatusPage,
+  empStatusListJson,
+  createEmpStatus,
+  updateEmpStatus,
+  deleteEmpStatus,
 };

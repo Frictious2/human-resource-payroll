@@ -57,8 +57,7 @@
                         <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th style="width: 30px;">#</th>
-                                    <th>Code</th>
+                                    <th style="width: 30px;">No.</th>
                                     <th>Reason</th>
                                     <th class="text-end">Action</th>
                                 </tr>
@@ -180,15 +179,11 @@ function renderPage() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${start + index + 1}</td>
-            <td>${item.ReasonCode}</td>
             <td contenteditable="true" class="editable-cell" onblur="updateItem(this, '${item.ReasonCode}', 'Reason')" onkeypress="handleEnter(event, this)">${item.Reason}</td>
             <td class="text-end">
-                <div class="dropdown">
-                    <a href="#" class="btn btn-sm btn-light dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></a>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item text-danger" href="#" onclick="openDeleteModal('${item.ReasonCode}')"><i class="bi bi-trash me-2"></i>Delete</a></li>
-                    </ul>
-                </div>
+                <button class="btn btn-sm btn-outline-danger" onclick="openDeleteModal('${item.ReasonCode}')">
+                    <i class="bi bi-trash"></i>
+                </button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -202,12 +197,28 @@ function renderPagination() {
     const pagination = document.getElementById('pagination');
     pagination.innerHTML = '';
     
+    if (totalPages <= 1) return;
+
+    // Previous
+    const prevLi = document.createElement('li');
+    prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+    prevLi.innerHTML = `<a class="page-link" href="#">Previous</a>`;
+    prevLi.onclick = (e) => { e.preventDefault(); if (currentPage > 1) { changePage(currentPage - 1); } };
+    pagination.appendChild(prevLi);
+
     for (let i = 1; i <= totalPages; i++) {
         const li = document.createElement('li');
         li.className = `page-item ${i === currentPage ? 'active' : ''}`;
         li.innerHTML = `<a class="page-link" href="#" onclick="changePage(${i})">${i}</a>`;
         pagination.appendChild(li);
     }
+
+    // Next
+    const nextLi = document.createElement('li');
+    nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+    nextLi.innerHTML = `<a class="page-link" href="#">Next</a>`;
+    nextLi.onclick = (e) => { e.preventDefault(); if (currentPage < totalPages) { changePage(currentPage + 1); } };
+    pagination.appendChild(nextLi);
 }
 
 function changePage(page) {

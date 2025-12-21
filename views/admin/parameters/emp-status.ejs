@@ -40,7 +40,7 @@
             <div class="d-flex align-items-center justify-content-between mb-4">
                 <h2 class="mb-0"><%= title %></h2>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#add_item">
-                    <i class="bi bi-plus-circle me-2"></i>Add Outcome
+                    <i class="bi bi-plus-circle me-2"></i>Add Status
                 </button>
             </div>
 
@@ -58,7 +58,7 @@
                             <thead class="table-light">
                                 <tr>
                                     <th style="width: 30px;">No.</th>
-                                    <th>Reaction</th>
+                                    <th>Status</th>
                                     <th class="text-end">Action</th>
                                 </tr>
                             </thead>
@@ -84,14 +84,14 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Add Discipline Outcome</h5>
+                    <h5 class="modal-title">Add EMP Status</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <form id="addItemForm">
                         <div class="mb-3">
-                            <label class="form-label">Reaction <span class="text-danger">*</span></label>
-                            <input class="form-control" type="text" name="Reaction" required>
+                            <label class="form-label">Status <span class="text-danger">*</span></label>
+                            <input class="form-control" type="text" name="EmpStatus" required>
                         </div>
                     </form>
                 </div>
@@ -108,11 +108,11 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Delete Outcome</h5>
+                    <h5 class="modal-title">Delete EMP Status</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Are you sure want to delete this outcome?</p>
+                    <p>Are you sure want to delete this status?</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -146,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadData() {
     try {
-        const res = await fetch('/admin/api/parameters/discipline-outcomes');
+        const res = await fetch('/admin/api/parameters/emp-status');
         const json = await res.json();
         allData = json.data;
         filterData();
@@ -179,7 +179,7 @@ function renderPage() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${start + index + 1}</td>
-            <td contenteditable="true" class="editable-cell" onblur="updateItem(this, '${item.Code}', 'Reaction')" onkeypress="handleEnter(event, this)">${item.Reaction}</td>
+            <td contenteditable="true" class="editable-cell" onblur="updateItem(this, '${item.Code}', 'EmpStatus')" onkeypress="handleEnter(event, this)">${item.EmpStatus}</td>
             <td class="text-end">
                 <button class="btn btn-sm btn-outline-danger" onclick="openDeleteModal('${item.Code}')">
                     <i class="bi bi-trash"></i>
@@ -239,7 +239,7 @@ async function createItem() {
     const data = Object.fromEntries(formData.entries());
     
     try {
-        const res = await fetch('/admin/api/parameters/discipline-outcomes', {
+        const res = await fetch('/admin/api/parameters/emp-status', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
@@ -268,7 +268,7 @@ async function updateItem(element, code, field) {
     if (value === original) return;
     
     try {
-        const res = await fetch(`/admin/api/parameters/discipline-outcomes/${code}`, {
+        const res = await fetch(`/admin/api/parameters/emp-status/${code}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ [field]: value })
@@ -293,7 +293,11 @@ async function updateItem(element, code, field) {
 
 function openDeleteModal(code) {
     deleteId = code;
-    const modal = new bootstrap.Modal(document.getElementById('delete_item'));
+    const modalEl = document.getElementById('delete_item');
+    let modal = bootstrap.Modal.getInstance(modalEl);
+    if (!modal) {
+        modal = new bootstrap.Modal(modalEl);
+    }
     modal.show();
 }
 
@@ -301,7 +305,7 @@ async function deleteItem() {
     if (!deleteId) return;
     
     try {
-        const res = await fetch(`/admin/api/parameters/discipline-outcomes/${deleteId}`, {
+        const res = await fetch(`/admin/api/parameters/emp-status/${deleteId}`, {
             method: 'DELETE'
         });
         const json = await res.json();
@@ -312,7 +316,7 @@ async function deleteItem() {
             
             const modalElement = document.getElementById('delete_item');
             const modal = bootstrap.Modal.getInstance(modalElement);
-            modal.hide();
+            if (modal) modal.hide();
         } else {
             alert(json.error || 'Failed to delete');
         }

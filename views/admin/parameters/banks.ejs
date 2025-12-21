@@ -146,6 +146,7 @@
         let filteredData = [];
         let currentPage = 1;
         const rowsPerPage = 10;
+        let deleteId = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             const tableBody = document.querySelector('#banksTable tbody');
@@ -274,22 +275,41 @@
                 if (btn) {
                     const row = btn.closest('tr');
                     const code = row.dataset.code;
-                    if (confirm('Are you sure you want to delete this bank?')) {
-                        try {
-                            const res = await fetch(`/admin/api/parameters/banks/${code}`, { method: 'DELETE' });
-                            const json = await res.json();
-                            if (json.success) {
-                                // Remove from allData and re-render
-                                allData = allData.filter(i => i.Code != code);
-                                filterData();
-                            } else {
-                                alert('Failed to delete');
-                            }
-                        } catch (err) {
-                            console.error(err);
-                            alert('Error deleting bank');
-                        }
+                    openDeleteModal(code);
+                }
+            });
+
+            function openDeleteModal(code) {
+                deleteId = code;
+                const modalEl = document.getElementById('delete_item');
+                let modal = bootstrap.Modal.getInstance(modalEl);
+                if (!modal) {
+                    modal = new bootstrap.Modal(modalEl);
+                }
+                modal.show();
+            }
+
+            document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
+                if (!deleteId) return;
+                
+                try {
+                    const res = await fetch(`/admin/api/parameters/banks/${deleteId}`, { method: 'DELETE' });
+                    const json = await res.json();
+                    if (json.success) {
+                        // Remove from allData and re-render
+                        allData = allData.filter(i => i.Code != deleteId);
+                        filterData();
+                        
+                        // Close modal
+                        const modalEl = document.getElementById('delete_item');
+                        const modal = bootstrap.Modal.getInstance(modalEl);
+                        modal.hide();
+                    } else {
+                        alert('Failed to delete');
                     }
+                } catch (err) {
+                    console.error(err);
+                    alert('Error deleting bank');
                 }
             });
 
