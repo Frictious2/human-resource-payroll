@@ -100,9 +100,18 @@ router.post('/api/parameters/emp-status', adminController.createEmpStatus);
 router.patch('/api/parameters/emp-status/:code', adminController.updateEmpStatus);
 router.delete('/api/parameters/emp-status/:code', adminController.deleteEmpStatus);
 
-router.get('/parameters/service-benefit', adminController.comingSoon('Service Benefit', 'Parameters'));
-router.get('/parameters/global-params', adminController.comingSoon('Global Params', 'Parameters'));
-router.get('/parameters/work-days', adminController.comingSoon('Work Days', 'Parameters'));
+router.get('/parameters/end-of-service-benefit', adminController.eosBenefitPage);
+router.get('/api/parameters/end-of-service-benefit', adminController.getEOSBenefit);
+router.post('/api/parameters/end-of-service-benefit', adminController.saveEOSBenefit);
+// Global Params
+router.get('/parameters/global-params', adminController.globalParamsPage);
+router.get('/api/parameters/global-params', adminController.getGlobalParams);
+router.post('/api/parameters/global-params', adminController.saveGlobalParams);
+
+// Work Days
+router.get('/parameters/work-days', adminController.workDaysPage);
+router.get('/api/parameters/work-days', adminController.getWorkDays);
+router.post('/api/parameters/work-days', adminController.saveWorkDays);
 router.get('/parameters/public-holidays', adminController.comingSoon('Public Holidays', 'Parameters'));
 router.get('/parameters/tax-table', adminController.comingSoon('Tax Table', 'Parameters'));
 router.get('/parameters/sponsors', adminController.comingSoon('Sponsors', 'Parameters'));

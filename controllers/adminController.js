@@ -1279,6 +1279,300 @@ const deleteEmpStatus = async (req, res) => {
     }
 };
 
+// End of Service Benefit (tblEOSCalc)
+const eosBenefitPage = async (req, res) => {
+    try {
+        res.render('admin/parameters/end-of-service-benefit', {
+            title: 'END OF SERVICE CALCULATION',
+            group: 'Parameters',
+            user: { name: 'David' }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+};
+
+const getEOSBenefit = async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM tbleoscalc LIMIT 1');
+        res.json(rows[0] || {});
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch EOS data' });
+    }
+};
+
+const saveEOSBenefit = async (req, res) => {
+    try {
+        const {
+            EOSDate,
+            Y1, D1, R1,
+            Y2, D2, R2,
+            Y3, D3, R3,
+            Y4, D4, R4,
+            Y5, D5, R5,
+            E1, E2, B1,
+            E3, E4, B2,
+            MinAge,
+            Exemption, EOSTax,
+            LS1, L1Percent, L1_USD,
+            LS2, L2ercent, L2_USD,
+            LS3, L3Percent, L3_USD
+        } = req.body;
+
+        // Check if record exists
+        const [existing] = await pool.query('SELECT * FROM tbleoscalc LIMIT 1');
+
+        if (existing.length > 0) {
+            // Update logic
+            let whereClause = '';
+            let whereParams = [];
+            
+            if (existing[0].BankID) {
+                whereClause = ' WHERE BankID = ?';
+                whereParams = [existing[0].BankID];
+            } else if (existing[0].CompanyID) {
+                whereClause = ' WHERE CompanyID = ?';
+                whereParams = [existing[0].CompanyID];
+            }
+            
+            const sql = `UPDATE tbleoscalc SET 
+                EOSDate = ?, 
+                Y1 = ?, D1 = ?, R1 = ?,
+                Y2 = ?, D2 = ?, R2 = ?,
+                Y3 = ?, D3 = ?, R3 = ?,
+                Y4 = ?, D4 = ?, R4 = ?,
+                Y5 = ?, D5 = ?, R5 = ?,
+                E1 = ?, E2 = ?, B1 = ?,
+                E3 = ?, E4 = ?, B2 = ?,
+                MinAge = ?,
+                Exemption = ?, EOSTax = ?,
+                LS1 = ?, L1Percent = ?, L1_USD = ?,
+                LS2 = ?, L2ercent = ?, L2_USD = ?,
+                LS3 = ?, L3Percent = ?, L3_USD = ?` + whereClause;
+                
+            await pool.query(sql, [
+                EOSDate,
+                Y1, D1, R1,
+                Y2, D2, R2,
+                Y3, D3, R3,
+                Y4, D4, R4,
+                Y5, D5, R5,
+                E1, E2, B1,
+                E3, E4, B2,
+                MinAge,
+                Exemption, EOSTax,
+                LS1, L1Percent, L1_USD,
+                LS2, L2ercent, L2_USD,
+                LS3, L3Percent, L3_USD,
+                ...whereParams
+            ]);
+            
+            res.json({ success: true, message: 'Updated successfully' });
+        } else {
+            // Insert logic
+            const sql = `INSERT INTO tbleoscalc (
+                BankID, EOSDate, 
+                Y1, D1, R1,
+                Y2, D2, R2,
+                Y3, D3, R3,
+                Y4, D4, R4,
+                Y5, D5, R5,
+                E1, E2, B1,
+                E3, E4, B2,
+                MinAge,
+                Exemption, EOSTax,
+                LS1, L1Percent, L1_USD,
+                LS2, L2ercent, L2_USD,
+                LS3, L3Percent, L3_USD,
+                CompanyID
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            
+            await pool.query(sql, [
+                '0001', EOSDate,
+                Y1, D1, R1,
+                Y2, D2, R2,
+                Y3, D3, R3,
+                Y4, D4, R4,
+                Y5, D5, R5,
+                E1, E2, B1,
+                E3, E4, B2,
+                MinAge,
+                Exemption, EOSTax,
+                LS1, L1Percent, L1_USD,
+                LS2, L2ercent, L2_USD,
+                LS3, L3Percent, L3_USD,
+                1
+            ]);
+            res.json({ success: true, message: 'Created successfully' });
+        }
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to save EOS data' });
+    }
+};
+
+// Global Params (tblParams1)
+const globalParamsPage = async (req, res) => {
+    try {
+        res.render('admin/parameters/global-params', {
+            title: 'Global Parameters',
+            group: 'Parameters',
+            user: { name: 'David' }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+};
+
+const getGlobalParams = async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM tblparams1 LIMIT 1');
+        res.json(rows[0] || {});
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch Global Params' });
+    }
+};
+
+const saveGlobalParams = async (req, res) => {
+    try {
+        const {
+            SeqNo, RegNo,
+            NDate, NRate, NORate,
+            GDate, GRate, GORate,
+            RetireAge, ConfirmDays, ChildAge,
+            EmpAge, Management, UnionDues,
+            Max_Dependants, RetireNotice, AdvanceInt,
+            QueryLimit, ClockIn, LoanDuration,
+            HOD, Dept, DeptName,
+            VPolicy
+        } = req.body;
+
+        const [existing] = await pool.query('SELECT * FROM tblparams1 LIMIT 1');
+        
+        if (existing.length > 0) {
+            // Update
+            const sql = `UPDATE tblparams1 SET 
+                SeqNo=?, RegNo=?, 
+                NDate=?, NRate=?, NORate=?, 
+                GDate=?, GRate=?, GORate=?, 
+                RetireAge=?, ConfirmDays=?, ChildAge=?, 
+                EmpAge=?, Management=?, UnionDues=?, 
+                Max_Dependants=?, RetireNotice=?, AdvanceInt=?, 
+                QueryLimit=?, ClockIn=?, 
+                HOD=?, Dept=?, DeptName=?, 
+                VPolicy=?`;
+                
+            const params = [
+                SeqNo, RegNo,
+                NDate, NRate, NORate,
+                GDate, GRate, GORate,
+                RetireAge, ConfirmDays, ChildAge,
+                EmpAge, Management, UnionDues,
+                Max_Dependants, RetireNotice, AdvanceInt,
+                QueryLimit, ClockIn,
+                HOD, Dept, DeptName,
+                VPolicy
+            ];
+            
+            await pool.query(sql, params);
+            res.json({ success: true, message: 'Updated successfully' });
+        } else {
+            // Insert
+            const sql = `INSERT INTO tblparams1 (
+                SeqNo, RegNo, 
+                NDate, NRate, NORate, 
+                GDate, GRate, GORate, 
+                RetireAge, ConfirmDays, ChildAge, 
+                EmpAge, Management, UnionDues, 
+                Max_Dependants, RetireNotice, AdvanceInt, 
+                QueryLimit, ClockIn, 
+                HOD, Dept, DeptName, 
+                VPolicy, CompanyID
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            
+            const params = [
+                SeqNo, RegNo,
+                NDate, NRate, NORate,
+                GDate, GRate, GORate,
+                RetireAge, ConfirmDays, ChildAge,
+                EmpAge, Management, UnionDues,
+                Max_Dependants, RetireNotice, AdvanceInt,
+                QueryLimit, ClockIn,
+                HOD, Dept, DeptName,
+                VPolicy, 1
+            ];
+            
+            await pool.query(sql, params);
+            res.json({ success: true, message: 'Created successfully' });
+        }
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to save Global Params' });
+    }
+};
+
+// Work Days (tblWeek)
+const workDaysPage = async (req, res) => {
+    try {
+        res.render('admin/parameters/work-days', {
+            title: 'Work Days',
+            group: 'Parameters',
+            user: { name: 'David' }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+};
+
+const getWorkDays = async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM tblweek ORDER BY DayNo');
+        res.json(rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch Work Days' });
+    }
+};
+
+const saveWorkDays = async (req, res) => {
+    try {
+        const days = req.body; // Expecting an array of objects
+        
+        // We'll use a transaction to ensure all updates succeed or fail together
+        const connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        try {
+            for (const day of days) {
+                const { DayNo, WDayNo, WorkDay } = day;
+                // WorkDay should be -1 for true, 0 for false based on schema observation
+                // But let's trust what the frontend sends if we normalize it there.
+                // Or normalize here.
+                
+                await connection.query(
+                    'UPDATE tblweek SET WDayNo = ?, WorkDay = ? WHERE DayNo = ?',
+                    [WDayNo, WorkDay, DayNo]
+                );
+            }
+            await connection.commit();
+            res.json({ success: true, message: 'Work days updated successfully' });
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to save Work Days' });
+    }
+};
+
 module.exports = {
   renderDashboard,
   comingSoon,
@@ -1360,4 +1654,13 @@ module.exports = {
   createEmpStatus,
   updateEmpStatus,
   deleteEmpStatus,
+  eosBenefitPage,
+  getEOSBenefit,
+  saveEOSBenefit,
+  globalParamsPage,
+  getGlobalParams,
+  saveGlobalParams,
+  workDaysPage,
+  getWorkDays,
+  saveWorkDays,
 };
