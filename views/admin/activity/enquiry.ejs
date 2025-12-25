@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · <%= group %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+    <style>
+        .filter-card {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <!-- Page Title -->
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <h2 class="mb-0"><%= title %></h2>
+            </div>
+
+            <!-- Filter Section -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-funnel"></i> Filters</h5>
+                </div>
+                <div class="card-body">
+                    <form id="filterForm" class="row g-3">
+                        <!-- Served Year -->
+                        <div class="col-md-3">
+                            <label for="servedYear" class="form-label">Served Year</label>
+                            <input type="number" class="form-control" id="servedYear" name="servedYear" placeholder="e.g. 5">
+                        </div>
+                        
+                        <!-- Department -->
+                        <div class="col-md-3">
+                            <label for="department" class="form-label">Department</label>
+                            <select class="form-select" id="department" name="department">
+                                <option value="">All Departments</option>
+                                <% departments.forEach(dept => { %>
+                                    <option value="<%= dept.Code %>"><%= dept.Dept %></option>
+                                <% }); %>
+                            </select>
+                        </div>
+
+                        <!-- Job Title -->
+                        <div class="col-md-3">
+                            <label for="jobTitle" class="form-label">Job Title</label>
+                            <select class="form-select" id="jobTitle" name="jobTitle">
+                                <option value="">All Job Titles</option>
+                                <% jobTitles.forEach(job => { %>
+                                    <option value="<%= job.Code %>"><%= job.JobTitle %></option>
+                                <% }); %>
+                            </select>
+                        </div>
+
+                        <!-- Gender -->
+                        <div class="col-md-3">
+                            <label for="gender" class="form-label">Gender</label>
+                            <select class="form-select" id="gender" name="gender">
+                                <option value="">All</option>
+                                <option value="01">Male</option>
+                                <option value="02">Female</option>
+                            </select>
+                        </div>
+
+                        <!-- Age Range -->
+                        <div class="col-md-3">
+                            <label class="form-label">Age Range</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="ageMin" name="ageMin" placeholder="Min">
+                                <span class="input-group-text">-</span>
+                                <input type="number" class="form-control" id="ageMax" name="ageMax" placeholder="Max">
+                            </div>
+                        </div>
+
+                        <!-- To Retire Range -->
+                        <div class="col-md-3">
+                            <label class="form-label">Years to Retire</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="retireMin" name="retireMin" placeholder="Min">
+                                <span class="input-group-text">-</span>
+                                <input type="number" class="form-control" id="retireMax" name="retireMax" placeholder="Max">
+                            </div>
+                        </div>
+
+                        <!-- Former Department -->
+                        <div class="col-md-3">
+                            <label for="formerDept" class="form-label">Former Department</label>
+                            <select class="form-select" id="formerDept" name="formerDept">
+                                <option value="">All Departments</option>
+                                <% departments.forEach(dept => { %>
+                                    <option value="<%= dept.Code %>"><%= dept.Dept %></option>
+                                <% }); %>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-search"></i> Search
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Data Table -->
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>PF No</th>
+                                    <th>Staff Name</th>
+                                    <th>Department</th>
+                                    <th>Job Title</th>
+                                    <th>Employed</th>
+                                    <th>Served (Yrs)</th>
+                                    <th>Age (Yrs)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="enquiryTableBody">
+                                <!-- Data populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="mt-4 py-3 text-center text-muted border-top">
+                <%- include('../partials/footer') %>
+            </footer>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/dashboard.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadEnquiryData();
+
+            document.getElementById('filterForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                loadEnquiryData();
+            });
+        });
+
+        async function loadEnquiryData() {
+            const formData = new FormData(document.getElementById('filterForm'));
+            const params = new URLSearchParams(formData);
+
+            try {
+                const response = await fetch(`/admin/api/activity/enquiry?${params.toString()}`);
+                if (!response.ok) throw new Error('Failed to load data');
+                const result = await response.json();
+                
+                const tbody = document.getElementById('enquiryTableBody');
+                tbody.innerHTML = '';
+
+                if (result.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4">No records found matching the criteria.</td></tr>';
+                    return;
+                }
+
+                result.data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${row.PFNo}</td>
+                        <td>${row.SName}</td>
+                        <td>${row.Department || '-'}</td>
+                        <td>${row.JobTitle || '-'}</td>
+                        <td>${formatDate(row.DOE)}</td>
+                        <td>${row.ServedYears}</td>
+                        <td>${row.Age}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error loading enquiry data');
+            }
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleDateString();
+        }
+    </script>
+</body>
+</html>

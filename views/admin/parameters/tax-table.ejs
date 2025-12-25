@@ -1,285 +1,288 @@
-<%- include('../partials/topbar') %>
-<%- include('../partials/sidebar') %>
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · <%= group %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
 
-<div class="main-content">
-    <div class="page-content">
+    <main class="main">
         <div class="container-fluid">
             <!-- Page Title -->
-            <div class="row">
-                <div class="col-12">
-                    <div class="page-title-box d-sm-flex align-items-center justify-content-between">
-                        <h4 class="mb-sm-0"><%= title %></h4>
-                        <div class="page-title-right">
-                            <ol class="breadcrumb m-0">
-                                <li class="breadcrumb-item"><a href="/admin/dashboard">Dashboard</a></li>
-                                <li class="breadcrumb-item active"><%= title %></li>
-                            </ol>
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <h2 class="mb-0"><%= title %></h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb m-0">
+                        <li class="breadcrumb-item"><a href="/admin/dashboard">Dashboard</a></li>
+                        <li class="breadcrumb-item active" aria-current="page"><%= title %></li>
+                    </ol>
+                </nav>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <form id="taxForm">
+                        <!-- Row 1: Tax Date -->
+                        <div class="row mb-4">
+                            <div class="col-md-4">
+                                <label for="TaxDate" class="form-label">Tax Date</label>
+                                <input type="date" class="form-control" id="TaxDate" name="TaxDate" required>
+                            </div>
                         </div>
-                    </div>
+
+                        <!-- Row 2: Tax Table -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered align-middle">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Range</th>
+                                                <th>Up To (NLe)</th>
+                                                <th>%</th>
+                                                <th>Tax (NLe)</th>
+                                                <th>Cummulative (NLe)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Range 1 -->
+                                            <tr>
+                                                <td>Range 1</td>
+                                                <td><input type="number" class="form-control tax-input" id="R1" name="R1" step="0.01"></td>
+                                                <td><input type="number" class="form-control tax-input" id="R1Tax" name="R1Tax" step="0.01"></td>
+                                                <td id="Tax1">0.00</td>
+                                                <td id="Cum1">0.00</td>
+                                            </tr>
+                                            <!-- Range 2 -->
+                                            <tr>
+                                                <td>Range 2</td>
+                                                <td><input type="number" class="form-control tax-input" id="R2" name="R2" step="0.01"></td>
+                                                <td><input type="number" class="form-control tax-input" id="R2Tax" name="R2Tax" step="0.01"></td>
+                                                <td id="Tax2">0.00</td>
+                                                <td id="Cum2">0.00</td>
+                                            </tr>
+                                            <!-- Range 3 -->
+                                            <tr>
+                                                <td>Range 3</td>
+                                                <td><input type="number" class="form-control tax-input" id="R3" name="R3" step="0.01"></td>
+                                                <td><input type="number" class="form-control tax-input" id="R3Tax" name="R3Tax" step="0.01"></td>
+                                                <td id="Tax3">0.00</td>
+                                                <td id="Cum3">0.00</td>
+                                            </tr>
+                                            <!-- Range 4 -->
+                                            <tr>
+                                                <td>Range 4</td>
+                                                <td><input type="number" class="form-control tax-input" id="R4" name="R4" step="0.01"></td>
+                                                <td><input type="number" class="form-control tax-input" id="R4Tax" name="R4Tax" step="0.01"></td>
+                                                <td id="Tax4">0.00</td>
+                                                <td id="Cum4">0.00</td>
+                                            </tr>
+                                            <!-- Range 5 -->
+                                            <tr>
+                                                <td>Range 5</td>
+                                                <td><input type="number" class="form-control tax-input" id="R5" name="R5" step="0.01"></td>
+                                                <td><input type="number" class="form-control tax-input" id="R5Tax" name="R5Tax" step="0.01"></td>
+                                                <td id="Tax5">0.00</td>
+                                                <td id="Cum5">0.00</td>
+                                            </tr>
+                                            <!-- Range 6 -->
+                                            <tr>
+                                                <td>Range 6</td>
+                                                <td><input type="number" class="form-control tax-input" id="R6" name="R6" step="0.01"></td>
+                                                <td><input type="number" class="form-control tax-input" id="R6Tax" name="R6Tax" step="0.01"></td>
+                                                <td id="Tax6">0.00</td>
+                                                <td id="Cum6">0.00</td>
+                                            </tr>
+                                            <!-- Range 7 (Leave) -->
+                                            <tr>
+                                                <td>Leave</td>
+                                                <td><input type="number" class="form-control tax-input" id="R7" name="R7" step="0.01"></td>
+                                                <td><input type="number" class="form-control tax-input" id="R7Tax" name="R7Tax" step="0.01"></td>
+                                                <td>0.00</td>
+                                                <td>0.00</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Row 3: Thresholds -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="RentThreshold" class="form-label">Rent Threshold</label>
+                                <input type="number" class="form-control" id="RentThreshold" name="RentThreshold" step="0.01">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="AllwThreshold" class="form-label">Allowed Threshold</label>
+                                <input type="number" class="form-control" id="AllwThreshold" name="AllwThreshold" step="0.01">
+                            </div>
+                        </div>
+
+                        <!-- Row 4: Withholding Tax -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="Withholding_Tax" class="form-label">Withholding Tax</label>
+                                <input type="number" class="form-control" id="Withholding_Tax" name="Withholding_Tax" step="0.01">
+                            </div>
+                        </div>
+
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </form>
                 </div>
             </div>
 
-            <div class="row">
-                <div class="col-lg-12">
-                    <div class="card">
-                        <div class="card-body">
-                            <form id="taxForm">
-                                <!-- Row 1: Tax Date -->
-                                <div class="row mb-4">
-                                    <div class="col-md-4">
-                                        <label for="TaxDate" class="form-label">Tax Date</label>
-                                        <input type="date" class="form-control" id="TaxDate" name="TaxDate" required>
-                                    </div>
-                                </div>
-
-                                <!-- Row 2: Tax Table -->
-                                <div class="row mb-4">
-                                    <div class="col-12">
-                                        <div class="table-responsive">
-                                            <table class="table table-bordered align-middle">
-                                                <thead class="table-light">
-                                                    <tr>
-                                                        <th>Range</th>
-                                                        <th>Up To</th>
-                                                        <th>%</th>
-                                                        <th>Tax</th>
-                                                        <th>Cummulative</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <!-- Range 1 -->
-                                                    <tr>
-                                                        <td>Range 1</td>
-                                                        <td><input type="number" class="form-control tax-input" id="R1" name="R1" step="0.01"></td>
-                                                        <td><input type="number" class="form-control tax-input" id="R1Tax" name="R1Tax" step="0.01"></td>
-                                                        <td id="Tax1">0.00</td>
-                                                        <td id="Cum1">0.00</td>
-                                                    </tr>
-                                                    <!-- Range 2 -->
-                                                    <tr>
-                                                        <td>Range 2</td>
-                                                        <td><input type="number" class="form-control tax-input" id="R2" name="R2" step="0.01"></td>
-                                                        <td><input type="number" class="form-control tax-input" id="R2Tax" name="R2Tax" step="0.01"></td>
-                                                        <td id="Tax2">0.00</td>
-                                                        <td id="Cum2">0.00</td>
-                                                    </tr>
-                                                    <!-- Range 3 -->
-                                                    <tr>
-                                                        <td>Range 3</td>
-                                                        <td><input type="number" class="form-control tax-input" id="R3" name="R3" step="0.01"></td>
-                                                        <td><input type="number" class="form-control tax-input" id="R3Tax" name="R3Tax" step="0.01"></td>
-                                                        <td id="Tax3">0.00</td>
-                                                        <td id="Cum3">0.00</td>
-                                                    </tr>
-                                                    <!-- Range 4 -->
-                                                    <tr>
-                                                        <td>Range 4</td>
-                                                        <td><input type="number" class="form-control tax-input" id="R4" name="R4" step="0.01"></td>
-                                                        <td><input type="number" class="form-control tax-input" id="R4Tax" name="R4Tax" step="0.01"></td>
-                                                        <td id="Tax4">0.00</td>
-                                                        <td id="Cum4">0.00</td>
-                                                    </tr>
-                                                    <!-- Range 5 -->
-                                                    <tr>
-                                                        <td>Range 5</td>
-                                                        <td><input type="number" class="form-control tax-input" id="R5" name="R5" step="0.01"></td>
-                                                        <td><input type="number" class="form-control tax-input" id="R5Tax" name="R5Tax" step="0.01"></td>
-                                                        <td id="Tax5">0.00</td>
-                                                        <td id="Cum5">0.00</td>
-                                                    </tr>
-                                                    <!-- Range 6 -->
-                                                    <tr>
-                                                        <td>Range 6</td>
-                                                        <td><input type="number" class="form-control tax-input" id="R6" name="R6" step="0.01"></td>
-                                                        <td><input type="number" class="form-control tax-input" id="R6Tax" name="R6Tax" step="0.01"></td>
-                                                        <td id="Tax6">0.00</td>
-                                                        <td id="Cum6">0.00</td>
-                                                    </tr>
-                                                    <!-- Range 7 (Leave) -->
-                                                    <tr>
-                                                        <td>Leave</td>
-                                                        <td><input type="number" class="form-control tax-input" id="R7" name="R7" step="0.01"></td>
-                                                        <td><input type="number" class="form-control tax-input" id="R7Tax" name="R7Tax" step="0.01"></td>
-                                                        <td>0.00</td>
-                                                        <td>0.00</td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Row 3: Thresholds -->
-                                <div class="row mb-4">
-                                    <div class="col-md-6">
-                                        <label for="RentThreshold" class="form-label">Rent Threshold</label>
-                                        <input type="number" class="form-control" id="RentThreshold" name="RentThreshold" step="0.01">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="AllwThreshold" class="form-label">Allowed Threshold</label>
-                                        <input type="number" class="form-control" id="AllwThreshold" name="AllwThreshold" step="0.01">
-                                    </div>
-                                </div>
-
-                                <!-- Row 4: Withholding Tax -->
-                                <div class="row mb-4">
-                                    <div class="col-md-6">
-                                        <label for="Withholding_Tax" class="form-label">Withholding Tax</label>
-                                        <input type="number" class="form-control" id="Withholding_Tax" name="Withholding_Tax" step="0.01">
-                                    </div>
-                                </div>
-
-                                <div class="text-end">
-                                    <button type="submit" class="btn btn-primary">Save Changes</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <footer class="mt-4 py-3 text-center text-muted border-top">
+                <%- include('../partials/footer') %>
+            </footer>
         </div>
-    </div>
-</div>
+    </main>
 
-<%- include('../partials/footer') %>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/dashboard.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTaxData();
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        loadTaxData();
+            // Add event listeners for calculations
+            const inputs = document.querySelectorAll('.tax-input');
+            inputs.forEach(input => {
+                input.addEventListener('input', calculateTax);
+            });
 
-        // Add event listeners for calculations
-        const inputs = document.querySelectorAll('.tax-input');
-        inputs.forEach(input => {
-            input.addEventListener('input', calculateTax);
+            document.getElementById('taxForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                const data = Object.fromEntries(formData.entries());
+
+                try {
+                    const response = await fetch('/admin/api/parameters/tax-table', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    });
+
+                    if (response.ok) {
+                        alert('Tax table updated successfully');
+                    } else {
+                        alert('Failed to update tax table');
+                    }
+                } catch (err) {
+                    console.error('Error saving tax table:', err);
+                    alert('An error occurred while saving');
+                }
+            });
         });
 
-        document.getElementById('taxForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            const data = Object.fromEntries(formData.entries());
-
+        async function loadTaxData() {
             try {
-                const response = await fetch('/admin/api/parameters/tax-table', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
+                const response = await fetch('/admin/api/parameters/tax-table');
+                const json = await response.json();
+                if (json.data) {
+                    const data = json.data;
+                    
+                    // Set TaxDate
+                    if (data.TaxDate) {
+                        const date = new Date(data.TaxDate);
+                        document.getElementById('TaxDate').value = date.toISOString().split('T')[0];
+                    }
 
-                if (response.ok) {
-                    alert('Tax table updated successfully');
-                } else {
-                    alert('Failed to update tax table');
+                    // Set Range Inputs
+                    for (let i = 1; i <= 7; i++) {
+                        if (document.getElementById(`R${i}`)) document.getElementById(`R${i}`).value = data[`R${i}`];
+                        if (document.getElementById(`R${i}Tax`)) document.getElementById(`R${i}Tax`).value = data[`R${i}Tax`];
+                    }
+
+                    // Set Thresholds
+                    document.getElementById('RentThreshold').value = data.RentThreshold;
+                    document.getElementById('AllwThreshold').value = data.AllwThreshold;
+                    document.getElementById('Withholding_Tax').value = data.Withholding_Tax;
+
+                    calculateTax();
                 }
             } catch (err) {
-                console.error('Error saving tax table:', err);
-                alert('An error occurred while saving');
+                console.error('Error loading tax data:', err);
             }
-        });
-    });
-
-    async function loadTaxData() {
-        try {
-            const response = await fetch('/admin/api/parameters/tax-table');
-            const json = await response.json();
-            if (json.data) {
-                const data = json.data;
-                
-                // Set TaxDate
-                if (data.TaxDate) {
-                    const date = new Date(data.TaxDate);
-                    document.getElementById('TaxDate').value = date.toISOString().split('T')[0];
-                }
-
-                // Set Range Inputs
-                for (let i = 1; i <= 7; i++) {
-                    if (document.getElementById(`R${i}`)) document.getElementById(`R${i}`).value = data[`R${i}`];
-                    if (document.getElementById(`R${i}Tax`)) document.getElementById(`R${i}Tax`).value = data[`R${i}Tax`];
-                }
-
-                // Set Thresholds
-                document.getElementById('RentThreshold').value = data.RentThreshold;
-                document.getElementById('AllwThreshold').value = data.AllwThreshold;
-                document.getElementById('Withholding_Tax').value = data.Withholding_Tax;
-
-                calculateTax();
-            }
-        } catch (err) {
-            console.error('Error loading tax data:', err);
         }
-    }
 
-    function calculateTax() {
-        // Helper to get float value
-        const val = (id) => parseFloat(document.getElementById(id).value) || 0;
-        
-        // R1
-        const R1 = val('R1');
-        const R1Tax = val('R1Tax');
-        
-        // Tax 1 = R1 * (R1Tax/100)
-        // User said: "R1Tax * R1" (assuming /100 for consistency with others)
-        const tax1 = R1 * (R1Tax / 100);
-        const cum1 = tax1;
-        
-        document.getElementById('Tax1').textContent = tax1.toFixed(2);
-        document.getElementById('Cum1').textContent = cum1.toFixed(2);
+        function calculateTax() {
+            // Helper to get float value
+            const val = (id) => parseFloat(document.getElementById(id).value) || 0;
+            
+            // R1
+            const R1 = val('R1');
+            const R1Tax = val('R1Tax');
+            
+            // Tax 1 = R1 * (R1Tax/100)
+            const tax1 = R1 * (R1Tax / 100);
+            const cum1 = tax1;
+            
+            document.getElementById('Tax1').textContent = tax1.toFixed(2);
+            document.getElementById('Cum1').textContent = cum1.toFixed(2);
 
-        // R2
-        const R2 = val('R2');
-        const R2Tax = val('R2Tax');
-        // Tax 2 = (R2-R1)*(R2Tax/100)
-        const tax2 = (R2 - R1) * (R2Tax / 100);
-        // Cum 2 = Tax2 + Cum1
-        // User said: (R2-R1)*(R2Tax/100)+(R1*(R1Tax/100))
-        const cum2 = tax2 + cum1;
+            // R2
+            const R2 = val('R2');
+            const R2Tax = val('R2Tax');
+            // Tax 2 = (R2-R1)*(R2Tax/100)
+            const tax2 = (R2 - R1) * (R2Tax / 100);
+            // Cum 2 = Tax2 + Cum1
+            const cum2 = tax2 + cum1;
 
-        document.getElementById('Tax2').textContent = tax2.toFixed(2);
-        document.getElementById('Cum2').textContent = cum2.toFixed(2);
+            document.getElementById('Tax2').textContent = tax2.toFixed(2);
+            document.getElementById('Cum2').textContent = cum2.toFixed(2);
 
-        // R3
-        const R3 = val('R3');
-        const R3Tax = val('R3Tax');
-        // Tax 3 = (R3-R2)*(R3Tax/100)
-        const tax3 = (R3 - R2) * (R3Tax / 100);
-        // Cum 3 = Tax3 + Cum2
-        const cum3 = tax3 + cum2;
+            // R3
+            const R3 = val('R3');
+            const R3Tax = val('R3Tax');
+            // Tax 3 = (R3-R2)*(R3Tax/100)
+            const tax3 = (R3 - R2) * (R3Tax / 100);
+            // Cum 3 = Tax3 + Cum2
+            const cum3 = tax3 + cum2;
 
-        document.getElementById('Tax3').textContent = tax3.toFixed(2);
-        document.getElementById('Cum3').textContent = cum3.toFixed(2);
+            document.getElementById('Tax3').textContent = tax3.toFixed(2);
+            document.getElementById('Cum3').textContent = cum3.toFixed(2);
 
-        // R4
-        const R4 = val('R4');
-        const R4Tax = val('R4Tax');
-        // Tax 4 = (R4-R3)*(R4Tax/100)
-        const tax4 = (R4 - R3) * (R4Tax / 100);
-        // Cum 4 = Tax4 + Cum3
-        const cum4 = tax4 + cum3;
+            // R4
+            const R4 = val('R4');
+            const R4Tax = val('R4Tax');
+            // Tax 4 = (R4-R3)*(R4Tax/100)
+            const tax4 = (R4 - R3) * (R4Tax / 100);
+            // Cum 4 = Tax4 + Cum3
+            const cum4 = tax4 + cum3;
 
-        document.getElementById('Tax4').textContent = tax4.toFixed(2);
-        document.getElementById('Cum4').textContent = cum4.toFixed(2);
+            document.getElementById('Tax4').textContent = tax4.toFixed(2);
+            document.getElementById('Cum4').textContent = cum4.toFixed(2);
 
-        // R5
-        const R5 = val('R5');
-        const R5Tax = val('R5Tax');
-        // Tax 5 = (R5-R4)*(R5Tax/100)
-        const tax5 = (R5 - R4) * (R5Tax / 100);
-        // Cum 5 = Tax5 + Cum4
-        const cum5 = tax5 + cum4;
+            // R5
+            const R5 = val('R5');
+            const R5Tax = val('R5Tax');
+            // Tax 5 and Cumulative 5 should be 0 as per user request
+            const tax5 = 0;
+            const cum5 = 0;
 
-        document.getElementById('Tax5').textContent = tax5.toFixed(2);
-        document.getElementById('Cum5').textContent = cum5.toFixed(2);
+            document.getElementById('Tax5').textContent = tax5.toFixed(2);
+            document.getElementById('Cum5').textContent = cum5.toFixed(2);
 
-        // R6
-        const R6 = val('R6');
-        const R6Tax = val('R6Tax');
-        // Tax 6 = (R6-R5)*(R6Tax/100)
-        const tax6 = (R6 - R5) * (R6Tax / 100);
-        // Cum 6 = Tax6 + Cum5
-        const cum6 = tax6 + cum5;
+            // R6
+            const R6 = val('R6');
+            const R6Tax = val('R6Tax');
+            // Tax 6 and Cumulative 6 should be 0 as per user request
+            const tax6 = 0;
+            const cum6 = 0;
 
-        document.getElementById('Tax6').textContent = tax6.toFixed(2);
-        document.getElementById('Cum6').textContent = cum6.toFixed(2);
-    }
-</script>
+            document.getElementById('Tax6').textContent = tax6.toFixed(2);
+            document.getElementById('Cum6').textContent = cum6.toFixed(2);
+        }
+    </script>
+</body>
+</html>

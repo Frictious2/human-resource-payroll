@@ -1662,7 +1662,70 @@ const deletePublicHoliday = async (req, res) => {
     }
 };
 
-// Tax Table
+// Sponsors
+const sponsorsPage = async (req, res) => {
+    try {
+        res.render('admin/parameters/sponsors', {
+            title: 'Sponsors',
+            group: 'Parameters',
+            user: req.user
+        });
+    } catch (error) {
+        console.error('Error rendering sponsors page:', error);
+        res.status(500).send('Server Error');
+    }
+};
+
+const getSponsors = async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM tblCourseSponsor ORDER BY SCode');
+        res.json(rows);
+    } catch (error) {
+        console.error('Error fetching sponsors:', error);
+        res.status(500).json({ message: 'Error fetching sponsors' });
+    }
+};
+
+const addSponsor = async (req, res) => {
+    const { SCode, Sponsor } = req.body;
+    try {
+        await pool.query(
+            'INSERT INTO tblCourseSponsor (SCode, Sponsor, CompanyID) VALUES (?, ?, ?)',
+            [SCode, Sponsor, 1] // Assuming CompanyID 1 for now
+        );
+        res.status(201).json({ message: 'Sponsor added successfully' });
+    } catch (error) {
+        console.error('Error adding sponsor:', error);
+        res.status(500).json({ message: 'Error adding sponsor' });
+    }
+};
+
+const updateSponsor = async (req, res) => {
+    const { SCode } = req.params;
+    const { Sponsor } = req.body;
+    try {
+        await pool.query(
+            'UPDATE tblCourseSponsor SET Sponsor = ? WHERE SCode = ?',
+            [Sponsor, SCode]
+        );
+        res.json({ message: 'Sponsor updated successfully' });
+    } catch (error) {
+        console.error('Error updating sponsor:', error);
+        res.status(500).json({ message: 'Error updating sponsor' });
+    }
+};
+
+const deleteSponsor = async (req, res) => {
+    const { SCode } = req.params;
+    try {
+        await pool.query('DELETE FROM tblCourseSponsor WHERE SCode = ?', [SCode]);
+        res.json({ message: 'Sponsor deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting sponsor:', error);
+        res.status(500).json({ message: 'Error deleting sponsor' });
+    }
+};
+
 const taxTablePage = async (req, res) => {
     try {
         res.render('admin/parameters/tax-table', {
@@ -1865,4 +1928,9 @@ module.exports = {
   taxTablePage,
   getTaxTable,
   saveTaxTable,
+  sponsorsPage,
+  getSponsors,
+  addSponsor,
+  updateSponsor,
+  deleteSponsor,
 };

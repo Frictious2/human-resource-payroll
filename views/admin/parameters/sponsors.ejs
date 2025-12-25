@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · <%= group %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <!-- Page Title and Add Button -->
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <h2 class="mb-0"><%= title %></h2>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSponsorModal">
+                    <i class="bi bi-plus-lg me-1"></i> Add Sponsor
+                </button>
+            </div>
+
+            <!-- Sponsors Table -->
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 15%">Code</th>
+                                    <th>Sponsor</th>
+                                    <th style="width: 15%">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sponsorsTableBody">
+                                <!-- Data populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="mt-4 py-3 text-center text-muted border-top">
+                <%- include('../partials/footer') %>
+            </footer>
+        </div>
+    </main>
+
+    <!-- Add Sponsor Modal -->
+    <div class="modal fade" id="addSponsorModal" tabindex="-1" aria-labelledby="addSponsorModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addSponsorModalLabel">Add Sponsor</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addSponsorForm">
+                        <div class="mb-3">
+                            <label for="SCode" class="form-label">Sponsor Code</label>
+                            <input type="text" class="form-control" id="SCode" name="SCode" required maxlength="2">
+                        </div>
+                        <div class="mb-3">
+                            <label for="Sponsor" class="form-label">Sponsor Name</label>
+                            <input type="text" class="form-control" id="Sponsor" name="Sponsor" required maxlength="255">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="saveSponsorBtn">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/dashboard.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSponsors();
+
+            document.getElementById('saveSponsorBtn').addEventListener('click', saveSponsor);
+        });
+
+        async function loadSponsors() {
+            try {
+                const response = await fetch('/admin/api/parameters/sponsors');
+                if (!response.ok) throw new Error('Failed to load sponsors');
+                const sponsors = await response.json();
+                const tbody = document.getElementById('sponsorsTableBody');
+                tbody.innerHTML = '';
+
+                sponsors.forEach(sponsor => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${sponsor.SCode}</td>
+                        <td>
+                            <input type="text" class="form-control form-control-sm border-0 bg-transparent" 
+                                value="${sponsor.Sponsor}" 
+                                onchange="updateSponsor('${sponsor.SCode}', this.value)"
+                            >
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteSponsor('${sponsor.SCode}')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error loading sponsors');
+            }
+        }
+
+        async function saveSponsor() {
+            const form = document.getElementById('addSponsorForm');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+
+            try {
+                const response = await fetch('/admin/api/parameters/sponsors', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('addSponsorModal'));
+                    modal.hide();
+                    form.reset();
+                    loadSponsors();
+                } else {
+                    const error = await response.json();
+                    alert('Error saving sponsor: ' + (error.message || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error saving sponsor');
+            }
+        }
+
+        async function updateSponsor(SCode, Sponsor) {
+            try {
+                const response = await fetch(`/admin/api/parameters/sponsors/${SCode}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ Sponsor })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to update sponsor');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error updating sponsor');
+                loadSponsors(); // Reload to reset value
+            }
+        }
+
+        async function deleteSponsor(SCode) {
+            if (!confirm('Are you sure you want to delete this sponsor?')) return;
+
+            try {
+                const response = await fetch(`/admin/api/parameters/sponsors/${SCode}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    loadSponsors();
+                } else {
+                    throw new Error('Failed to delete sponsor');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error deleting sponsor');
+            }
+        }
+    </script>
+</body>
+</html>

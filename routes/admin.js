@@ -122,7 +122,12 @@ router.delete('/api/parameters/public-holidays/:year/:name', adminController.del
 router.get('/parameters/tax-table', adminController.taxTablePage);
 router.get('/api/parameters/tax-table', adminController.getTaxTable);
 router.post('/api/parameters/tax-table', adminController.saveTaxTable);
-router.get('/parameters/sponsors', adminController.comingSoon('Sponsors', 'Parameters'));
+// Sponsors
+router.get('/parameters/sponsors', adminController.sponsorsPage);
+router.get('/api/parameters/sponsors', adminController.getSponsors);
+router.post('/api/parameters/sponsors', adminController.addSponsor);
+router.put('/api/parameters/sponsors/:SCode', adminController.updateSponsor);
+router.delete('/api/parameters/sponsors/:SCode', adminController.deleteSponsor);
 
 router.get('/activities/enquiry', adminController.comingSoon('Enquiry', 'Activities'));
 router.get('/activities/staff-file', adminController.comingSoon('Staff File', 'Activities'));
