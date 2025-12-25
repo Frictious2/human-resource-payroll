@@ -1573,6 +1573,200 @@ const saveWorkDays = async (req, res) => {
     }
 };
 
+// Public Holidays
+const publicHolidaysPage = async (req, res) => {
+    try {
+        res.render('admin/parameters/public-holidays', {
+            title: 'Public Holidays',
+            group: 'Parameters',
+            user: { name: 'David' }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+};
+
+const getPublicHolidays = async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM tblpublic_holidays ORDER BY Pub_Year DESC, Pub_Date DESC');
+        res.json({ data: rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch public holidays' });
+    }
+};
+
+const savePublicHoliday = async (req, res) => {
+    const { Pub_Date, Pub_Year, Pub_Name, HDate, Approved } = req.body;
+    
+    if (!Pub_Year || !Pub_Name || !HDate) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    try {
+        const sql = `INSERT INTO tblpublic_holidays (Pub_Date, Pub_Year, Pub_Name, HDate, Approved, CompanyID, DateKeyedIn) VALUES (?, ?, ?, ?, ?, ?, NOW())`;
+        await pool.query(sql, [Pub_Date || null, Pub_Year, Pub_Name, HDate, Approved || 0, 1]);
+        
+        const [rows] = await pool.query('SELECT * FROM tblpublic_holidays WHERE Pub_Year = ? AND Pub_Name = ?', [Pub_Year, Pub_Name]);
+        res.json({ success: true, item: rows[0] });
+    } catch (err) {
+        console.error(err);
+        if (err.code === 'ER_DUP_ENTRY') {
+            return res.status(400).json({ error: 'Holiday with this Year and Name already exists' });
+        }
+        res.status(500).json({ error: 'Failed to create public holiday' });
+    }
+};
+
+const updatePublicHoliday = async (req, res) => {
+    const { year, name } = req.params;
+    const { Pub_Date, Pub_Year, Pub_Name, HDate, Approved } = req.body;
+    
+    try {
+        const fields = [];
+        const values = [];
+        
+        if (Pub_Date !== undefined) { fields.push('Pub_Date = ?'); values.push(Pub_Date || null); }
+        if (Pub_Year !== undefined) { fields.push('Pub_Year = ?'); values.push(Pub_Year); }
+        if (Pub_Name !== undefined) { fields.push('Pub_Name = ?'); values.push(Pub_Name); }
+        if (HDate !== undefined) { fields.push('HDate = ?'); values.push(HDate); }
+        if (Approved !== undefined) { fields.push('Approved = ?'); values.push(Approved); }
+        
+        if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
+        
+        const sql = `UPDATE tblpublic_holidays SET ${fields.join(', ')} WHERE Pub_Year = ? AND Pub_Name = ?`;
+        values.push(year, name);
+        
+        await pool.query(sql, values);
+        
+        const newYear = Pub_Year !== undefined ? Pub_Year : year;
+        const newName = Pub_Name !== undefined ? Pub_Name : name;
+        
+        const [rows] = await pool.query('SELECT * FROM tblpublic_holidays WHERE Pub_Year = ? AND Pub_Name = ?', [newYear, newName]);
+        res.json({ success: true, item: rows[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to update public holiday' });
+    }
+};
+
+const deletePublicHoliday = async (req, res) => {
+    const { year, name } = req.params;
+    try {
+        await pool.query('DELETE FROM tblpublic_holidays WHERE Pub_Year = ? AND Pub_Name = ?', [year, name]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to delete public holiday' });
+    }
+};
+
+// Tax Table
+const taxTablePage = async (req, res) => {
+    try {
+        res.render('admin/parameters/tax-table', {
+            title: 'Tax Table',
+            group: 'Parameters',
+            user: { name: 'David' }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+};
+
+const getTaxTable = async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM tbltax WHERE CompanyID = 1 LIMIT 1');
+        res.json({ data: rows[0] || {} });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch tax table' });
+    }
+};
+
+const saveTaxTable = async (req, res) => {
+    const { 
+        TaxDate, 
+        R1, R1Tax, 
+        R2, R2Tax, 
+        R3, R3Tax, 
+        R4, R4Tax, 
+        R5, R5Tax, 
+        R6, R6Tax, 
+        R7, R7Tax, 
+        RentThreshold, AllwThreshold, Withholding_Tax 
+    } = req.body;
+
+    try {
+        // Check if record exists
+        const [rows] = await pool.query('SELECT * FROM tbltax WHERE CompanyID = 1');
+        
+        if (rows.length > 0) {
+            // Update
+            const sql = `UPDATE tbltax SET 
+                TaxDate = ?, 
+                R1 = ?, R1Tax = ?, 
+                R2 = ?, R2Tax = ?, 
+                R3 = ?, R3Tax = ?, 
+                R4 = ?, R4Tax = ?, 
+                R5 = ?, R5Tax = ?, 
+                R6 = ?, R6Tax = ?, 
+                R7 = ?, R7Tax = ?, 
+                RentThreshold = ?, AllwThreshold = ?, Withholding_Tax = ?
+                WHERE CompanyID = 1`;
+            
+            const values = [
+                TaxDate, 
+                R1, R1Tax, 
+                R2, R2Tax, 
+                R3, R3Tax, 
+                R4, R4Tax, 
+                R5, R5Tax, 
+                R6, R6Tax, 
+                R7, R7Tax, 
+                RentThreshold, AllwThreshold, Withholding_Tax
+            ];
+            
+            await pool.query(sql, values);
+        } else {
+            // Insert
+            const sql = `INSERT INTO tbltax (
+                TaxDate, 
+                R1, R1Tax, 
+                R2, R2Tax, 
+                R3, R3Tax, 
+                R4, R4Tax, 
+                R5, R5Tax, 
+                R6, R6Tax, 
+                R7, R7Tax, 
+                RentThreshold, AllwThreshold, Withholding_Tax, 
+                CompanyID
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`;
+            
+            const values = [
+                TaxDate, 
+                R1, R1Tax, 
+                R2, R2Tax, 
+                R3, R3Tax, 
+                R4, R4Tax, 
+                R5, R5Tax, 
+                R6, R6Tax, 
+                R7, R7Tax, 
+                RentThreshold, AllwThreshold, Withholding_Tax
+            ];
+            
+            await pool.query(sql, values);
+        }
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to save tax table' });
+    }
+};
+
 module.exports = {
   renderDashboard,
   comingSoon,
@@ -1663,4 +1857,12 @@ module.exports = {
   workDaysPage,
   getWorkDays,
   saveWorkDays,
+  publicHolidaysPage,
+  getPublicHolidays,
+  savePublicHoliday,
+  updatePublicHoliday,
+  deletePublicHoliday,
+  taxTablePage,
+  getTaxTable,
+  saveTaxTable,
 };

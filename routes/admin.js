@@ -112,8 +112,16 @@ router.post('/api/parameters/global-params', adminController.saveGlobalParams);
 router.get('/parameters/work-days', adminController.workDaysPage);
 router.get('/api/parameters/work-days', adminController.getWorkDays);
 router.post('/api/parameters/work-days', adminController.saveWorkDays);
-router.get('/parameters/public-holidays', adminController.comingSoon('Public Holidays', 'Parameters'));
-router.get('/parameters/tax-table', adminController.comingSoon('Tax Table', 'Parameters'));
+// Public Holidays
+router.get('/parameters/public-holidays', adminController.publicHolidaysPage);
+router.get('/api/parameters/public-holidays', adminController.getPublicHolidays);
+router.post('/api/parameters/public-holidays', adminController.savePublicHoliday);
+router.patch('/api/parameters/public-holidays/:year/:name', adminController.updatePublicHoliday);
+router.delete('/api/parameters/public-holidays/:year/:name', adminController.deletePublicHoliday);
+// Tax Table
+router.get('/parameters/tax-table', adminController.taxTablePage);
+router.get('/api/parameters/tax-table', adminController.getTaxTable);
+router.post('/api/parameters/tax-table', adminController.saveTaxTable);
 router.get('/parameters/sponsors', adminController.comingSoon('Sponsors', 'Parameters'));
 
 router.get('/activities/enquiry', adminController.comingSoon('Enquiry', 'Activities'));

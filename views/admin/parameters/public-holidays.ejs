@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · <%= group %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+    <style>
+        .editable-cell {
+            padding: 0.25rem;
+        }
+        .editable-cell input, .editable-cell select {
+            width: 100%;
+            border: 1px solid transparent;
+            background: transparent;
+            padding: 2px 4px;
+        }
+        .editable-cell input:focus, .editable-cell select:focus {
+            border: 1px solid #0d6efd;
+            background: #fff;
+            outline: none;
+        }
+        .editable-cell input[type="checkbox"] {
+            width: auto;
+        }
+        .cell-updated {
+            animation: highlight 1s ease-out;
+        }
+        @keyframes highlight {
+            0% { background-color: #d1e7dd; }
+            100% { background-color: transparent; }
+        }
+        .cell-error {
+            animation: highlight-error 1s ease-out;
+            border: 1px solid red !important;
+        }
+        @keyframes highlight-error {
+            0% { background-color: #f8d7da; }
+            100% { background-color: transparent; }
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <h2 class="mb-0"><%= title %></h2>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addHolidayModal">
+                    <i class="bi bi-plus-circle me-2"></i>Add Public Holiday
+                </button>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body p-3 border-bottom">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <input type="text" id="searchInput" class="form-control" placeholder="Search by year...">
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" id="holidaysTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>No.</th>
+                                    <th>Published Date</th>
+                                    <th>Published Year</th>
+                                    <th>Name</th>
+                                    <th>Holiday Date</th>
+                                    <th class="text-center">Approved</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Rows will be populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer bg-white border-top-0 py-3">
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination justify-content-end mb-0" id="pagination">
+                            <!-- Pagination will be populated by JS -->
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+
+            <footer class="mt-4 py-3 text-center text-muted border-top">
+                <%- include('../partials/footer') %>
+            </footer>
+        </div>
+    </main>
+
+    <!-- Add Holiday Modal -->
+    <div class="modal fade" id="addHolidayModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Public Holiday</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addHolidayForm">
+                        <div class="mb-3">
+                            <label class="form-label">Published Date</label>
+                            <input type="date" class="form-control" name="Pub_Date">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Published Year *</label>
+                            <input type="number" class="form-control" name="Pub_Year" required min="1900" max="2100">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Name *</label>
+                            <input type="text" class="form-control" name="Pub_Name" required maxlength="18">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Holiday Date *</label>
+                            <input type="date" class="form-control" name="HDate" required>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="Approved" id="checkApproved">
+                                <label class="form-check-label" for="checkApproved">Approved</label>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="saveNewHolidayBtn">Save Holiday</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Modal -->
+    <div class="modal fade" id="delete_holiday" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Delete Public Holiday</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure want to delete this holiday?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // State for pagination and search
+        let allData = [];
+        let filteredData = [];
+        let currentPage = 1;
+        const rowsPerPage = 10;
+        let deleteTarget = null; // { year, name }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const tableBody = document.querySelector('#holidaysTable tbody');
+            const addHolidayModal = new bootstrap.Modal(document.getElementById('addHolidayModal'));
+            const addHolidayForm = document.getElementById('addHolidayForm');
+            const searchInput = document.getElementById('searchInput');
+            const paginationContainer = document.getElementById('pagination');
+
+            // Load Data
+            loadItems();
+
+            async function loadItems() {
+                try {
+                    const res = await fetch('/admin/api/parameters/public-holidays');
+                    const json = await res.json();
+                    allData = json.data;
+                    filterData();
+                } catch (err) {
+                    console.error('Failed to load holidays', err);
+                    alert('Error loading public holidays');
+                }
+            }
+
+            // Search Logic
+            searchInput.addEventListener('input', () => {
+                filterData();
+            });
+
+            function filterData() {
+                const term = searchInput.value.toLowerCase();
+                filteredData = allData.filter(item => 
+                    String(item.Pub_Year).toLowerCase().includes(term) ||
+                    String(item.Pub_Name).toLowerCase().includes(term)
+                );
+                currentPage = 1;
+                renderPage();
+            }
+
+            function renderPage() {
+                const start = (currentPage - 1) * rowsPerPage;
+                const end = start + rowsPerPage;
+                const pageData = filteredData.slice(start, end);
+                renderTable(pageData, start);
+                renderPagination();
+            }
+
+            function renderPagination() {
+                const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+                paginationContainer.innerHTML = '';
+
+                if (totalPages <= 1) return;
+
+                // Previous
+                const prevLi = document.createElement('li');
+                prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+                prevLi.innerHTML = `<a class="page-link" href="#">Previous</a>`;
+                prevLi.onclick = (e) => { e.preventDefault(); if (currentPage > 1) { currentPage--; renderPage(); } };
+                paginationContainer.appendChild(prevLi);
+
+                // Page Numbers
+                let startPage = Math.max(1, currentPage - 2);
+                let endPage = Math.min(totalPages, startPage + 4);
+                
+                if (endPage - startPage < 4) {
+                    startPage = Math.max(1, endPage - 4);
+                }
+
+                for (let i = startPage; i <= endPage; i++) {
+                    const li = document.createElement('li');
+                    li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+                    li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+                    li.onclick = (e) => { e.preventDefault(); currentPage = i; renderPage(); };
+                    paginationContainer.appendChild(li);
+                }
+
+                // Next
+                const nextLi = document.createElement('li');
+                nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+                nextLi.innerHTML = `<a class="page-link" href="#">Next</a>`;
+                nextLi.onclick = (e) => { e.preventDefault(); if (currentPage < totalPages) { currentPage++; renderPage(); } };
+                paginationContainer.appendChild(nextLi);
+            }
+
+            function formatDate(dateStr) {
+                if (!dateStr) return '';
+                const d = new Date(dateStr);
+                if (isNaN(d.getTime())) return '';
+                return d.toISOString().split('T')[0];
+            }
+
+            function renderTable(items, startIndex) {
+                tableBody.innerHTML = '';
+                if (items.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="7" class="text-center py-3">No public holidays found</td></tr>';
+                    return;
+                }
+                items.forEach((item, index) => {
+                    const tr = document.createElement('tr');
+                    // Store PK in data attributes
+                    tr.dataset.year = item.Pub_Year;
+                    tr.dataset.name = item.Pub_Name;
+                    
+                    const pubDate = formatDate(item.Pub_Date);
+                    const hDate = formatDate(item.HDate);
+
+                    tr.innerHTML = `
+                        <td>${startIndex + index + 1}</td>
+                        <td class="editable-cell"><input type="date" name="Pub_Date" value="${pubDate}"></td>
+                        <td class="editable-cell"><input type="number" name="Pub_Year" value="${item.Pub_Year}" required></td>
+                        <td class="editable-cell"><input type="text" name="Pub_Name" value="${item.Pub_Name}" required maxlength="18"></td>
+                        <td class="editable-cell"><input type="date" name="HDate" value="${hDate}" required></td>
+                        <td class="text-center editable-cell"><input type="checkbox" name="Approved" ${item.Approved ? 'checked' : ''}></td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-danger delete-btn"><i class="bi bi-trash"></i></button>
+                        </td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+            }
+
+            // Save New Holiday
+            document.getElementById('saveNewHolidayBtn').addEventListener('click', async () => {
+                if (!addHolidayForm.checkValidity()) {
+                    addHolidayForm.reportValidity();
+                    return;
+                }
+
+                const formData = new FormData(addHolidayForm);
+                const data = Object.fromEntries(formData.entries());
+                data.Approved = formData.get('Approved') === 'on' ? 1 : 0;
+                
+                // Ensure required fields are present
+                if (!data.Pub_Year || !data.Pub_Name || !data.HDate) {
+                    alert('Please fill in all required fields');
+                    return;
+                }
+
+                try {
+                    const res = await fetch('/admin/api/parameters/public-holidays', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    const json = await res.json();
+                    
+                    if (json.success) {
+                        allData.push(json.item);
+                        filterData();
+                        addHolidayModal.hide();
+                        addHolidayForm.reset();
+                    } else {
+                        alert(json.error || 'Failed to create holiday');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert('Error creating holiday');
+                }
+            });
+
+            // Event Delegation for Inline Editing
+            tableBody.addEventListener('change', async (e) => {
+                const target = e.target;
+                if (target.tagName === 'INPUT' || target.tagName === 'SELECT') {
+                    handleUpdate(target);
+                }
+            });
+
+            tableBody.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.target.blur(); 
+                }
+            });
+            
+            // Delete Button
+            tableBody.addEventListener('click', (e) => {
+                const btn = e.target.closest('.delete-btn');
+                if (btn) {
+                    const row = btn.closest('tr');
+                    const year = row.dataset.year;
+                    const name = row.dataset.name;
+                    openDeleteModal(year, name);
+                }
+            });
+
+            function openDeleteModal(year, name) {
+                deleteTarget = { year, name };
+                const modalEl = document.getElementById('delete_holiday');
+                let modal = bootstrap.Modal.getInstance(modalEl);
+                if (!modal) {
+                    modal = new bootstrap.Modal(modalEl);
+                }
+                modal.show();
+            }
+
+            document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
+                if (!deleteTarget) return;
+                
+                const { year, name } = deleteTarget;
+                
+                try {
+                    // Use POST with _method=DELETE or just DELETE with query params or custom body
+                    // Since express router supports DELETE, but passing composite key in URL path is tricky if name has special chars.
+                    // Safest is to use query params or body. Let's use query params for now as it's standardish for REST if ID is complex.
+                    // Or I can use JSON body with DELETE method (supported by fetch, but some proxies/firewalls might strip it).
+                    // I will use URL encoding for the name.
+                    const encodedName = encodeURIComponent(name);
+                    const res = await fetch(`/admin/api/parameters/public-holidays/${year}/${encodedName}`, { method: 'DELETE' });
+                    const json = await res.json();
+                    if (json.success) {
+                        // Remove from allData and re-render
+                        allData = allData.filter(i => !(i.Pub_Year == year && i.Pub_Name == name));
+                        filterData();
+                        
+                        // Close modal
+                        const modalEl = document.getElementById('delete_holiday');
+                        const modal = bootstrap.Modal.getInstance(modalEl);
+                        if (modal) modal.hide();
+                    } else {
+                        alert('Failed to delete');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert('Error deleting holiday');
+                }
+            });
+
+            async function handleUpdate(input) {
+                const row = input.closest('tr');
+                const oldYear = row.dataset.year;
+                const oldName = row.dataset.name;
+                const field = input.name;
+                let value;
+
+                if (input.type === 'checkbox') {
+                    value = input.checked ? 1 : 0;
+                } else {
+                    value = input.value;
+                }
+
+                // If updating PK fields (Pub_Year or Pub_Name), we need to handle it carefully.
+                // The backend will need the OLD keys to find the record.
+                
+                try {
+                    const encodedName = encodeURIComponent(oldName);
+                    const res = await fetch(`/admin/api/parameters/public-holidays/${oldYear}/${encodedName}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            [field]: value
+                        })
+                    });
+                    
+                    const json = await res.json();
+                    
+                    if (json.success) {
+                        // Highlight success
+                        input.closest('td').classList.add('cell-updated');
+                        setTimeout(() => input.closest('td').classList.remove('cell-updated'), 1000);
+                        
+                        // Update local data
+                        const itemIndex = allData.findIndex(i => i.Pub_Year == oldYear && i.Pub_Name == oldName);
+                        if (itemIndex > -1) {
+                            allData[itemIndex] = { ...allData[itemIndex], ...json.item };
+                            
+                            // If PK changed, update data attributes
+                            if (field === 'Pub_Year' || field === 'Pub_Name') {
+                                row.dataset.year = json.item.Pub_Year;
+                                row.dataset.name = json.item.Pub_Name;
+                                // Also update filteredData if needed, but filterData() rebuilds it from allData usually? 
+                                // Actually filterData is derived from allData, but we modified allData in place.
+                            }
+                        }
+                    } else {
+                        throw new Error(json.error);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    input.closest('td').classList.add('cell-error');
+                    setTimeout(() => input.closest('td').classList.remove('cell-error'), 1000);
+                    alert('Failed to update: ' + err.message);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
