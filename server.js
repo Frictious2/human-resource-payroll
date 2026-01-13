@@ -46,9 +46,11 @@ app.get('/dashboard', (req, res) => {
 const adminRoutes = require('./routes/admin');
 const developerRoutes = require('./routes/developer');
 const managerRoutes = require('./routes/manager');
+const dataEntryRoutes = require('./routes/dataEntry');
 app.use('/admin', adminRoutes);
 app.use('/developer', developerRoutes);
 app.use('/manager', managerRoutes);
+app.use('/data-entry', dataEntryRoutes);
 
 // Admin dashboard routes
 app.get('/admin', (req, res) => {

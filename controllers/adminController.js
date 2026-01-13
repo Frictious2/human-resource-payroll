@@ -1849,7 +1849,7 @@ const enquiryPage = async (req, res) => {
 
 const getEnquiryData = async (req, res) => {
     try {
-        const { servedYear, department, jobTitle, gender, ageMin, ageMax, retireMin, retireMax, formerDept, approved } = req.query;
+        const { servedYearMin, servedYearMax, department, jobTitle, gender, ageMin, ageMax, retireMin, retireMax, formerDept, approved } = req.query;
 
         // Get retirement age first
         const [params] = await pool.query('SELECT RetireAge FROM tblparams1 LIMIT 1');
@@ -1881,9 +1881,14 @@ const getEnquiryData = async (req, res) => {
             values.push(approved);
         }
 
-        if (servedYear) {
-            sql += ` AND TIMESTAMPDIFF(YEAR, s.DOE, CURDATE()) = ?`;
-            values.push(servedYear);
+        if (servedYearMin) {
+            sql += ` AND TIMESTAMPDIFF(YEAR, s.DOE, CURDATE()) >= ?`;
+            values.push(servedYearMin);
+        }
+
+        if (servedYearMax) {
+            sql += ` AND TIMESTAMPDIFF(YEAR, s.DOE, CURDATE()) <= ?`;
+            values.push(servedYearMax);
         }
 
         if (department) {

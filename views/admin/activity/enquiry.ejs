@@ -35,10 +35,14 @@
                 </div>
                 <div class="card-body">
                     <form id="filterForm" class="row g-3">
-                        <!-- Served Year -->
+                        <!-- Served Year Range -->
                         <div class="col-md-3">
-                            <label for="servedYear" class="form-label">Served Year</label>
-                            <input type="number" class="form-control" id="servedYear" name="servedYear" placeholder="e.g. 5">
+                            <label class="form-label">Served Year</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="servedYearMin" name="servedYearMin" placeholder="Min">
+                                <span class="input-group-text">-</span>
+                                <input type="number" class="form-control" id="servedYearMax" name="servedYearMax" placeholder="Max">
+                            </div>
                         </div>
                         
                         <!-- Department -->
