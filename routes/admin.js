@@ -129,15 +129,20 @@ router.post('/api/parameters/sponsors', adminController.addSponsor);
 router.put('/api/parameters/sponsors/:SCode', adminController.updateSponsor);
 router.delete('/api/parameters/sponsors/:SCode', adminController.deleteSponsor);
 
-router.get('/activities/enquiry', adminController.comingSoon('Enquiry', 'Activities'));
-router.get('/activities/staff-file', adminController.comingSoon('Staff File', 'Activities'));
-router.get('/activities/import', adminController.comingSoon('Import', 'Activities'));
-router.get('/activities/discipline', adminController.comingSoon('Discipline', 'Activities'));
+// Activities
+router.get('/activity/enquiry', adminController.enquiryPage);
+router.get('/api/activity/enquiry', adminController.getEnquiryData);
+router.get('/activity/import', adminController.comingSoon('Import', 'Activities'));
+router.get('/activity/discipline', adminController.comingSoon('Discipline', 'Activities'));
 
 router.get('/reports/voucher', adminController.comingSoon('Voucher', 'Reports'));
 router.get('/reports/payslip', adminController.comingSoon('Pay slip', 'Reports'));
 router.get('/reports/end-of-service', adminController.comingSoon('End of Service', 'Reports'));
 
 router.get('/company-info', adminController.comingSoon('Company Info', 'Company Info'));
+
+// Staff File
+router.get('/activity/staff-file', adminController.staffFilePage);
+router.get('/api/activity/staff-file', adminController.getStaffFileData);
 
 module.exports = router;

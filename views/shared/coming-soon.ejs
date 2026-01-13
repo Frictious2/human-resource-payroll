@@ -12,6 +12,9 @@
   <% if (role === 'admin') { %>
     <%- include('../admin/partials/topbar', { user }) %>
     <%- include('../admin/partials/sidebar') %>
+  <% } else if (role === 'manager') { %>
+    <%- include('../manager/partials/topbar', { user }) %>
+    <%- include('../manager/partials/sidebar') %>
   <% } else { %>
     <%- include('../developer/partials/topbar', { user }) %>
     <%- include('../developer/partials/sidebar') %>
@@ -26,7 +29,7 @@
               <i class="bi bi-tools display-4 text-primary"></i>
               <h1 class="mt-3">Coming Soon</h1>
               <p class="text-muted mb-4">We’re building <strong><%= title %></strong> under <strong><%= group %></strong>.</p>
-              <a href="<%= role === 'admin' ? '/admin/dashboard' : '/developer/dashboard' %>" class="btn btn-outline-primary">
+              <a href="<%= role === 'admin' ? '/admin/dashboard' : (role === 'manager' ? '/manager/dashboard' : '/developer/dashboard') %>" class="btn btn-outline-primary">
                 <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
               </a>
             </div>
@@ -36,6 +39,8 @@
       <footer class="mt-4 py-3 text-center text-muted border-top">
         <% if (role === 'admin') { %>
           <%- include('../admin/partials/footer') %>
+        <% } else if (role === 'manager') { %>
+          <%- include('../manager/partials/footer') %>
         <% } else { %>
           <%- include('../developer/partials/footer') %>
         <% } %>

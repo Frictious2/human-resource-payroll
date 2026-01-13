@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Staff File · Activity</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar') %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <!-- Page Title & Breadcrumbs -->
+            <div class="row mb-4">
+                <div class="col-12 d-flex justify-content-between align-items-center">
+                    <h1 class="h3 text-gray-800">Staff File</h1>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item"><a href="/admin/dashboard">Dashboard</a></li>
+                            <li class="breadcrumb-item">Activity</li>
+                            <li class="breadcrumb-item active" aria-current="page">Staff File</li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- Row 1: Search Box -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card shadow">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Search Staff</h6>
+                        </div>
+                        <div class="card-body">
+                            <form id="searchForm" class="row g-3 align-items-center">
+                                <div class="col-auto">
+                                    <label for="pfNoSearch" class="col-form-label">Staff ID / PFNo:</label>
+                                </div>
+                                <div class="col-auto">
+                                    <input type="text" id="pfNoSearch" class="form-control" placeholder="Enter PFNo">
+                                </div>
+                                <div class="col-auto">
+                                    <button type="submit" class="btn btn-primary">Search</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 2: Staff Details -->
+            <div class="row mb-4" id="staffDetailsSection" style="display: none;">
+                <div class="col-12">
+                    <div class="card shadow">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Staff Information</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    <label class="small font-weight-bold text-gray-600">Staff Name</label>
+                                    <div class="h5 mb-0 text-gray-800" id="detailSName">-</div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label class="small font-weight-bold text-gray-600">Job Title</label>
+                                    <div class="h5 mb-0 text-gray-800" id="detailJobTitle">-</div>
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <label class="small font-weight-bold text-gray-600">Medical Limit</label>
+                                    <div class="h5 mb-0 text-gray-800" id="detailMedicalLimit">-</div>
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <label class="small font-weight-bold text-gray-600">Leave Days</label>
+                                    <div class="h5 mb-0 text-gray-800" id="detailLeaveDays">-</div>
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <label class="small font-weight-bold text-gray-600">Leave Days Due</label>
+                                    <div class="h5 mb-0 text-gray-800" id="detailLeaveDue">-</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 3: History (Salary & Grade) -->
+            <div class="row mb-4" id="historySection" style="display: none;">
+                <!-- Salary History -->
+                <div class="col-md-6">
+                    <div class="card shadow h-100">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Salary History</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-sm" id="salaryHistoryTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Annual Salary</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Populated via AJAX -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Grade History -->
+                <div class="col-md-6">
+                    <div class="card shadow h-100">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Grade History</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-sm" id="gradeHistoryTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Job Title</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Populated via AJAX -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 4: Discipline & Transfers -->
+            <div class="row mb-4" id="row4Section" style="display: none;">
+                <!-- Discipline History -->
+                <div class="col-md-6">
+                    <div class="card shadow h-100">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Discipline / Queries</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-sm" id="queryHistoryTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Transfer History -->
+                <div class="col-md-6">
+                    <div class="card shadow h-100">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Transfer History</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-sm" id="transferHistoryTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>From</th>
+                                            <th>To</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 5: Training / Courses -->
+            <div class="row mb-4" id="row5Section" style="display: none;">
+                <div class="col-12">
+                    <div class="card shadow">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Training / Courses</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-sm" id="courseHistoryTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>Start Date</th>
+                                            <th>Course</th>
+                                            <th>Organised By</th>
+                                            <th>Duration</th>
+                                            <th>Country</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/scripts.js"></script>
+
+    <script>
+    $(document).ready(function() {
+        $('#searchForm').on('submit', function(e) {
+            e.preventDefault();
+            const pfNo = $('#pfNoSearch').val().trim();
+            
+            if (!pfNo) {
+                alert('Please enter a Staff ID / PFNo');
+                return;
+            }
+
+            // Show loading state
+            $('button[type="submit"]').prop('disabled', true).text('Searching...');
+
+            $.ajax({
+                url: '/admin/api/activity/staff-file',
+                method: 'GET',
+                data: { pfNo: pfNo },
+                success: function(response) {
+                    if (response.success) {
+                        const data = response.data;
+                        
+                        // Populate Details
+                        $('#detailSName').text(data.details.SName || '-');
+                        $('#detailJobTitle').text(data.details.JobTitle || '-');
+                        $('#detailMedicalLimit').text(data.details.MedicalLimit || '0.00');
+                        $('#detailLeaveDays').text(data.details.LeaveDays || '0');
+                        $('#detailLeaveDue').text(data.details.LeaveDue || '0');
+
+                        // Populate Salary History
+                        const salaryBody = $('#salaryHistoryTable tbody');
+                        salaryBody.empty();
+                        if (data.salaryHistory && data.salaryHistory.length > 0) {
+                            data.salaryHistory.forEach(item => {
+                                salaryBody.append(`
+                                    <tr>
+                                        <td>${new Date(item.PDate).toLocaleDateString()}</td>
+                                        <td>${parseFloat(item.Annual).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                                    </tr>
+                                `);
+                            });
+                        } else {
+                            salaryBody.append('<tr><td colspan="2" class="text-center">No history found</td></tr>');
+                        }
+
+                        // Populate Grade History
+                        const gradeBody = $('#gradeHistoryTable tbody');
+                        gradeBody.empty();
+                        if (data.gradeHistory && data.gradeHistory.length > 0) {
+                            data.gradeHistory.forEach(item => {
+                                gradeBody.append(`
+                                    <tr>
+                                        <td>${new Date(item.PDate).toLocaleDateString()}</td>
+                                        <td>${item.JobTitle || '-'}</td>
+                                    </tr>
+                                `);
+                            });
+                        } else {
+                            gradeBody.append('<tr><td colspan="2" class="text-center">No history found</td></tr>');
+                        }
+
+                        // Populate Query History
+                        const queryBody = $('#queryHistoryTable tbody');
+                        queryBody.empty();
+                        if (data.queryHistory && data.queryHistory.length > 0) {
+                            data.queryHistory.forEach(item => {
+                                queryBody.append(`
+                                    <tr>
+                                        <td>${new Date(item.QDate).toLocaleDateString()}</td>
+                                        <td>${item.QDetails || '-'}</td>
+                                    </tr>
+                                `);
+                            });
+                        } else {
+                            queryBody.append('<tr><td colspan="2" class="text-center">No history found</td></tr>');
+                        }
+
+                        // Populate Transfer History
+                        const transferBody = $('#transferHistoryTable tbody');
+                        transferBody.empty();
+                        if (data.transferHistory && data.transferHistory.length > 0) {
+                            data.transferHistory.forEach(item => {
+                                transferBody.append(`
+                                    <tr>
+                                        <td>${new Date(item.TDate).toLocaleDateString()}</td>
+                                        <td>${item.PrevDeptName || '-'}</td>
+                                        <td>${item.NewDeptName || '-'}</td>
+                                    </tr>
+                                `);
+                            });
+                        } else {
+                            transferBody.append('<tr><td colspan="3" class="text-center">No history found</td></tr>');
+                        }
+
+                        // Populate Course History
+                        const courseBody = $('#courseHistoryTable tbody');
+                        courseBody.empty();
+                        if (data.courseHistory && data.courseHistory.length > 0) {
+                            data.courseHistory.forEach(item => {
+                                courseBody.append(`
+                                    <tr>
+                                        <td>${new Date(item.StartDate).toLocaleDateString()}</td>
+                                        <td>${item.Course || '-'}</td>
+                                        <td>${item.OrganisedBy || '-'}</td>
+                                        <td>${item.Duration || '-'}</td>
+                                        <td>${item.Country || '-'}</td>
+                                    </tr>
+                                `);
+                            });
+                        } else {
+                            courseBody.append('<tr><td colspan="5" class="text-center">No history found</td></tr>');
+                        }
+
+                        // Show sections
+                        $('#staffDetailsSection').slideDown();
+                        $('#historySection').slideDown();
+                        $('#row4Section').slideDown();
+                        $('#row5Section').slideDown();
+                    } else {
+                        alert('Staff not found or error retrieving data');
+                        $('#staffDetailsSection').hide();
+                        $('#historySection').hide();
+                        $('#row4Section').hide();
+                        $('#row5Section').hide();
+                    }
+                },
+                error: function(err) {
+                    console.error('Error:', err);
+                    alert('Error fetching staff data. Please try again.');
+                },
+                complete: function() {
+                    $('button[type="submit"]').prop('disabled', false).text('Search');
+                }
+            });
+        });
+    });
+    </script>
+</body>
+</html>

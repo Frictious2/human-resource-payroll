@@ -45,8 +45,10 @@ app.get('/dashboard', (req, res) => {
 // Wire route modules
 const adminRoutes = require('./routes/admin');
 const developerRoutes = require('./routes/developer');
+const managerRoutes = require('./routes/manager');
 app.use('/admin', adminRoutes);
 app.use('/developer', developerRoutes);
+app.use('/manager', managerRoutes);
 
 // Admin dashboard routes
 app.get('/admin', (req, res) => {

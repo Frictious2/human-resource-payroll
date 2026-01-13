@@ -1830,6 +1830,241 @@ const saveTaxTable = async (req, res) => {
     }
 };
 
+const enquiryPage = async (req, res) => {
+    try {
+        const [departments] = await pool.query('SELECT Code, Dept FROM tbldept ORDER BY Dept');
+        const [jobTitles] = await pool.query('SELECT Code, JobTitle FROM tbljobtitle ORDER BY JobTitle');
+        res.render('admin/activity/enquiry', { 
+            title: 'Enquiry', 
+            group: 'Activity',
+            user: { name: 'David' },
+            departments,
+            jobTitles
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error loading enquiry page');
+    }
+};
+
+const getEnquiryData = async (req, res) => {
+    try {
+        const { servedYear, department, jobTitle, gender, ageMin, ageMax, retireMin, retireMax, formerDept, approved } = req.query;
+
+        // Get retirement age first
+        const [params] = await pool.query('SELECT RetireAge FROM tblparams1 LIMIT 1');
+        const retireAge = params[0]?.RetireAge || 60;
+
+        let sql = `
+            SELECT 
+                s.PFNo, 
+                s.SName, 
+                d.Dept AS Department, 
+                j.JobTitle, 
+                s.DOE, 
+                s.DOB, 
+                s.SexCode,
+                s.Approved,
+                TIMESTAMPDIFF(YEAR, s.DOE, CURDATE()) AS ServedYears,
+                TIMESTAMPDIFF(YEAR, s.DOB, CURDATE()) AS Age,
+                (${retireAge} - TIMESTAMPDIFF(YEAR, s.DOB, CURDATE())) AS YearsToRetire
+            FROM tblstaff s 
+            LEFT JOIN tbldept d ON s.CDept = d.Code 
+            LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code 
+            WHERE 1=1
+        `;
+
+        const values = [];
+
+        if (approved) {
+            sql += ` AND s.Approved = ?`;
+            values.push(approved);
+        }
+
+        if (servedYear) {
+            sql += ` AND TIMESTAMPDIFF(YEAR, s.DOE, CURDATE()) = ?`;
+            values.push(servedYear);
+        }
+
+        if (department) {
+            sql += ` AND s.CDept = ?`;
+            values.push(department);
+        }
+
+        if (jobTitle) {
+            sql += ` AND s.JobTitle = ?`;
+            values.push(jobTitle);
+        }
+
+        if (gender) {
+            sql += ` AND s.SexCode = ?`;
+            values.push(gender);
+        }
+
+        if (ageMin) {
+            sql += ` AND TIMESTAMPDIFF(YEAR, s.DOB, CURDATE()) >= ?`;
+            values.push(ageMin);
+        }
+
+        if (ageMax) {
+            sql += ` AND TIMESTAMPDIFF(YEAR, s.DOB, CURDATE()) <= ?`;
+            values.push(ageMax);
+        }
+
+        if (formerDept) {
+            sql += ` AND s.DEmp = ?`;
+            values.push(formerDept);
+        }
+
+        // For "To Retire", we filter using HAVING because YearsToRetire is a calculated column
+        // However, WHERE is more efficient if we repeat the calculation or use a subquery.
+        // Let's use the expression in WHERE for efficiency/standard SQL support.
+        
+        if (retireMin) {
+            sql += ` AND (${retireAge} - TIMESTAMPDIFF(YEAR, s.DOB, CURDATE())) >= ?`;
+            values.push(retireMin);
+        }
+
+        if (retireMax) {
+            sql += ` AND (${retireAge} - TIMESTAMPDIFF(YEAR, s.DOB, CURDATE())) <= ?`;
+            values.push(retireMax);
+        }
+
+        sql += ` ORDER BY s.PFNo`;
+
+        const [rows] = await pool.query(sql, values);
+        res.json({ data: rows });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ data: [], error: 'Failed to load enquiry data' });
+    }
+};
+
+const staffFilePage = (req, res) => {
+  res.render('admin/activity/staff-file', {
+    title: 'Staff File',
+    path: '/admin/activity/staff-file',
+    user: { name: 'David' }
+  });
+};
+
+const getStaffFileData = async (req, res) => {
+  try {
+    const pfNo = req.query.pfNo;
+    if (!pfNo) {
+      return res.status(400).json({ success: false, message: 'PFNo is required' });
+    }
+
+    // 1. Staff Details
+    const detailsQuery = `
+      SELECT
+        s.SName,
+        jt.JobTitle AS JobTitleName,
+        g.Medical AS MedicalLimit,
+        g.WDays AS LeaveDays
+      FROM tblStaff s
+      LEFT JOIN tblJobTitle jt ON s.JobTitle = jt.Code
+      LEFT JOIN tblGrade g ON s.GradeCode = g.GradeCode AND s.JobTitle = g.JobTitle
+      WHERE s.PFNo = ?
+    `;
+
+    const [details] = await pool.query(detailsQuery, [pfNo]);
+
+    if (details.length === 0) {
+      return res.json({ success: false, message: 'Staff not found' });
+    }
+
+    const staff = details[0];
+
+    // 2. Leave Days Due (tblLeaveHistory)
+    // "subtracting the values from LDay and BalDay"
+    const leaveQuery = `
+      SELECT LDays, BalDays
+      FROM tblLeaveHistory
+      WHERE PFNo = ?
+      ORDER BY LYear DESC, EntryDate DESC
+      LIMIT 1
+    `;
+    const [leaveHistory] = await pool.query(leaveQuery, [pfNo]);
+    let leaveDue = 0;
+    if (leaveHistory.length > 0) {
+      const lh = leaveHistory[0];
+      leaveDue = (lh.LDays || 0) - (lh.BalDays || 0);
+    }
+
+    // 3. Salary History
+    const salaryQuery = `
+      SELECT PDate, Annual
+      FROM tblSalary
+      WHERE PFNo = ?
+      ORDER BY PDate DESC
+    `;
+    const [salaryHistory] = await pool.query(salaryQuery, [pfNo]);
+
+    // 4. Grade History
+    const gradeQuery = `
+      SELECT p.PDate, jt.JobTitle
+      FROM tblPromotions p
+      LEFT JOIN tblJobTitle jt ON p.JobTitle = jt.Code
+      WHERE p.PFNO = ?
+      ORDER BY p.PDate DESC
+    `;
+    const [gradeHistory] = await pool.query(gradeQuery, [pfNo]);
+
+    // 5. Discipline / Queries
+    const queryQuery = `
+      SELECT QDate, QDetails, QType
+      FROM tblQuery
+      WHERE PFNO = ?
+      ORDER BY QDate DESC
+    `;
+    const [queryHistory] = await pool.query(queryQuery, [pfNo]);
+
+    // 6. Transfer History
+    const transferQuery = `
+      SELECT t.TDate, d1.Dept AS PrevDeptName, d2.Dept AS NewDeptName
+      FROM tblTransfer t
+      LEFT JOIN tbldept d1 ON t.PrevDept = d1.Code
+      LEFT JOIN tbldept d2 ON t.TDept = d2.Code
+      WHERE t.PFNO = ?
+      ORDER BY t.TDate DESC
+    `;
+    const [transferHistory] = await pool.query(transferQuery, [pfNo]);
+
+    // 7. Training / Course History
+    const courseQuery = `
+      SELECT StartDate, Course, OrganisedBy, Duration, Country
+      FROM tblCourse
+      WHERE PFNo = ?
+      ORDER BY StartDate DESC
+    `;
+    const [courseHistory] = await pool.query(courseQuery, [pfNo]);
+
+    res.json({
+      success: true,
+      data: {
+        details: {
+          SName: staff.SName,
+          JobTitle: staff.JobTitleName,
+          MedicalLimit: staff.MedicalLimit,
+          LeaveDays: staff.LeaveDays,
+          LeaveDue: leaveDue
+        },
+        salaryHistory: salaryHistory,
+        gradeHistory: gradeHistory,
+        queryHistory: queryHistory,
+        transferHistory: transferHistory,
+        courseHistory: courseHistory
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching staff file data:', error);
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
 module.exports = {
   renderDashboard,
   comingSoon,
@@ -1933,4 +2168,8 @@ module.exports = {
   addSponsor,
   updateSponsor,
   deleteSponsor,
+  enquiryPage,
+  getEnquiryData,
+  staffFilePage,
+  getStaffFileData,
 };
