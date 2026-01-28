@@ -47,9 +47,17 @@
         <div class="container-fluid">
             <div class="d-flex align-items-center justify-content-between mb-4">
                 <h2 class="mb-0">Grades</h2>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addGradeModal">
-                    <i class="bi bi-plus-circle me-2"></i>Add Grade
-                </button>
+                <div class="d-flex gap-2 d-print-none">
+                    <button type="button" class="btn btn-success" onclick="exportExcel()">
+                        <i class="bi bi-file-earmark-excel"></i> Export to Excel
+                    </button>
+                    <button type="button" class="btn btn-danger" onclick="exportPDF()">
+                        <i class="bi bi-file-earmark-pdf"></i> Export to PDF
+                    </button>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addGradeModal">
+                        <i class="bi bi-plus-circle me-2"></i>Add Grade
+                    </button>
+                </div>
             </div>
 
             <div class="card shadow-sm">
@@ -61,6 +69,10 @@
                     </div>
                 </div>
                 <div class="card-body p-0">
+                    <div class="d-none d-print-block text-center py-4">
+                        <h2 class="fw-bold mt-0">HR Payroll</h2>
+                        <h4 class="text-decoration-underline mt-0">Grades</h4>
+                    </div>
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0" id="gradesTable">
                             <thead class="table-light">

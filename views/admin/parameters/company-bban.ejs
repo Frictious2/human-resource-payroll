@@ -440,6 +440,48 @@
                     alert('Error adding company bban');
                 }
             });
+
+            window.exportExcel = async function() {
+                if (!allData || allData.length === 0) {
+                    alert("No data to export");
+                    return;
+                }
+                
+                const exportData = allData.map(item => ({
+                    Bank: item.Bank,
+                    BBAN: item.BBAN,
+                    Short: item.Short
+                }));
+
+                const ws = XLSX.utils.json_to_sheet(exportData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "CompanyBBAN");
+                XLSX.writeFile(wb, "CompanyBBAN.xlsx");
+            };
+
+            window.exportPDF = function() {
+                const element = document.getElementById('printableArea');
+                const header = element.querySelector('.d-print-block');
+                const wasHidden = header && header.classList.contains('d-none');
+                
+                if (wasHidden) {
+                    header.classList.remove('d-none');
+                }
+                
+                const opt = {
+                    margin: 10,
+                    filename: 'CompanyBBAN.pdf',
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2 },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+                };
+                
+                html2pdf().set(opt).from(element).save().then(() => {
+                    if (wasHidden) {
+                        header.classList.add('d-none');
+                    }
+                });
+            };
         });
     </script>
 </body>

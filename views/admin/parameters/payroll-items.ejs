@@ -50,13 +50,21 @@
         <div class="container-fluid">
             <div class="d-flex align-items-center justify-content-between mb-4">
                 <h2 class="mb-0">Payroll Items</h2>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addItemModal">
-                    <i class="bi bi-plus-circle me-2"></i>Add Item
-                </button>
+                <div class="d-flex gap-2 d-print-none">
+                    <button type="button" class="btn btn-success" onclick="exportExcel()">
+                        <i class="bi bi-file-earmark-excel"></i> Export to Excel
+                    </button>
+                    <button type="button" class="btn btn-danger" onclick="exportPDF()">
+                        <i class="bi bi-file-earmark-pdf"></i> Export to PDF
+                    </button>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addItemModal">
+                        <i class="bi bi-plus-circle me-2"></i>Add Item
+                    </button>
+                </div>
             </div>
 
-            <div class="card shadow-sm">
-                <div class="card-body p-3 border-bottom">
+            <div class="card shadow-sm" id="printableArea">
+                <div class="card-body p-3 border-bottom d-print-none">
                     <div class="row">
                         <div class="col-md-4">
                             <input type="text" id="searchInput" class="form-control" placeholder="Search payroll items...">

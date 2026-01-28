@@ -7,7 +7,8 @@ router.get('/', (req, res) => res.redirect('/manager/dashboard'));
 router.get('/dashboard', managerController.getDashboard);
 
 // Enquiry
-router.get('/enquiry/staff', managerController.getComingSoon);
+router.get('/enquiry/staff', managerController.getStaffEnquiry);
+router.get('/enquiry/staff/general-info', managerController.getStaffGeneralInfo);
 router.get('/enquiry/transfer-prom', managerController.getComingSoon);
 router.get('/enquiry/warning', managerController.getComingSoon);
 router.get('/enquiry/training', managerController.getComingSoon);

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · HR & Payroll</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+    <!-- html2pdf.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+            transition: all 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2"><%= title %></h1>
+            </div>
+
+            <div class="row g-4">
+                <!-- 1. Emp-Information -->
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm card-hover text-center">
+                        <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                            <div class="display-4 text-primary mb-3">
+                                <i class="bi bi-person-badge"></i>
+                            </div>
+                            <h3 class="card-title">Emp-Information</h3>
+                            <p class="card-text text-muted">View and manage detailed employee information.</p>
+                            <a href="/data-entry/staff/new-edit" class="btn btn-primary mt-auto stretched-link">
+                                <i class="bi bi-arrow-right"></i> Go to Employee Info
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. General Information -->
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm card-hover text-center">
+                        <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                            <div class="display-4 text-success mb-3">
+                                <i class="bi bi-table"></i>
+                            </div>
+                            <h3 class="card-title">General Information</h3>
+                            <p class="card-text text-muted">View general staff list with advanced filters and export options.</p>
+                            <!-- Opens in new window -->
+                            <a href="/data-entry/enquiry/staff/general-info" target="_blank" class="btn btn-success mt-auto">
+                                <i class="bi bi-box-arrow-up-right"></i> Open in New Window
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Birthday -->
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm card-hover text-center">
+                        <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                            <div class="display-4 text-warning mb-3">
+                                <i class="bi bi-cake2"></i>
+                            </div>
+                            <h3 class="card-title">Birthday List</h3>
+                            <p class="card-text text-muted">Generate and print staff birthday lists by month.</p>
+                            <button type="button" class="btn btn-warning mt-auto text-white" data-bs-toggle="modal" data-bs-target="#birthdayModal">
+                                <i class="bi bi-calendar-event"></i> View Birthdays
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Birthday Modal -->
+    <div class="modal fade" id="birthdayModal" tabindex="-1" aria-labelledby="birthdayModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="birthdayModalLabel">Staff Birthday List</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3 d-print-none">
+                        <div class="col-md-6 offset-md-3">
+                            <label for="birthdayMonth" class="form-label">Select Month</label>
+                            <select class="form-select" id="birthdayMonth" onchange="loadBirthdays()">
+                                <option value="">-- Select Month --</option>
+                                <option value="1">January</option>
+                                <option value="2">February</option>
+                                <option value="3">March</option>
+                                <option value="4">April</option>
+                                <option value="5">May</option>
+                                <option value="6">June</option>
+                                <option value="7">July</option>
+                                <option value="8">August</option>
+                                <option value="9">September</option>
+                                <option value="10">October</option>
+                                <option value="11">November</option>
+                                <option value="12">December</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Printable Area -->
+                    <div id="birthdayPrintArea">
+                        <!-- Header for Print -->
+                        <div class="d-none d-print-block text-center mb-4" id="printHeader">
+                            <h2 class="fw-bold"><%= companyName %></h2>
+                            <h4 class="text-decoration-underline" id="printTitle">Staff Birthday List</h4>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-striped table-bordered" id="birthdayTable">
+                                <thead>
+                                    <tr>
+                                        <th>Emp-ID</th>
+                                        <th>Employee Name</th>
+                                        <th>Birthdate</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td colspan="3" class="text-center">Select a month to view birthdays.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer d-print-none">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="printBirthdays()">
+                        <i class="bi bi-printer"></i> Print Preview
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const monthNames = ["January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"
+        ];
+
+        async function loadBirthdays() {
+            const month = document.getElementById('birthdayMonth').value;
+            if (!month) {
+                document.querySelector('#birthdayTable tbody').innerHTML = '<tr><td colspan="3" class="text-center">Select a month to view birthdays.</td></tr>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/data-entry/enquiry/staff/birthdays?month=${month}`);
+                const data = await response.json();
+                
+                const tbody = document.querySelector('#birthdayTable tbody');
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="text-center">No birthdays found for this month.</td></tr>';
+                } else {
+                    tbody.innerHTML = data.map(staff => `
+                        <tr>
+                            <td>${staff.PFNo}</td>
+                            <td>${staff.SName}</td>
+                            <td>${staff.Birthdate}</td>
+                        </tr>
+                    `).join('');
+                }
+
+                // Update Print Title
+                const currentYear = new Date().getFullYear();
+                document.getElementById('printTitle').textContent = `Staff Birthday List for ${monthNames[month-1]} ${currentYear}`;
+
+            } catch (error) {
+                console.error('Error fetching birthdays:', error);
+                alert('Error fetching data');
+            }
+        }
+
+        function printBirthdays() {
+            // We need to print only the modal content or specific area
+            // Simplest way is to open a new window or use a print specific stylesheet
+            // But since we are in a modal, standard window.print() prints the background too.
+            // Let's use a temporary print approach: hide everything except the printable area.
+            
+            const printContent = document.getElementById('birthdayPrintArea').innerHTML;
+            const originalContent = document.body.innerHTML;
+
+            // Create a temporary container for printing
+            const printContainer = document.createElement('div');
+            printContainer.innerHTML = printContent;
+            
+            // Show the print header
+            const header = printContainer.querySelector('#printHeader');
+            if (header) {
+                header.classList.remove('d-none');
+                header.classList.add('d-block');
+            }
+
+            // Replace body content
+            document.body.innerHTML = printContainer.innerHTML;
+            
+            window.print();
+
+            // Restore original content
+            document.body.innerHTML = originalContent;
+            
+            // Re-bind event listeners or reload page might be needed if JS breaks, 
+            // but reload is safer to restore state fully.
+            window.location.reload(); 
+        }
+    </script>
+</body>
+</html>

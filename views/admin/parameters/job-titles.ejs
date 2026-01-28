@@ -136,6 +136,49 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Export Functions
+        async function exportExcel() {
+            if (!allData || allData.length === 0) {
+                alert("No data to export");
+                return;
+            }
+            
+            // Format data for export
+            const exportData = allData.map(item => ({
+                Code: item.Code,
+                JobTitle: item.JobTitle
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "JobTitles");
+            XLSX.writeFile(wb, "JobTitles.xlsx");
+        }
+
+        function exportPDF() {
+            const element = document.getElementById('printableArea');
+            const header = element.querySelector('.d-print-block');
+            const wasHidden = header && header.classList.contains('d-none');
+            
+            if (wasHidden) {
+                header.classList.remove('d-none');
+            }
+            
+            const opt = {
+                margin: 10,
+                filename: 'JobTitles.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            
+            html2pdf().set(opt).from(element).save().then(() => {
+                if (wasHidden) {
+                    header.classList.add('d-none');
+                }
+            });
+        }
+
         // State for pagination and search
         let allData = [];
         let filteredData = [];

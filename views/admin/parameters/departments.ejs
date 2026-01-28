@@ -7,6 +7,17 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
     <link href="/css/styles.css" rel="stylesheet" />
+    <!-- html2pdf.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- SheetJS for Excel export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <style>
+        @media print {
+            tr { page-break-inside: avoid; }
+            .d-print-none { display: none !important; }
+        }
+        tr { page-break-inside: avoid; }
+    </style>
     <style>
         .editable-cell {
             padding: 0.25rem;
@@ -47,13 +58,21 @@
         <div class="container-fluid">
             <div class="d-flex align-items-center justify-content-between mb-4">
                 <h2 class="mb-0">Departments</h2>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addDeptModal">
-                    <i class="bi bi-plus-circle me-2"></i>Add Department
-                </button>
+                <div class="d-flex gap-2 d-print-none">
+                    <button type="button" class="btn btn-success" onclick="exportExcel()">
+                        <i class="bi bi-file-earmark-excel"></i> Export to Excel
+                    </button>
+                    <button type="button" class="btn btn-danger" onclick="exportPDF()">
+                        <i class="bi bi-file-earmark-pdf"></i> Export to PDF
+                    </button>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addDeptModal">
+                        <i class="bi bi-plus-circle me-2"></i>Add Department
+                    </button>
+                </div>
             </div>
 
-            <div class="card shadow-sm">
-                <div class="card-body p-3 border-bottom">
+            <div class="card shadow-sm" id="printableArea">
+                <div class="card-body p-3 border-bottom d-print-none">
                     <div class="row">
                         <div class="col-md-4">
                             <input type="text" id="searchInput" class="form-control" placeholder="Search departments...">
@@ -61,6 +80,11 @@
                     </div>
                 </div>
                 <div class="card-body p-0">
+                    <!-- Print Header -->
+                    <div class="d-none d-print-block text-center py-4">
+                        <h2 class="fw-bold mt-0">HR Payroll</h2>
+                        <h4 class="text-decoration-underline mt-0">Departments</h4>
+                    </div>
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0" id="departmentsTable">
                             <thead class="table-light">
@@ -138,6 +162,42 @@
     <script>
         // State for pagination and search
         let allData = [];
+
+        async function exportExcel() {
+            if (!allData || allData.length === 0) {
+                alert("No data to export");
+                return;
+            }
+            
+            const ws = XLSX.utils.json_to_sheet(allData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Departments");
+            XLSX.writeFile(wb, "Departments.xlsx");
+        }
+
+        function exportPDF() {
+            const element = document.getElementById('printableArea');
+            const header = element.querySelector('.d-print-block');
+            const wasHidden = header && header.classList.contains('d-none');
+            
+            if (wasHidden) {
+                header.classList.remove('d-none');
+            }
+            
+            const opt = {
+                margin: 10,
+                filename: 'Departments.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            
+            html2pdf().set(opt).from(element).save().then(() => {
+                if (wasHidden) {
+                    header.classList.add('d-none');
+                }
+            });
+        }
         let filteredData = [];
         let currentPage = 1;
         const rowsPerPage = 10;

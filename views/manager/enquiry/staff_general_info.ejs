@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · HR & Payroll</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+    <!-- html2pdf.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- SheetJS for Excel export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <style>
+        @media print {
+            tr { page-break-inside: avoid; }
+        }
+        /* For html2pdf */
+        tr { page-break-inside: avoid; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
+            <div class="d-none">
+                <h2 class="fw-bold"><%= companyName %></h2>
+                <h4 class="text-muted">Staff General Information</h4>
+            </div>
+            <div class="d-print-none w-100 text-end">
+                <button class="btn btn-outline-secondary" onclick="window.close()">Close Window</button>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="card mb-4 shadow-sm d-print-none">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-funnel"></i> Filters</h5>
+            </div>
+            <div class="card-body">
+                <form method="GET" class="row g-3">
+                    <!-- Row 1 -->
+                    <div class="col-md-3">
+                        <label class="form-label">Served (Years)</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="servedFrom" placeholder="From" value="<%= filters.servedFrom || '' %>">
+                            <span class="input-group-text">-</span>
+                            <input type="number" class="form-control" name="servedTo" placeholder="To" value="<%= filters.servedTo || '' %>">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Department</label>
+                        <select class="form-select" name="dept">
+                            <option value="">All Departments</option>
+                            <% depts.forEach(d => { %>
+                                <option value="<%= d.Code %>" <%= filters.dept === d.Code ? 'selected' : '' %>><%= d.Dept %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Job Title</label>
+                        <select class="form-select" name="jobTitle">
+                            <option value="">All Job Titles</option>
+                            <% jobs.forEach(j => { %>
+                                <option value="<%= j.Code %>" <%= filters.jobTitle === j.Code ? 'selected' : '' %>><%= j.JobTitle %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Gender</label>
+                        <select class="form-select" name="gender">
+                            <option value="">All</option>
+                            <% sexes.forEach(s => { %>
+                                <option value="<%= s.SexCode %>" <%= filters.gender === s.SexCode ? 'selected' : '' %>><%= s.Status %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+
+                    <!-- Row 2 -->
+                    <div class="col-md-3">
+                        <label class="form-label">Age (Years)</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="ageFrom" placeholder="From" value="<%= filters.ageFrom || '' %>">
+                            <span class="input-group-text">-</span>
+                            <input type="number" class="form-control" name="ageTo" placeholder="To" value="<%= filters.ageTo || '' %>">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">To Retire (Years)</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="retireFrom" placeholder="From" value="<%= filters.retireFrom || '' %>">
+                            <span class="input-group-text">-</span>
+                            <input type="number" class="form-control" name="retireTo" placeholder="To" value="<%= filters.retireTo || '' %>">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Former Department</label>
+                        <select class="form-select" name="formerDept">
+                            <option value="">Any</option>
+                            <% depts.forEach(d => { %>
+                                <option value="<%= d.Code %>" <%= filters.formerDept === d.Code ? 'selected' : '' %>><%= d.Dept %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Expired Contract</label>
+                        <select class="form-select" name="expiredContract">
+                            <option value="">All</option>
+                            <option value="Yes" <%= filters.expiredContract === 'Yes' ? 'selected' : '' %>>Yes</option>
+                            <option value="No" <%= filters.expiredContract === 'No' ? 'selected' : '' %>>No</option>
+                        </select>
+                    </div>
+
+                    <!-- Row 3 -->
+                    <div class="col-md-3">
+                        <label class="form-label">Contract to Expire (Years)</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="contractExpFrom" placeholder="From" value="<%= filters.contractExpFrom || '' %>">
+                            <span class="input-group-text">-</span>
+                            <input type="number" class="form-control" name="contractExpTo" placeholder="To" value="<%= filters.contractExpTo || '' %>">
+                        </div>
+                    </div>
+                    <div class="col-md-9 d-flex align-items-end justify-content-end">
+                        <button type="submit" class="btn btn-primary me-2"><i class="bi bi-filter"></i> Apply Filters</button>
+                        <a href="/manager/enquiry/staff/general-info" class="btn btn-secondary"><i class="bi bi-arrow-counterclockwise"></i> Reset</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="d-flex justify-content-end mb-3 d-print-none">
+            <div class="btn-group">
+                <button type="button" class="btn btn-success" onclick="exportExcel()">
+                    <i class="bi bi-file-earmark-excel"></i> Export to Excel
+                </button>
+                <button type="button" class="btn btn-danger" onclick="exportPDF()">
+                    <i class="bi bi-file-earmark-pdf"></i> Export to PDF
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="window.print()">
+                    <i class="bi bi-printer"></i> Print
+                </button>
+            </div>
+        </div>
+
+        <!-- Table Area -->
+        <div class="card shadow-sm border-0" id="printableArea">
+            <div class="card-body p-0">
+                <!-- Print Header (Hidden on screen) -->
+                <div class="d-none d-print-block text-center mb-4">
+                    <h2 class="fw-bold mt-0"><%= companyName %></h2>
+                    <h4 class="text-decoration-underline mt-0">Staff General Information</h4>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover table-bordered" id="dataTable">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Emp-ID</th>
+                                <th>Name</th>
+                                <th>Department</th>
+                                <th>Job Title</th>
+                                <th>Employed</th>
+                                <th>Served (Yrs)</th>
+                                <th>Age</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (data.length > 0) { %>
+                                <% data.forEach(row => { %>
+                                    <tr>
+                                        <td><%= row.PFNo %></td>
+                                        <td><%= row.SName %></td>
+                                        <td><%= row.Department || '-' %></td>
+                                        <td><%= row.JobTitle || '-' %></td>
+                                        <td><%= new Date(row.DateEmployed).toLocaleDateString() %></td>
+                                        <td><%= row.ServedYears %></td>
+                                        <td><%= row.Age %></td>
+                                    </tr>
+                                <% }) %>
+                            <% } else { %>
+                                <tr>
+                                    <td colspan="7" class="text-center">No records found matching filters.</td>
+                                </tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <% if (pagination.totalPages > 1) { %>
+            <nav class="mt-4 d-print-none">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item <%= pagination.page === 1 ? 'disabled' : '' %>">
+                        <a class="page-link" href="?page=<%= pagination.page - 1 %>&<%= new URLSearchParams({...filters, page: undefined}).toString() %>">Previous</a>
+                    </li>
+                    <% for(let i = 1; i <= pagination.totalPages; i++) { %>
+                        <li class="page-item <%= pagination.page === i ? 'active' : '' %>">
+                            <a class="page-link" href="?page=<%= i %>&<%= new URLSearchParams({...filters, page: undefined}).toString() %>"><%= i %></a>
+                        </li>
+                    <% } %>
+                    <li class="page-item <%= pagination.page === pagination.totalPages ? 'disabled' : '' %>">
+                        <a class="page-link" href="?page=<%= pagination.page + 1 %>&<%= new URLSearchParams({...filters, page: undefined}).toString() %>">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        <% } %>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        async function exportExcel() {
+            try {
+                const btn = document.querySelector('button[onclick="exportExcel()"]');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Exporting...';
+                btn.disabled = true;
+
+                // Get current URL search params
+                const params = new URLSearchParams(window.location.search);
+                params.set('export', 'json');
+                
+                // Fetch all data
+                const response = await fetch(`${window.location.pathname}?${params.toString()}`);
+                if (!response.ok) throw new Error('Network response was not ok');
+                
+                const data = await response.json();
+                
+                if (data.length === 0) {
+                    alert("No data to export");
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    return;
+                }
+
+                // Transform data for Excel
+                const excelData = data.map(row => ({
+                    "Emp-ID": row.PFNo,
+                    "Name": row.SName,
+                    "Department": row.Department || '-',
+                    "Job Title": row.JobTitle || '-',
+                    "Employed": row.DateEmployed ? new Date(row.DateEmployed).toLocaleDateString() : '-',
+                    "Served (Yrs)": row.ServedYears,
+                    "Age": row.Age
+                }));
+
+                // Create worksheet
+                const ws = XLSX.utils.json_to_sheet(excelData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Staff General Info");
+                
+                // Save file
+                XLSX.writeFile(wb, "Staff_General_Info.xlsx");
+                
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            } catch (error) {
+                console.error('Export failed:', error);
+                alert('Failed to export data. Please try again.');
+                const btn = document.querySelector('button[onclick="exportExcel()"]');
+                if (btn) {
+                    btn.innerHTML = '<i class="bi bi-file-earmark-excel"></i> Export to Excel';
+                    btn.disabled = false;
+                }
+            }
+        }
+
+        function exportPDF() {
+            const element = document.getElementById('printableArea');
+            // Temporarily show the header for PDF generation
+            const header = element.querySelector('.d-print-block');
+            const wasHidden = header && header.classList.contains('d-none');
+            
+            if (wasHidden) {
+                header.classList.remove('d-none');
+            }
+
+            const opt = {
+                margin:       5, // Reduced margin
+                filename:     'staff_general_info.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' },
+                pagebreak:    { avoid: 'tr' }
+            };
+            
+            html2pdf().set(opt).from(element).save().then(() => {
+                // Revert visibility
+                if (wasHidden) {
+                    header.classList.add('d-none');
+                }
+            });
+        }
+    </script>
+</body>
+</html>

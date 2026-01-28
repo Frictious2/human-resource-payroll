@@ -7,16 +7,19 @@ router.get('/', (req, res) => res.redirect('/data-entry/dashboard'));
 router.get('/dashboard', dataEntryController.getDashboard);
 
 // 1. Enquiry
-router.get('/enquiry/staff', dataEntryController.getComingSoon);
+router.get('/enquiry/staff', dataEntryController.getStaffEnquiry);
+router.get('/enquiry/staff/birthdays', dataEntryController.getStaffBirthdays);
+router.get('/enquiry/staff/general-info', dataEntryController.getStaffGeneralInfo);
 router.get('/enquiry/transfer-promotion', dataEntryController.getComingSoon);
 router.get('/enquiry/training', dataEntryController.getComingSoon);
-router.get('/enquiry/discipline', dataEntryController.getComingSoon);
+router.get('/enquiry/discipline', dataEntryController.getDisciplineEnquiry);
 router.get('/enquiry/loan-balance', dataEntryController.getComingSoon);
 router.get('/enquiry/medical', dataEntryController.getComingSoon);
-router.get('/enquiry/applications', dataEntryController.getComingSoon);
+router.get('/enquiry/applications', dataEntryController.getApplicationsEnquiry);
 
 // 2. Staff
-router.get('/staff/applications', dataEntryController.getComingSoon);
+router.get('/staff/applications', dataEntryController.getApplications);
+router.post('/staff/applications', dataEntryController.postApplications);
 router.get('/staff/interview', dataEntryController.getComingSoon);
 router.get('/staff/new-edit', dataEntryController.getComingSoon);
 router.get('/staff/dependants', dataEntryController.getComingSoon);
@@ -57,7 +60,9 @@ router.get('/welfare/corporate-benefit', dataEntryController.getComingSoon);
 router.get('/welfare/redundancy', dataEntryController.getComingSoon);
 
 // 5. Reports
-router.get('/reports/payroll', dataEntryController.getComingSoon);
+router.get('/reports/payroll', dataEntryController.getPayrollReports);
+router.get('/api/staff/:pfno/name', dataEntryController.getStaffName);
+router.get('/api/reports/payslip', dataEntryController.getPayslipData);
 router.get('/reports/journal', dataEntryController.getComingSoon);
 router.get('/reports/vehicle-insurance-status', dataEntryController.getComingSoon);
 router.get('/reports/medical', dataEntryController.getComingSoon);

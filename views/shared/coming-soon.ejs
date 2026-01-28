@@ -15,6 +15,9 @@
   <% } else if (role === 'manager') { %>
     <%- include('../manager/partials/topbar', { user }) %>
     <%- include('../manager/partials/sidebar') %>
+  <% } else if (role === 'data_entry') { %>
+    <%- include('../data_entry/partials/topbar', { user }) %>
+    <%- include('../data_entry/partials/sidebar') %>
   <% } else { %>
     <%- include('../developer/partials/topbar', { user }) %>
     <%- include('../developer/partials/sidebar') %>
@@ -41,6 +44,8 @@
           <%- include('../admin/partials/footer') %>
         <% } else if (role === 'manager') { %>
           <%- include('../manager/partials/footer') %>
+        <% } else if (role === 'data_entry') { %>
+          <%- include('../data_entry/partials/footer') %>
         <% } else { %>
           <%- include('../developer/partials/footer') %>
         <% } %>
