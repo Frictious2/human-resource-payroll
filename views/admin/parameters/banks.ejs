@@ -54,9 +54,17 @@
         <div class="container-fluid">
             <div class="d-flex align-items-center justify-content-between mb-4">
                 <h2 class="mb-0">Banks</h2>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addBankModal">
-                    <i class="bi bi-plus-circle me-2"></i>Add Bank
-                </button>
+                <div class="d-flex gap-2 d-print-none">
+                    <button type="button" class="btn btn-success" onclick="exportExcel()">
+                        <i class="bi bi-file-earmark-excel"></i> Export to Excel
+                    </button>
+                    <button type="button" class="btn btn-danger" onclick="exportPDF()">
+                        <i class="bi bi-file-earmark-pdf"></i> Export to PDF
+                    </button>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addBankModal">
+                        <i class="bi bi-plus-circle me-2"></i>Add Bank
+                    </button>
+                </div>
             </div>
 
             <div class="card shadow-sm">
@@ -67,7 +75,11 @@
                         </div>
                     </div>
                 </div>
-                <div class="card-body p-0">
+                <div class="card-body p-0" id="printableArea">
+                    <div class="d-none d-print-block text-center py-4">
+                        <h2 class="fw-bold mt-0">HR Payroll</h2>
+                        <h4 class="text-decoration-underline mt-0">Banks</h4>
+                    </div>
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0" id="banksTable">
                             <thead class="table-light">
@@ -78,7 +90,7 @@
                                     <th style="width: 10%">Bank Code</th>
                                     <th style="width: 20%">Street Address</th>
                                     <th style="width: 20%">Town Address</th>
-                                    <th class="text-end" style="width: 10%">Actions</th>
+                                    <th class="text-end d-print-none" style="width: 10%">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -167,6 +179,50 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Export Functions
+        window.exportExcel = function() {
+            if (!allData || allData.length === 0) {
+                alert("No data to export");
+                return;
+            }
+            const exportData = allData.map(item => ({
+                Bank: item.Bank,
+                ShortName: item.Short,
+                BankCode: item.BankCode,
+                StreetAddress: item.Street_Address,
+                TownAddress: item.Town_Address
+            }));
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Banks");
+            XLSX.writeFile(wb, "Banks.xlsx");
+        };
+
+        window.exportPDF = async function() {
+            const element = document.getElementById('printableArea');
+            const header = element.querySelector('.d-print-block');
+            const originalPage = currentPage;
+            
+            if (header) header.classList.remove('d-none');
+            renderTable(filteredData, 0); 
+            
+            const opt = {
+                margin: 10,
+                filename: 'Banks.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            };
+            
+            try {
+                await html2pdf().set(opt).from(element).save();
+            } finally {
+                if (header) header.classList.add('d-none');
+                currentPage = originalPage;
+                renderPage();
+            }
+        };
+
         // State for pagination and search
         let allData = [];
         let filteredData = [];
@@ -273,7 +329,7 @@
                         <td class="editable-cell"><input type="text" name="BankCode" value="${item.BankCode || ''}"></td>
                         <td class="editable-cell"><input type="text" name="Street_Address" value="${item.Street_Address || ''}"></td>
                         <td class="editable-cell"><input type="text" name="Town_Address" value="${item.Town_Address || ''}"></td>
-                        <td class="text-end">
+                        <td class="text-end d-print-none">
                             <button class="btn btn-sm btn-outline-danger delete-btn"><i class="bi bi-trash"></i></button>
                         </td>
                     `;

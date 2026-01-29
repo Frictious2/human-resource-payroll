@@ -7,6 +7,11 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
     <link href="/css/styles.css" rel="stylesheet" />
+    <style>
+        @media print {
+            .d-print-none { display: none !important; }
+        }
+    </style>
 </head>
 <body>
     <%- include('../partials/topbar', { user }) %>
@@ -17,9 +22,17 @@
             <!-- Page Title and Add Button -->
             <div class="d-flex align-items-center justify-content-between mb-4">
                 <h2 class="mb-0"><%= title %></h2>
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSponsorModal">
-                    <i class="bi bi-plus-lg me-1"></i> Add Sponsor
-                </button>
+                <div class="d-flex gap-2 d-print-none">
+                    <button type="button" class="btn btn-success" onclick="exportExcel()">
+                        <i class="bi bi-file-earmark-excel"></i> Export to Excel
+                    </button>
+                    <button type="button" class="btn btn-danger" onclick="exportPDF()">
+                        <i class="bi bi-file-earmark-pdf"></i> Export to PDF
+                    </button>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSponsorModal">
+                        <i class="bi bi-plus-lg me-1"></i> Add Sponsor
+                    </button>
+                </div>
             </div>
 
             <!-- Sponsors Table -->
@@ -76,9 +89,13 @@
         </div>
     </div>
 
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/js/dashboard.js"></script>
     <script>
+        let allData = [];
+
         document.addEventListener('DOMContentLoaded', () => {
             loadSponsors();
 
@@ -89,11 +106,11 @@
             try {
                 const response = await fetch('/admin/api/parameters/sponsors');
                 if (!response.ok) throw new Error('Failed to load sponsors');
-                const sponsors = await response.json();
+                allData = await response.json();
                 const tbody = document.getElementById('sponsorsTableBody');
                 tbody.innerHTML = '';
 
-                sponsors.forEach(sponsor => {
+                allData.forEach(sponsor => {
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>${sponsor.SCode}</td>
@@ -103,7 +120,7 @@
                                 onchange="updateSponsor('${sponsor.SCode}', this.value)"
                             >
                         </td>
-                        <td>
+                        <td class="d-print-none">
                             <button class="btn btn-sm btn-outline-danger" onclick="deleteSponsor('${sponsor.SCode}')">
                                 <i class="bi bi-trash"></i>
                             </button>
@@ -116,6 +133,41 @@
                 alert('Error loading sponsors');
             }
         }
+
+        window.exportExcel = function() {
+            if (!allData || allData.length === 0) {
+                alert("No data to export");
+                return;
+            }
+            const exportData = allData.map((item, index) => ({
+                "No.": index + 1,
+                "Code": item.SCode,
+                "Sponsor": item.Sponsor
+            }));
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Sponsors");
+            XLSX.writeFile(wb, "Sponsors.xlsx");
+        };
+
+        window.exportPDF = function() {
+            const element = document.getElementById('printableArea');
+            const header = element.querySelector('.d-print-block');
+            const wasHidden = header && header.classList.contains('d-none');
+            
+            if (wasHidden) header.classList.remove('d-none');
+
+            const opt = {
+                margin: 10,
+                filename: 'Sponsors.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            html2pdf().set(opt).from(element).save().then(() => {
+                if (wasHidden) header.classList.add('d-none');
+            });
+        };
 
         async function saveSponsor() {
             const form = document.getElementById('addSponsorForm');

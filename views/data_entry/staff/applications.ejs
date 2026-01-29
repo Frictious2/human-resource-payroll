@@ -124,8 +124,8 @@
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label for="PFNo" class="form-label">PF Number</label>
-                                <input type="text" class="form-control" id="PFNo" name="PFNo">
+                                <label for="Email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="Email" name="Email">
                             </div>
 
                             <!-- Referees -->
@@ -175,29 +175,7 @@
                                 <input type="datetime-local" class="form-control" id="IntDate" name="IntDate">
                             </div>
 
-                            <!-- Appointment and Posting -->
-                            <div class="col-md-4">
-                                <label for="DateAppointed" class="form-label">Date Appointed</label>
-                                <input type="datetime-local" class="form-control" id="DateAppointed" name="DateAppointed">
-                            </div>
-                            <div class="col-md-4">
-                                <label for="Dept" class="form-label">Department</label>
-                                <select class="form-select" id="Dept" name="Dept">
-                                    <option value="">Select Department</option>
-                                    <% depts.forEach(d => { %>
-                                        <option value="<%= d.Code %>"><%= d.Dept %></option>
-                                    <% }) %>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="Grade" class="form-label">Grade</label>
-                                <select class="form-select" id="Grade" name="Grade">
-                                    <option value="">Select Grade</option>
-                                    <% grades.forEach(g => { %>
-                                        <option value="<%= g.GradeCode %>"><%= g.Grade %></option>
-                                    <% }) %>
-                                </select>
-                            </div>
+                            <!-- Appointment and Posting - REMOVED -->
                         </div>
 
                         <div class="mt-4 d-flex justify-content-end">

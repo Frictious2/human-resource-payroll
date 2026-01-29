@@ -7,7 +7,14 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
     <link href="/css/styles.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <style>
+        @media print {
+            tr { page-break-inside: avoid; }
+            .d-print-none { display: none !important; }
+        }
+        tr { page-break-inside: avoid; }
         .editable-cell {
             padding: 0.25rem;
         }
@@ -39,13 +46,25 @@
         <div class="container-fluid">
             <div class="d-flex align-items-center justify-content-between mb-4">
                 <h2 class="mb-0"><%= title %></h2>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#add_item">
-                    <i class="bi bi-plus-circle me-2"></i>Add Reason
-                </button>
+                <div class="d-flex gap-2 d-print-none">
+                    <button class="btn btn-success" onclick="exportExcel()">
+                        <i class="bi bi-file-earmark-excel"></i> Export to Excel
+                    </button>
+                    <button class="btn btn-danger" onclick="exportPDF()">
+                        <i class="bi bi-file-earmark-pdf"></i> Export to PDF
+                    </button>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#add_item">
+                        <i class="bi bi-plus-circle me-2"></i>Add Reason
+                    </button>
+                </div>
             </div>
 
-            <div class="card shadow-sm">
-                <div class="card-body p-3 border-bottom">
+            <div class="card shadow-sm" id="printableArea">
+                <div class="d-none d-print-block text-center mb-4">
+                    <h2>HR Payroll</h2>
+                    <h3>Discipline Reasons</h3>
+                </div>
+                <div class="card-body p-3 border-bottom d-print-none">
                     <div class="row">
                         <div class="col-md-4">
                             <input type="text" id="searchInput" class="form-control" placeholder="Search...">
@@ -59,7 +78,7 @@
                                 <tr>
                                     <th style="width: 30px;">No.</th>
                                     <th>Reason</th>
-                                    <th class="text-end">Action</th>
+                                    <th class="text-end d-print-none">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="tableBody">
@@ -68,7 +87,7 @@
                         </table>
                     </div>
                 </div>
-                <div class="card-footer bg-white border-top-0 py-3">
+                <div class="card-footer bg-white border-top-0 py-3 d-print-none">
                     <nav aria-label="Page navigation">
                         <ul class="pagination justify-content-end mb-0" id="pagination">
                             <!-- Pagination -->
@@ -180,7 +199,7 @@ function renderPage() {
         tr.innerHTML = `
             <td>${start + index + 1}</td>
             <td contenteditable="true" class="editable-cell" onblur="updateItem(this, '${item.ReasonCode}', 'Reason')" onkeypress="handleEnter(event, this)">${item.Reason}</td>
-            <td class="text-end">
+            <td class="text-end d-print-none">
                 <button class="btn btn-sm btn-outline-danger" onclick="openDeleteModal('${item.ReasonCode}')">
                     <i class="bi bi-trash"></i>
                 </button>
@@ -321,6 +340,59 @@ async function deleteItem() {
         alert('Error deleting item');
     }
 }
+
+window.exportExcel = function() {
+    if (filteredData.length === 0) {
+        alert("No data to export");
+        return;
+    }
+    
+    const data = filteredData.map(item => ({
+        Reason: item.Reason
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "DisciplineReasons");
+    XLSX.writeFile(wb, "DisciplineReasons.xlsx");
+};
+
+window.exportPDF = async function() {
+    const element = document.getElementById('printableArea');
+    const header = element.querySelector('.d-print-block');
+    const originalPage = currentPage;
+    
+    if (header) header.classList.remove('d-none');
+    
+    // Render all filtered data for PDF
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+    filteredData.forEach((item, index) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${index + 1}</td>
+            <td class="editable-cell">${item.Reason}</td>
+            <td class="text-end d-print-none"></td>
+        `;
+        tbody.appendChild(tr);
+    });
+    
+    const opt = {
+        margin: 10,
+        filename: 'DisciplineReasons.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    
+    try {
+        await html2pdf().set(opt).from(element).save();
+    } finally {
+        if (header) header.classList.add('d-none');
+        currentPage = originalPage;
+        renderPage();
+    }
+};
 </script>
 </body>
 </html>

@@ -175,14 +175,17 @@
             XLSX.writeFile(wb, "Departments.xlsx");
         }
 
-        function exportPDF() {
+        async function exportPDF() {
             const element = document.getElementById('printableArea');
             const header = element.querySelector('.d-print-block');
-            const wasHidden = header && header.classList.contains('d-none');
+            const originalPage = currentPage;
             
-            if (wasHidden) {
-                header.classList.remove('d-none');
-            }
+            // Show header
+            if (header) header.classList.remove('d-none');
+            
+            // Render ALL data for PDF
+            // We use the current filteredData but show ALL of it
+            renderTable(filteredData, 0); 
             
             const opt = {
                 margin: 10,
@@ -192,11 +195,14 @@
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
             
-            html2pdf().set(opt).from(element).save().then(() => {
-                if (wasHidden) {
-                    header.classList.add('d-none');
-                }
-            });
+            try {
+                await html2pdf().set(opt).from(element).save();
+            } finally {
+                // Restore state
+                if (header) header.classList.add('d-none');
+                currentPage = originalPage;
+                renderPage(); // Restore pagination
+            }
         }
         let filteredData = [];
         let currentPage = 1;

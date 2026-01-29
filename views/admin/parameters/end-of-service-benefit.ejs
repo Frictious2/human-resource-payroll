@@ -29,8 +29,12 @@
                 <h2 class="mb-0"><%= title %></h2>
             </div>
 
-            <div class="card shadow-sm">
+            <div class="card shadow-sm" id="printableArea">
                 <div class="card-body">
+                    <div class="d-none d-print-block text-center py-4">
+                        <h2 class="fw-bold mt-0">HR Payroll</h2>
+                        <h4 class="text-decoration-underline mt-0">End of Service Benefit</h4>
+                    </div>
                     <form id="eosForm">
                         <!-- EOS Date -->
                         <div class="row mb-4">
@@ -51,7 +55,7 @@
                                     <div class="col-3"></div>
                                     <div class="col-3">Years</div>
                                     <div class="col-3">Days</div>
-                                    <div class="col-3">Red</div>
+                                    <div class="col-3">Redundant</div>
                                 </div>
 
                                 <!-- Range 1 -->
@@ -170,7 +174,7 @@
                             </div>
                         </div>
 
-                        <div class="text-end mt-4">
+                        <div class="text-end mt-4 d-print-none">
                             <button type="submit" class="btn btn-primary px-4" id="saveBtn">Save</button>
                         </div>
                     </form>

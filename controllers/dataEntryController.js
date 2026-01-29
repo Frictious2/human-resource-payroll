@@ -504,6 +504,247 @@ const dataEntryController = {
         }
     },
 
+    getDependants: async (req, res) => {
+        try {
+            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+            // Fetch Relations for the modal
+            const [relations] = await pool.query('SELECT RCode, Relation FROM tblrelation ORDER BY Relation');
+
+            // Fetch Reasons for the delete modal
+            const [reasons] = await pool.query('SELECT ReasonCode, Reason FROM tblreason ORDER BY Reason');
+
+            res.render('data_entry/staff/dependants', {
+                title: 'Staff Dependants',
+                group: 'Staff',
+                path: '/data-entry/staff/dependants',
+                user: { name: 'Data Entry Clerk' },
+                role: 'data_entry',
+                companyName,
+                relations,
+                reasons,
+                success: req.query.success,
+                error: req.query.error
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    searchDependants: async (req, res) => {
+        try {
+            const { pfno } = req.params;
+            
+            // Check staff existence
+            const [staffRows] = await pool.query('SELECT SName FROM tblstaff WHERE PFNo = ?', [pfno]);
+            if (staffRows.length === 0) {
+                return res.status(404).json({ error: 'Staff not found' });
+            }
+
+            // Get dependants
+            const query = `
+                SELECT 
+                    d.PFNo,
+                    d.DepNo,
+                    d.Dependant,
+                    d.RCode,
+                    r.Relation,
+                    DATE_FORMAT(d.DOB, '%Y-%m-%d') as Birthdate,
+                    d.PhoneNo
+                FROM tbldependant d
+                LEFT JOIN tblrelation r ON d.RCode = r.RCode
+                WHERE d.PFNo = ? AND (d.Closed = 0 OR d.Closed IS NULL)
+                ORDER BY d.DepNo
+            `;
+            const [dependants] = await pool.query(query, [pfno]);
+
+            // Get max dependants limit
+            const [paramsRows] = await pool.query('SELECT Max_Dependants FROM tblparams1 LIMIT 1');
+            const maxDependants = paramsRows[0] ? paramsRows[0].Max_Dependants : 0;
+
+            res.json({
+                staff: { pfno, name: staffRows[0].SName },
+                dependants,
+                maxDependants
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
+        }
+    },
+
+    addDependant: async (req, res) => {
+        try {
+            const { pfno, dependant, rcode, dob, phone } = req.body;
+
+            // Get max dependants limit
+            const [paramsRows] = await pool.query('SELECT Max_Dependants FROM tblparams1 LIMIT 1');
+            const maxDependants = paramsRows[0] ? paramsRows[0].Max_Dependants : 0;
+
+            // Check current count
+            const [countRows] = await pool.query('SELECT COUNT(*) as count FROM tbldependant WHERE PFNo = ? AND (Closed = 0 OR Closed IS NULL)', [pfno]);
+            const currentCount = countRows[0].count;
+
+            if (currentCount >= maxDependants) {
+                return res.status(400).json({ error: `Maximum number of dependants (${maxDependants}) reached.` });
+            }
+
+            // Find next DepNo
+            const [maxDepRow] = await pool.query('SELECT MAX(CAST(DepNo AS UNSIGNED)) as maxDep FROM tbldependant WHERE PFNo = ?', [pfno]);
+            let nextDepNo = (maxDepRow[0].maxDep || 0) + 1;
+            
+            if (nextDepNo > 9) {
+                 return res.status(400).json({ error: 'DepNo limit reached (max 9)' });
+            }
+
+            const query = `
+                INSERT INTO tbldependant (PFNo, DepNo, Dependant, RCode, DOB, PhoneNo, Closed, Approved, CompanyID)
+                VALUES (?, ?, ?, ?, ?, ?, 0, 0, 1)
+            `;
+            await pool.query(query, [pfno, nextDepNo, dependant, rcode, dob, phone]);
+
+            res.json({ success: true });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
+        }
+    },
+
+    editDependant: async (req, res) => {
+        try {
+            const { pfno, depNo, dependant, rcode, dob, phone } = req.body;
+
+            const query = `
+                UPDATE tbldependant 
+                SET Dependant = ?, RCode = ?, DOB = ?, PhoneNo = ?
+                WHERE PFNo = ? AND DepNo = ?
+            `;
+            await pool.query(query, [dependant, rcode, dob, phone, pfno, depNo]);
+
+            res.json({ success: true });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
+        }
+    },
+
+    deleteDependant: async (req, res) => {
+        try {
+            const { pfno, depNo, dateClosed, reason } = req.body;
+
+            const query = `
+                UPDATE tbldependant 
+                SET Closed = 1, DateClosed = ?, Reason = ? 
+                WHERE PFNo = ? AND DepNo = ?
+            `;
+            await pool.query(query, [dateClosed, reason, pfno, depNo]);
+
+            res.json({ success: true });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
+        }
+    },
+
+    checkOver18Dependants: async (req, res) => {
+        try {
+            // 1. Get Params (ChildAge limit, HOD, DeptName)
+            const [params] = await pool.query('SELECT ChildAge, HOD, DeptName FROM tblparams1 LIMIT 1');
+            if (params.length === 0) {
+                 return res.json({ error: 'Parameters not configured (tblparams1)' });
+            }
+            const { ChildAge, HOD, DeptName } = params[0];
+            const ageLimit = ChildAge || 18; // Default to 18 if not set
+
+            // 2. Get Company Info for Email
+            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+            // 3. Find Over-Age Dependants
+            // Filter: Active (Closed=0), SON/DAUGHTER (RCode IN ('03','04')), Age > ageLimit
+            // Note: TIMESTAMPDIFF(YEAR, DOB, CURDATE()) returns the full years.
+            const query = `
+                SELECT d.PFNo, d.DepNo, d.Dependant, d.RCode, d.DOB, s.SName, s.Email
+                FROM tbldependant d
+                JOIN tblstaff s ON d.PFNo = s.PFNo
+                WHERE d.Closed = 0 
+                AND d.RCode IN ('03', '04')
+                AND TIMESTAMPDIFF(YEAR, d.DOB, CURDATE()) > ?
+            `;
+            const [dependants] = await pool.query(query, [ageLimit]);
+
+            if (dependants.length === 0) {
+                return res.json({ success: true, message: 'No over-age dependants found.', count: 0 });
+            }
+
+            // 4. Process each dependant
+            const nodemailer = require('nodemailer');
+            const transporter = nodemailer.createTransport({
+                host: process.env.SMTP_HOST,
+                port: process.env.SMTP_PORT,
+                secure: process.env.SMTP_SECURE === 'true',
+                auth: {
+                    user: process.env.SMTP_USER,
+                    pass: process.env.SMTP_PASS
+                }
+            });
+
+            let processedCount = 0;
+            const now = new Date();
+
+            for (const dep of dependants) {
+                const relation = dep.RCode === '03' ? 'Son' : 'Daughter';
+                
+                // Send Email
+                if (dep.Email) { 
+                    const html = `
+                        <div style="font-family: Arial, sans-serif;">
+                            <p>Dear ${dep.SName},</p>
+                            <p><strong>MEDICAL FACILITY FOR CHILD</strong></p>
+                            <p>Your ${relation}, ${dep.Dependant}, is now over ${ageLimit} years of age, therefore the office will no longer be responsible for his/her medical bills.</p>
+                            <p>Please be advised accordingly.</p>
+                            <br>
+                            <p>Sincerely Yours,</p>
+                            <p>${HOD || 'HOD'}</p>
+                            <p>${DeptName || 'Department'}</p>
+                        </div>
+                    `;
+
+                    const mailOptions = {
+                        from: `"${companyName}" <${process.env.SMTP_USER}>`,
+                        to: dep.Email,
+                        subject: 'MEDICAL FACILITY FOR CHILD - OFF AGE',
+                        html: html
+                    };
+                    
+                    try {
+                         await transporter.sendMail(mailOptions);
+                         console.log(`Email sent to ${dep.Email} for ${dep.Dependant}`);
+                    } catch (err) {
+                        console.error(`Failed to send email to ${dep.Email}:`, err);
+                    }
+                }
+
+                // Close Record
+                // Update Closed=1, DateClosed=NOW, Reason='09' (OFF AGE)
+                // Also set TimeKeyedIn/DateKeyedIn if needed, but user only specified DateClosed and Closed and Reason.
+                await pool.query(
+                    'UPDATE tbldependant SET Closed = 1, DateClosed = ?, Reason = ? WHERE PFNo = ? AND DepNo = ?',
+                    [now, '09', dep.PFNo, dep.DepNo]
+                );
+                processedCount++;
+            }
+
+            res.json({ success: true, message: `Processed ${processedCount} dependants.`, count: processedCount });
+
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error processing over-age dependants' });
+        }
+    },
+
     postApplications: async (req, res) => {
         try {
             const { 
@@ -518,6 +759,7 @@ const dataEntryController = {
                 City,
                 DApplied,
                 QCode,
+                Email,
                 Ref1Name,
                 Ref1Addr,
                 Ref1Phone,
@@ -526,11 +768,7 @@ const dataEntryController = {
                 Ref2Phone,
                 ExamDate,
                 Result,
-                IntDate,
-                DateAppointed,
-                PFNo,
-                Dept,
-                Grade
+                IntDate
             } = req.body;
 
             if (!RefNo || !SName) {
@@ -548,8 +786,8 @@ const dataEntryController = {
 
             const query = `
                 INSERT INTO tblapplication 
-                (RefNo, Received, SName, DOB, Sex, Nationality, MStatus, Address, City, DApplied, QCode, Ref1Name, Ref1Addr, Ref1Phone, Ref2Name, Ref2Addr, Ref2Phone, ExamDate, Result, IntDate, DateAppointed, PFNo, Dept, Grade, Approved, DateApproved, Selected, dateSelected, CompanyID) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (RefNo, Received, SName, DOB, Sex, Nationality, MStatus, Address, City, DApplied, QCode, Email, Ref1Name, Ref1Addr, Ref1Phone, Ref2Name, Ref2Addr, Ref2Phone, ExamDate, Result, IntDate, Approved, DateApproved, Selected, dateSelected, CompanyID) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
 
             await pool.query(query, [
@@ -564,6 +802,7 @@ const dataEntryController = {
                 City || null,
                 cleanDateTime(DApplied),
                 QCode || null,
+                Email || null,
                 Ref1Name || null,
                 Ref1Addr || null,
                 Ref1Phone || null,
@@ -573,10 +812,6 @@ const dataEntryController = {
                 cleanDateTime(ExamDate),
                 Result || null,
                 cleanDateTime(IntDate),
-                cleanDateTime(DateAppointed),
-                PFNo || null,
-                Dept || null,
-                Grade || null,
                 0,
                 null,
                 0,
@@ -592,6 +827,232 @@ const dataEntryController = {
             } else {
                  res.redirect('/data-entry/staff/applications?error=Server Error: ' + error.message);
             }
+        }
+    },
+
+    getInterview: async (req, res) => {
+        try {
+            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+            const [applicants] = await pool.query('SELECT RefNo, SName FROM tblapplication ORDER BY SName');
+
+            res.render('data_entry/staff/interview', {
+                title: 'Interview Invitation',
+                path: '/data-entry/staff/interview',
+                user: { name: 'Data Entry Clerk' },
+                companyName,
+                applicants
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getApplicantDetails: async (req, res) => {
+        try {
+            const { refno } = req.params;
+            const [rows] = await pool.query('SELECT RefNo, SName, Email, Result, DApplied FROM tblapplication WHERE RefNo = ?', [refno]);
+            
+            if (rows.length > 0) {
+                res.json(rows[0]);
+            } else {
+                res.status(404).json({ error: 'Applicant not found' });
+            }
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    postInvite: async (req, res) => {
+        try {
+            const { applicants, content } = req.body;
+            
+            if (!applicants || !Array.isArray(applicants) || applicants.length === 0) {
+                return res.status(400).json({ error: 'No applicants provided' });
+            }
+
+            const [comRows] = await pool.query('SELECT Com_Name, Logopath FROM tblcominfo LIMIT 1');
+            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+            const logoPath = comRows[0] ? comRows[0].Logopath : null; // In real app, might need full URL
+
+            const nodemailer = require('nodemailer');
+            const transporter = nodemailer.createTransport({
+                host: process.env.SMTP_HOST,
+                port: process.env.SMTP_PORT,
+                secure: process.env.SMTP_SECURE === 'true',
+                auth: {
+                    user: process.env.SMTP_USER,
+                    pass: process.env.SMTP_PASS
+                }
+            });
+
+            let sentCount = 0;
+
+            for (const app of applicants) {
+                if (!app.Email) continue;
+
+                // Construct email HTML
+                const html = `
+                    <div style="font-family: Arial, sans-serif; text-align: center;">
+                        ${logoPath ? `<img src="cid:companyLogo" alt="Company Logo" style="max-width: 150px; margin-bottom: 20px;">` : ''}
+                        <h2>${companyName}</h2>
+                    </div>
+                    <div style="font-family: Arial, sans-serif; margin-top: 20px;">
+                        <p>Dear ${app.Name},</p>
+                        <p>${content.replace(/\n/g, '<br>')}</p>
+                        <br>
+                        <p>Best Regards,</p>
+                        <p>${companyName}</p>
+                    </div>
+                `;
+
+                const mailOptions = {
+                    from: `"${companyName}" <${process.env.SMTP_USER}>`,
+                    to: app.Email,
+                    subject: 'Interview Invitation',
+                    html: html,
+                    attachments: logoPath ? [{
+                        filename: 'logo.png', // Adjust extension based on actual file
+                        path: logoPath, // Ensure this is a valid filesystem path or URL
+                        cid: 'companyLogo'
+                    }] : []
+                };
+
+                try {
+                    await transporter.sendMail(mailOptions);
+                    sentCount++;
+                } catch (err) {
+                    console.error(`Failed to send email to ${app.Email}:`, err);
+                }
+            }
+
+            res.json({ success: true, sentCount });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error: ' + error.message });
+        }
+    },
+
+    getTrainingEnquiry: async (req, res) => {
+        try {
+            const { pfno, dept, grade, gender, profession, course, dateFrom, dateTo, page = 1 } = req.query;
+            const limit = 10;
+            const offset = (page - 1) * limit;
+
+            // Fetch Company Info
+            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+            // Fetch Dropdowns
+            const [depts] = await pool.query('SELECT Code, Dept FROM tbldept ORDER BY Dept');
+            const [grades] = await pool.query('SELECT GradeCode, Grade FROM tblgrade ORDER BY Grade');
+            const [professions] = await pool.query('SELECT Code, QType FROM tblqualiftype ORDER BY QType');
+            const [sexes] = await pool.query('SELECT SexCode, Status FROM tblsex ORDER BY Status');
+
+            let baseQuery = `
+                SELECT 
+                    c.PFNo,
+                    s.SName,
+                    c.Country as Location,
+                    c.Course,
+                    c.Level,
+                    c.Type,
+                    c.StartDate,
+                    c.Duration,
+                    NULL as WH,
+                    NULL as Resumes
+                FROM tblcourse c
+                LEFT JOIN tblstaff s ON c.PFNo = s.PFNo
+                WHERE 1=1
+            `;
+
+            const params = [];
+
+            if (pfno) {
+                baseQuery += ' AND c.PFNo LIKE ?';
+                params.push(`%${pfno}%`);
+            }
+
+            if (dept) {
+                baseQuery += ' AND s.CDept = ?';
+                params.push(dept);
+            }
+
+            if (grade) {
+                baseQuery += ' AND s.CGrade = ?';
+                params.push(grade);
+            }
+
+            if (gender) {
+                baseQuery += ' AND s.SexCode = ?';
+                params.push(gender);
+            }
+
+            if (profession) {
+                baseQuery += ' AND s.Professional = ?';
+                params.push(profession);
+            }
+
+            if (course) {
+                baseQuery += ' AND c.Course LIKE ?';
+                params.push(`%${course}%`);
+            }
+
+            if (dateFrom) {
+                baseQuery += ' AND c.StartDate >= ?';
+                params.push(dateFrom);
+            }
+
+            if (dateTo) {
+                baseQuery += ' AND c.StartDate <= ?';
+                params.push(dateTo);
+            }
+
+            const countQuery = `SELECT COUNT(*) as total FROM (${baseQuery}) as sub`;
+            const [countRows] = await pool.query(countQuery, params);
+            const total = countRows[0].total;
+
+            const pagedQuery = baseQuery + ' ORDER BY c.StartDate DESC LIMIT ? OFFSET ?';
+            const pageParams = params.slice();
+            pageParams.push(limit, offset);
+
+            const [rows] = await pool.query(pagedQuery, pageParams);
+
+            res.render('data_entry/enquiry/training', {
+                title: 'Training Enquiry',
+                group: 'Enquiry',
+                path: '/data-entry/enquiry/training',
+                user: { name: 'Data Entry Clerk' },
+                role: 'data_entry',
+                companyName,
+                data: rows,
+                depts,
+                grades,
+                professions,
+                sexes,
+                filters: {
+                    pfno,
+                    dept,
+                    grade,
+                    gender,
+                    profession,
+                    course,
+                    dateFrom,
+                    dateTo
+                },
+                pagination: {
+                    page: parseInt(page),
+                    totalPages: Math.ceil(total / limit),
+                    totalRecords: total
+                }
+            });
+
+        } catch (err) {
+            console.error(err);
+            res.status(500).send('Server Error');
         }
     },
 

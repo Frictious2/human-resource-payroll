@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · HR & Payroll</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <!-- Top Navbar -->
+    <%- include('../partials/topbar', { user }) %>
+
+    <!-- Sidebar -->
+    <%- include('../partials/sidebar') %>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container-fluid">
+            <!-- Header -->
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2"><%= companyName %></h1>
+            </div>
+
+            <!-- Alerts -->
+            <div id="alertContainer"></div>
+
+            <!-- Selection Card -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-person-check"></i> Select Applicants for Interview</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-6">
+                            <label for="applicantSelect" class="form-label">Select Applicant</label>
+                            <select class="form-select" id="applicantSelect">
+                                <option value="">Choose...</option>
+                                <% applicants.forEach(app => { %>
+                                    <option value="<%= app.RefNo %>"><%= app.RefNo %> - <%= app.SName %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-success w-100" id="btnAddApplicant">
+                                <i class="bi bi-plus-circle"></i> Add
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Selected Applicants Table -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Selected Applicants</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-bordered" id="applicantsTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Reference Number</th>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Exam Grade</th>
+                                    <th>Date Applied</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Rows will be added here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="d-flex justify-content-end mt-3">
+                        <button type="button" class="btn btn-primary d-none" id="btnInvite">
+                            <i class="bi bi-envelope"></i> Invite
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Email Modal -->
+    <div class="modal fade" id="emailModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Invitation Email Content</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="emailContent" class="form-label">Message Body</label>
+                        <textarea class="form-control" id="emailContent" rows="10" placeholder="Enter the content of the letter/email here..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="btnSendEmails">
+                        <i class="bi bi-send"></i> Send Invitations
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const addedApplicants = new Set();
+        const applicantsTableBody = document.querySelector('#applicantsTable tbody');
+        const btnInvite = document.getElementById('btnInvite');
+        const alertContainer = document.getElementById('alertContainer');
+
+        function showAlert(message, type = 'success') {
+            const alertHtml = `
+                <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            alertContainer.innerHTML = alertHtml;
+        }
+
+        document.getElementById('btnAddApplicant').addEventListener('click', async () => {
+            const select = document.getElementById('applicantSelect');
+            const refNo = select.value;
+
+            if (!refNo) return;
+            if (addedApplicants.has(refNo)) {
+                showAlert('Applicant already added.', 'warning');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/data-entry/api/applicant/${refNo}`);
+                if (!response.ok) throw new Error('Failed to fetch details');
+                const data = await response.json();
+
+                const row = document.createElement('tr');
+                row.dataset.refno = data.RefNo;
+                row.dataset.name = data.SName;
+                row.dataset.email = data.Email;
+                
+                // Format Date Applied
+                const dateApplied = data.DApplied ? new Date(data.DApplied).toLocaleDateString() : 'N/A';
+
+                row.innerHTML = `
+                    <td>${data.RefNo}</td>
+                    <td>${data.SName}</td>
+                    <td>${data.Email || 'N/A'}</td>
+                    <td>${data.Result || 'N/A'}</td>
+                    <td>${dateApplied}</td>
+                    <td>
+                        <button class="btn btn-sm btn-danger btn-remove"><i class="bi bi-trash"></i></button>
+                    </td>
+                `;
+
+                applicantsTableBody.appendChild(row);
+                addedApplicants.add(refNo);
+                select.value = ''; // Reset selection
+                btnInvite.classList.remove('d-none');
+
+                // Add remove event listener
+                row.querySelector('.btn-remove').addEventListener('click', () => {
+                    row.remove();
+                    addedApplicants.delete(refNo);
+                    if (applicantsTableBody.children.length === 0) {
+                        btnInvite.classList.add('d-none');
+                    }
+                });
+
+            } catch (error) {
+                console.error(error);
+                showAlert('Error fetching applicant details.', 'danger');
+            }
+        });
+
+        document.getElementById('btnInvite').addEventListener('click', () => {
+            if (applicantsTableBody.children.length === 0) return;
+            const modal = new bootstrap.Modal(document.getElementById('emailModal'));
+            modal.show();
+        });
+
+        document.getElementById('btnSendEmails').addEventListener('click', async () => {
+            const content = document.getElementById('emailContent').value;
+            if (!content) {
+                alert('Please enter email content.');
+                return;
+            }
+
+            const applicants = [];
+            applicantsTableBody.querySelectorAll('tr').forEach(row => {
+                applicants.push({
+                    RefNo: row.dataset.refno,
+                    Name: row.dataset.name,
+                    Email: row.dataset.email
+                });
+            });
+
+            // Filter out applicants without email
+            const validApplicants = applicants.filter(a => a.Email && a.Email !== 'N/A' && a.Email !== 'null');
+            
+            if (validApplicants.length === 0) {
+                alert('No applicants with valid emails to send to.');
+                return;
+            }
+
+            const btn = document.getElementById('btnSendEmails');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sending...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/data-entry/staff/invite', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ applicants: validApplicants, content })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Close modal
+                    bootstrap.Modal.getInstance(document.getElementById('emailModal')).hide();
+                    showAlert(`Successfully sent ${result.sentCount} emails.`);
+                    // Clear table
+                    applicantsTableBody.innerHTML = '';
+                    addedApplicants.clear();
+                    btnInvite.classList.add('d-none');
+                    document.getElementById('emailContent').value = '';
+                } else {
+                    throw new Error(result.error || 'Failed to send emails');
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Error sending emails: ' + error.message);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

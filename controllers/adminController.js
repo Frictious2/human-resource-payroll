@@ -17,6 +17,89 @@ const pool = require('../config/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const mailer = require('../config/mailer');
+const multer = require('multer');
+const path = require('path');
+
+// Configure Multer for logo uploads
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, './public/uploads/');
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({ 
+    storage: storage,
+    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
+    fileFilter: (req, file, cb) => {
+        const filetypes = /jpeg|jpg|png|gif/;
+        const mimetype = filetypes.test(file.mimetype);
+        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+        if (mimetype && extname) {
+            return cb(null, true);
+        }
+        cb(new Error('Error: File upload only supports images!'));
+    }
+});
+
+async function getCompanyInfo(req, res) {
+    try {
+        const [rows] = await pool.query('SELECT * FROM tblcominfo LIMIT 1');
+        const company = rows[0] || {};
+        res.render('admin/company-info', { 
+            title: 'Company Information',
+            group: 'Company Info',
+            user: { name: 'David' },
+            company 
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+}
+
+async function updateCompanyInfo(req, res) {
+    try {
+        const {
+            Com_Name, TinNo, Address, Town, City, Country,
+            AccNo, Phone, Bank, PayingBank, Email, Manager
+        } = req.body;
+
+        const Logopath = req.file ? '/uploads/' + req.file.filename : req.body.currentLogo;
+
+        // Check if company record exists
+        const [rows] = await pool.query('SELECT CompanyID FROM tblcominfo LIMIT 1');
+        
+        if (rows.length > 0) {
+            // Update
+            await pool.query(
+                `UPDATE tblcominfo SET 
+                    Com_Name=?, TinNo=?, Address=?, Town=?, City=?, Country=?, 
+                    AccNo=?, Phone=?, Bank=?, PayingBank=?, Email=?, Manager=?, Logopath=? 
+                 WHERE CompanyID=?`,
+                [Com_Name, TinNo, Address, Town, City, Country, AccNo, Phone, Bank, PayingBank, Email, Manager, Logopath, rows[0].CompanyID]
+            );
+        } else {
+            // Insert
+            await pool.query(
+                `INSERT INTO tblcominfo (
+                    Com_Name, TinNo, Address, Town, City, Country, 
+                    AccNo, Phone, Bank, PayingBank, Email, Manager, Logopath, DateCreated
+                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+                [Com_Name, TinNo, Address, Town, City, Country, AccNo, Phone, Bank, PayingBank, Email, Manager, Logopath]
+            );
+        }
+
+        res.redirect('/admin/company-info?success=Company info updated successfully');
+    } catch (err) {
+        console.error(err);
+        res.redirect('/admin/company-info?error=Failed to update company info');
+    }
+}
+
 
 async function adminsListPage(req, res) {
     res.render('admin/admins', { user: { name: 'David' } });
@@ -2176,5 +2259,10 @@ module.exports = {
   enquiryPage,
   getEnquiryData,
   staffFilePage,
-  getStaffFileData,
+    getStaffFileData,
+
+    // Company Info
+    getCompanyInfo,
+    updateCompanyInfo,
+    upload
 };

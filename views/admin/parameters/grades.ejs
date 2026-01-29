@@ -68,7 +68,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="card-body p-0">
+                <div class="card-body p-0" id="printableArea">
                     <div class="d-none d-print-block text-center py-4">
                         <h2 class="fw-bold mt-0">HR Payroll</h2>
                         <h4 class="text-decoration-underline mt-0">Grades</h4>
@@ -86,7 +86,7 @@
                                     <th style="width: 7%">Notch</th>
                                     <th style="width: 7%">Notice</th>
                                     <th style="width: 7%">PromPeriod</th>
-                                    <th class="text-end" style="width: 8%">Actions</th>
+                                    <th class="text-end d-print-none" style="width: 8%">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -193,6 +193,8 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script>
         const jobTitlesData = JSON.parse('<%- JSON.stringify(jobTitles || []).replace(/\\/g, "\\\\").replace(/\'/g, "\\\'").replace(/\"/g, "\\\"") %>');
         
@@ -202,6 +204,63 @@
         let currentPage = 1;
         const rowsPerPage = 10;
         let deleteId = null;
+
+        // Export Functions
+        window.exportExcel = function() {
+            if (!allData || allData.length === 0) {
+                alert("No data to export");
+                return;
+            }
+            const exportData = allData.map(item => {
+                const jobTitle = jobTitlesData.find(j => j.Code === item.JobTitleCode);
+                return {
+                    Grade: item.Grade,
+                    JobTitle: jobTitle ? jobTitle.JobTitle : item.JobTitleCode,
+                    LDays: item.LDays,
+                    MedLimit: item.Medical,
+                    CDays: item.Confirm,
+                    Notch: item.NotchIncr,
+                    Notice: item.Notice,
+                    PromPeriod: item.PromPeriod
+                };
+            });
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Grades");
+            XLSX.writeFile(wb, "Grades.xlsx");
+        };
+
+        window.exportPDF = async function() {
+            const element = document.getElementById('printableArea');
+            const header = element.querySelector('.d-print-block');
+            const originalPage = currentPage;
+            
+            // Show header for PDF
+            if (header) header.classList.remove('d-none');
+            
+            // Render all data for PDF
+            renderTable(filteredData, 0); 
+            
+            const opt = {
+                margin: 10,
+                filename: 'Grades.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            
+            try {
+                await html2pdf().set(opt).from(element).save();
+            } catch (err) {
+                console.error('PDF Export Error:', err);
+                alert('Error generating PDF');
+            } finally {
+                // Restore state
+                if (header) header.classList.add('d-none');
+                currentPage = originalPage;
+                renderPage();
+            }
+        };
 
         document.addEventListener('DOMContentLoaded', () => {
             const tableBody = document.querySelector('#gradesTable tbody');
@@ -320,7 +379,7 @@
                         <td class="editable-cell"><input type="number" name="NotchIncr" value="${item.NotchIncr || 0}"></td>
                         <td class="editable-cell"><input type="number" name="Notice" value="${item.Notice || 0}"></td>
                         <td class="editable-cell"><input type="number" name="PromPeriod" value="${item.PromPeriod || 0}"></td>
-                        <td class="text-end">
+                        <td class="text-end d-print-none">
                             <button class="btn btn-sm btn-outline-danger delete-btn"><i class="bi bi-trash"></i></button>
                         </td>
                     `;

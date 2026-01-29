@@ -139,7 +139,8 @@ router.get('/reports/voucher', adminController.comingSoon('Voucher', 'Reports'))
 router.get('/reports/payslip', adminController.comingSoon('Pay slip', 'Reports'));
 router.get('/reports/end-of-service', adminController.comingSoon('End of Service', 'Reports'));
 
-router.get('/company-info', adminController.comingSoon('Company Info', 'Company Info'));
+router.get('/company-info', adminController.getCompanyInfo);
+router.post('/company-info', adminController.upload.single('logo'), adminController.updateCompanyInfo);
 
 // Staff File
 router.get('/activity/staff-file', adminController.staffFilePage);
