@@ -11,7 +11,7 @@ router.get('/enquiry/staff', managerController.getStaffEnquiry);
 router.get('/enquiry/staff/general-info', managerController.getStaffGeneralInfo);
 router.get('/enquiry/transfer-prom', managerController.getComingSoon);
 router.get('/enquiry/warning', managerController.getComingSoon);
-router.get('/enquiry/training', managerController.getComingSoon);
+router.get('/enquiry/training', managerController.getTransferApprovals);
 router.get('/enquiry/on-leave', managerController.getComingSoon);
 router.get('/enquiry/medical', managerController.getComingSoon);
 
@@ -29,7 +29,8 @@ router.get('/approve/edited-payroll', managerController.getComingSoon);
 router.get('/approve/leave', managerController.getComingSoon);
 router.get('/approve/interview', managerController.getComingSoon);
 router.get('/approve/promotion-demotion', managerController.getComingSoon);
-router.get('/approve/transfer', managerController.getComingSoon);
+router.get('/approve/transfer', managerController.getTransferApprovals);
+router.post('/approve/transfer', managerController.postTransferApproval);
 router.get('/approve/training', managerController.getComingSoon);
 router.get('/approve/query', managerController.getComingSoon);
 router.get('/approve/acting-allowance', managerController.getComingSoon);

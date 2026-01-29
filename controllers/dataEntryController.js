@@ -745,6 +745,94 @@ const dataEntryController = {
         }
     },
 
+    getTransfer: async (req, res) => {
+        try {
+            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+            
+            const [depts] = await pool.query('SELECT Code, Dept FROM tbldept ORDER BY Dept');
+
+            res.render('data_entry/staff/transfer', {
+                title: 'Staff Transfer',
+                user: req.user,
+                companyName,
+                departments: depts
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    searchStaffForTransfer: async (req, res) => {
+        try {
+            const { pfno } = req.query;
+            if (!pfno) {
+                return res.status(400).json({ error: 'PFNo is required' });
+            }
+
+            const query = `
+                SELECT s.PFNo, s.SName, s.CDept, d.Dept as DeptName, s.CDeptDate
+                FROM tblstaff s
+                LEFT JOIN tbldept d ON s.CDept = d.Code
+                WHERE s.PFNo = ?
+            `;
+            const [rows] = await pool.query(query, [pfno]);
+
+            if (rows.length === 0) {
+                return res.status(404).json({ error: 'Staff not found' });
+            }
+
+            res.json(rows[0]);
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
+        }
+    },
+
+    postTransfer: async (req, res) => {
+        try {
+            const { pfno, newDeptCode, transferDate } = req.body;
+            
+            // Get staff details for SName and PrevDept
+            const [staffRows] = await pool.query('SELECT SName, CDept FROM tblstaff WHERE PFNo = ?', [pfno]);
+            if (staffRows.length === 0) {
+                return res.status(404).json({ error: 'Staff not found' });
+            }
+            const staff = staffRows[0];
+
+            // Insert into tbltransfer
+            const query = `
+                INSERT INTO tbltransfer (
+                    PFNO, SName, TDate, PrevDept, Activity, TDept, 
+                    approved, approvedby, dateapproved, CompanyID
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            
+            // Defaulting dateapproved to NULL and approvedby to current user (or 'user')
+            // Using TDate from body or CURDATE()
+            const tDate = transferDate || new Date();
+            
+            await pool.query(query, [
+                pfno, 
+                staff.SName, 
+                tDate, 
+                staff.CDept, 
+                0, // Activity
+                newDeptCode, 
+                0, // approved (false)
+                req.user ? req.user.username : 'user', 
+                null, // dateapproved
+                1 // CompanyID
+            ]);
+
+            res.json({ success: true });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
+        }
+    },
+
     postApplications: async (req, res) => {
         try {
             const { 

@@ -256,6 +256,98 @@ const managerController = {
       group: group,
       title: title
     });
+  },
+
+  getTransferApprovals: async (req, res) => {
+      try {
+          // Fetch Company Info
+          const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+          const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+          // Fetch Pending Transfers
+          const query = `
+              SELECT t.PFNO, t.TDate, t.SName, 
+                     dp.Dept AS PrevDeptName, 
+                     dt.Dept AS TDeptName,
+                     t.PrevDept, t.TDept
+              FROM tbltransfer t
+              LEFT JOIN tbldept dp ON t.PrevDept = dp.Code
+              LEFT JOIN tbldept dt ON t.TDept = dt.Code
+              WHERE t.approved = 0
+          `;
+          const [transfers] = await pool.query(query);
+
+          res.render('manager/approve/transfer', {
+              title: 'Approve Transfers',
+              group: 'Approve',
+              path: '/manager/approve/transfer',
+              user: { name: 'Manager' },
+              role: 'manager',
+              companyName,
+              transfers
+          });
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+  },
+
+  postTransferApproval: async (req, res) => {
+      try {
+          const { pfno, tDate, newDeptCode, action } = req.body;
+          const user = req.user ? req.user.username : 'manager'; 
+
+          // Helper to format date as YYYY-MM-DD HH:mm:ss without timezone
+          const formatDateTime = (dateStr) => {
+            const d = new Date(dateStr);
+            const pad = (n) => n.toString().padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+                   `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+          };
+
+          const formattedTDate = formatDateTime(tDate);
+          
+          // Convert tDate string to Date object for accurate comparison in WHERE clause
+          const tDateObj = new Date(tDate);
+
+          if (action === 'approve') {
+              // 1. Update tbltransfer
+              const updateTransfer = `
+                  UPDATE tbltransfer 
+                  SET approved = -1, approvedby = ?, dateapproved = NOW()
+                  WHERE PFNO = ? AND TDate = ? AND approved = 0
+              `;
+              await pool.query(updateTransfer, [user, pfno, tDateObj]); // Use Date object for TDate match
+
+              // 2. Update tblstaff
+              // Update CDept and CDeptDate (formatted without timezone)
+              const updateStaff = `
+                  UPDATE tblstaff 
+                  SET CDept = ?, CDeptDate = ?
+                  WHERE PFNO = ?
+              `;
+              await pool.query(updateStaff, [newDeptCode, formattedTDate, pfno]);
+
+              res.json({ success: true, message: 'Transfer approved successfully.' });
+
+          } else if (action === 'reject') {
+              // Update tbltransfer only
+              const updateTransfer = `
+                  UPDATE tbltransfer 
+                  SET approved = 2, approvedby = ?, dateapproved = NOW()
+                  WHERE PFNO = ? AND TDate = ? AND approved = 0
+              `;
+              await pool.query(updateTransfer, [user, pfno, tDateObj]);
+
+              res.json({ success: true, message: 'Transfer rejected.' });
+          } else {
+              res.status(400).json({ error: 'Invalid action' });
+          }
+
+      } catch (error) {
+          console.error(error);
+          res.status(500).json({ error: 'Server error processing approval.' });
+      }
   }
 };
 
