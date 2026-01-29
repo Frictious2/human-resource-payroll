@@ -21,7 +21,8 @@ router.get('/activity/medical-limits', managerController.getComingSoon);
 
 // Approve
 router.get('/approve/new-staff', managerController.getComingSoon);
-router.get('/approve/dependants', managerController.getComingSoon);
+router.get('/approve/dependants', managerController.getApproveDependants);
+router.post('/approve/dependants', managerController.postApproveDependants);
 router.get('/approve/income-setup', managerController.getComingSoon);
 router.get('/approve/travel', managerController.getComingSoon);
 router.get('/approve/salary', managerController.getComingSoon);

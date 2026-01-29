@@ -348,6 +348,72 @@ const managerController = {
           console.error(error);
           res.status(500).json({ error: 'Server error processing approval.' });
       }
+  },
+
+  getApproveDependants: async (req, res) => {
+      try {
+          const query = `
+              SELECT 
+                  d.PFNo, 
+                  d.DepNo,
+                  s.SName, 
+                  d.Dependant, 
+                  r.Relation, 
+                  d.DateClosed, 
+                  re.Reason as ReasonText,
+                  d.Reason as ReasonCode
+              FROM tbldependant d
+              JOIN tblstaff s ON d.PFNo = s.PFNo
+              LEFT JOIN tblrelation r ON d.RCode = r.RCode
+              LEFT JOIN tblreason re ON d.Reason = re.ReasonCode
+              WHERE d.Approved = 0
+              ORDER BY d.PFNo, d.DepNo
+          `;
+          
+          const [dependants] = await pool.query(query);
+
+          res.render('manager/approve/dependants', {
+              title: 'Approve Dependants',
+              user: req.user,
+              dependants
+          });
+
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+  },
+
+  postApproveDependants: async (req, res) => {
+      try {
+          const { pfno, depNo, action } = req.body;
+          const user = req.user ? req.user.username : 'manager';
+
+          if (action === 'approve') {
+              const query = `
+                  UPDATE tbldependant 
+                  SET Approved = -1, ApprovedBy = ?, DateApproved = NOW()
+                  WHERE PFNo = ? AND DepNo = ?
+              `;
+              await pool.query(query, [user, pfno, depNo]);
+              res.json({ success: true, message: 'Dependant approved.' });
+
+          } else if (action === 'reject') {
+              const query = `
+                  UPDATE tbldependant 
+                  SET Approved = 2, ApprovedBy = ?, DateApproved = NOW()
+                  WHERE PFNo = ? AND DepNo = ?
+              `;
+              await pool.query(query, [user, pfno, depNo]);
+              res.json({ success: true, message: 'Dependant rejected.' });
+          } else {
+              res.status(400).json({ error: 'Invalid action' });
+          }
+
+      } catch (error) {
+          console.error(error);
+          res.status(500).json({ error: 'Server error' });
+      }
   }
 };
 
