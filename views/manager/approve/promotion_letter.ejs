@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Letter of <%= promo.Mode === 'D' ? 'Demotion' : 'Promotion' %></title>
+    <style>
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            line-height: 1.6;
+            color: #000;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .logo {
+            max-width: 150px;
+            margin-bottom: 10px;
+        }
+        .company-name {
+            font-size: 24px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin: 5px 0;
+        }
+        .company-address {
+            font-size: 14px;
+        }
+        .date {
+            text-align: right;
+            margin-bottom: 30px;
+        }
+        .recipient {
+            margin-bottom: 20px;
+        }
+        .subject {
+            font-weight: bold;
+            text-decoration: underline;
+            text-transform: uppercase;
+            text-align: center;
+            margin: 30px 0;
+        }
+        .content {
+            margin-bottom: 40px;
+            text-align: justify;
+        }
+        .signature {
+            margin-top: 50px;
+        }
+        .print-btn-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .print-btn {
+            padding: 10px 20px;
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .print-btn:hover {
+            background-color: #0b5ed7;
+        }
+        @media print {
+            body { padding: 0; }
+            .print-btn-container { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-btn-container">
+        <button onclick="window.print()" class="print-btn">Click to Print</button>
+    </div>
+
+    <div class="header">
+        <% if (company.Logopath) { %>
+            <img src="<%= baseUrl %><%= company.Logopath %>" alt="Company Logo" class="logo">
+        <% } %>
+        <div class="company-name"><%= company.Com_Name %></div>
+        <div class="company-address"><%= company.Address %></div>
+    </div>
+
+    <div class="date">
+        Date: <%= new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) %>
+    </div>
+
+    <div class="recipient">
+        Dear <%= staff.SName %>,
+    </div>
+
+    <div class="subject">
+        LETTER OF <%= promo.Mode === 'D' ? 'DEMOTION' : 'PROMOTION' %>
+    </div>
+
+    <div class="content">
+        <% if (promo.Mode === 'D') { %>
+            <p>This letter serves to advise you that in compliance to company policy, you will be demoted to the rank of <strong>"<%= promo.JobTitle %>"</strong> with effect from <strong><%= new Date(pDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) %></strong>.</p>
+            
+            <p>This demotion is the disciplinary action taken against you with respect to the Disciplinary Committee's recommendation on the recent investigation on the quality of your service output contrary to the code of conduct of the company.</p>
+            
+            <p>Your income and earnings will be decreased to the new scale above as a result of this demotion.</p>
+            
+            <p>Within the next one year, you must make improvements for your case to be reviewed. Failure to make the necessary adjustments/corrections will leave management with no option but to terminate your services.</p>
+        <% } else { %>
+            <p>Management is pleased to inform you that, as a result of your outstanding output, you have been promoted to the rank of <strong>"<%= promo.JobTitle %>"</strong> with effect from <strong><%= new Date(pDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) %></strong>.</p>
+            
+            <p>Please note the current grade carries added responsibility to which Management has no doubt you will be capable to handle.</p>
+            
+            <p>Attached is your new basic salary and related allowances as computed from the Finance Department.</p>
+            
+            <p>We congratulate you on this achievement and look forward to receiving your best.</p>
+        <% } %>
+    </div>
+
+    <div class="signature">
+        <p>Sincerely Yours,</p>
+        <br><br>
+        <p><strong><%= hod %></strong></p>
+    </div>
+</body>
+</html>

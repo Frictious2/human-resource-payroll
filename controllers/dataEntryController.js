@@ -630,23 +630,6 @@ const dataEntryController = {
         }
     },
 
-    deleteDependant: async (req, res) => {
-        try {
-            const { pfno, depNo, dateClosed, reason } = req.body;
-
-            const query = `
-                UPDATE tbldependant 
-                SET Closed = 1, DateClosed = ?, Reason = ? 
-                WHERE PFNo = ? AND DepNo = ?
-            `;
-            await pool.query(query, [dateClosed, reason, pfno, depNo]);
-
-            res.json({ success: true });
-        } catch (error) {
-            console.error(error);
-            res.status(500).json({ error: 'Server error' });
-        }
-    },
 
     checkOver18Dependants: async (req, res) => {
         try {
@@ -742,6 +725,230 @@ const dataEntryController = {
         } catch (error) {
             console.error(error);
             res.status(500).json({ error: 'Server error processing over-age dependants' });
+        }
+    },
+
+    // Training
+    getTraining: async (req, res) => {
+        try {
+            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+            const [levels] = await pool.query('SELECT CLCode, CLevel FROM tblcourselevel ORDER BY CLevel');
+            const [types] = await pool.query('SELECT CourseCode, CType FROM tblcoursetype ORDER BY CType');
+            const [sponsors] = await pool.query('SELECT SCode, Sponsor FROM tblcoursesponsor ORDER BY Sponsor');
+            const [staff] = await pool.query('SELECT PFNo, SName FROM tblstaff ORDER BY SName');
+
+            res.render('data_entry/staff/training', {
+                title: 'Staff Training',
+                group: 'Staff',
+                path: '/data-entry/staff/training',
+                user: { name: 'Data Entry Clerk' },
+                role: 'data_entry',
+                companyName,
+                levels,
+                types,
+                sponsors,
+                staff
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    searchStaffTraining: async (req, res) => {
+        try {
+            const { pfno } = req.query;
+            if (!pfno) return res.status(400).json({ error: 'PFNo is required' });
+
+            const query = `
+                SELECT t.PFNo, t.Course, t.Level, t.Type, t.OrganisedBy, t.Duration, t.Country, t.StartDate, t.Cost, t.SponsoredBy, t.Completed, t.YCompleted,
+                       l.CLevel, ty.CType, s.Sponsor as SponsorName
+                FROM tblcourse t
+                LEFT JOIN tblcourselevel l ON t.Level = l.CLCode 
+                LEFT JOIN tblcoursetype ty ON t.Type = ty.CourseCode
+                LEFT JOIN tblcoursesponsor s ON t.SponsoredBy = s.SCode
+                WHERE t.PFNo = ?
+                ORDER BY t.StartDate DESC
+            `;
+            const [rows] = await pool.query(query, [pfno]);
+            res.json(rows);
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
+        }
+    },
+
+    addTraining: async (req, res) => {
+        try {
+            const { 
+                pfno, course, level, type, organisedBy, duration, country, startDate, cost, sponsor, completed, yearCompleted 
+            } = req.body;
+
+            const isCompleted = completed === 'on' || completed === true || completed === 1 ? 1 : 0;
+            const safeYearCompleted = yearCompleted && yearCompleted !== '' ? yearCompleted : null;
+
+            const query = `
+                INSERT INTO tblcourse 
+                (PFNo, Course, Level, Type, OrganisedBy, Duration, Country, StartDate, Cost, SponsoredBy, Completed, YCompleted, approved, CompanyID)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1)
+            `;
+            
+            await pool.query(query, [
+                pfno, course, level, type, organisedBy, duration, country, startDate, cost, sponsor, isCompleted, safeYearCompleted
+            ]);
+
+            res.json({ success: true, message: 'Training added successfully.' });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
+        }
+    },
+
+    updateTraining: async (req, res) => {
+         try {
+            const { 
+                pfno, course, level, type, organisedBy, duration, country, startDate, cost, sponsor, completed, yearCompleted,
+                originalCourse, originalStartDate 
+            } = req.body;
+            
+            const isCompleted = completed === 'on' || completed === true || completed === 1 ? 1 : 0;
+            const safeYearCompleted = yearCompleted && yearCompleted !== '' ? yearCompleted : null;
+            
+            const query = `
+                UPDATE tblcourse 
+                SET Course=?, Level=?, Type=?, OrganisedBy=?, Duration=?, Country=?, StartDate=?, Cost=?, SponsoredBy=?, Completed=?, YCompleted=?, approved=0
+                WHERE PFNo=? AND Course=? AND StartDate=?
+            `;
+            
+            await pool.query(query, [
+                course, level, type, organisedBy, duration, country, startDate, cost, sponsor, isCompleted, safeYearCompleted,
+                pfno, originalCourse, originalStartDate
+            ]);
+
+            res.json({ success: true, message: 'Training updated successfully.' });
+
+         } catch (error) {
+             console.error(error);
+             res.status(500).json({ error: 'Server error' });
+         }
+    },
+
+    // Queries
+    getQueries: async (req, res) => {
+        try {
+            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+            // Fetch Query Types and Reactions for dropdowns
+            const [qTypes] = await pool.query('SELECT Code, QType FROM tblqtype ORDER BY QType');
+            const [mReactions] = await pool.query('SELECT Code, Reaction FROM tblmreaction ORDER BY Reaction');
+
+            res.render('data_entry/staff/queries', {
+                title: 'Staff Queries',
+                group: 'Staff',
+                path: '/data-entry/staff/queries',
+                user: { name: 'Data Entry Clerk' },
+                role: 'data_entry',
+                companyName,
+                qTypes,
+                mReactions
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    searchQueries: async (req, res) => {
+        try {
+            const { pfno } = req.params;
+            
+            // Check staff existence
+            const [staffRows] = await pool.query('SELECT SName FROM tblstaff WHERE PFNo = ?', [pfno]);
+            if (staffRows.length === 0) {
+                return res.status(404).json({ error: 'Staff not found' });
+            }
+
+            // Get queries
+            const query = `
+                SELECT 
+                    q.PFNO,
+                    DATE_FORMAT(q.QDate, '%Y-%m-%d %H:%i:%s') as QDateFormatted,
+                    q.QDate,
+                    q.QType as QTypeCode,
+                    qt.QType as QTypeName,
+                    q.QDetails,
+                    q.MResponse as MResponseCode,
+                    mr.Reaction as MResponseName,
+                    DATE_FORMAT(q.SDate, '%Y-%m-%d') as SDateFormatted,
+                    DATE_FORMAT(q.EDate, '%Y-%m-%d') as EDateFormatted,
+                    q.SDate,
+                    q.EDate,
+                    q.Percent,
+                    q.Approved
+                FROM tblquery q
+                LEFT JOIN tblqtype qt ON q.QType = qt.Code
+                LEFT JOIN tblmreaction mr ON q.MResponse = mr.Code
+                WHERE q.PFNO = ?
+                ORDER BY q.QDate DESC
+            `;
+            const [queries] = await pool.query(query, [pfno]);
+
+            res.json({
+                staff: { pfno, name: staffRows[0].SName },
+                queries
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
+        }
+    },
+
+    addQuery: async (req, res) => {
+        try {
+            const { pfno, qDate, qType, qDetails, mResponse, sDate, eDate, percent } = req.body;
+
+            const query = `
+                INSERT INTO tblquery (
+                    PFNO, QDate, QType, QDetails, Recorded, MResponse, SDate, EDate, Percent, 
+                    Expired, Approved, CompanyID
+                ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, 0, 0, 1)
+            `;
+            
+            // Handle optional dates
+            const sDateVal = sDate || null;
+            const eDateVal = eDate || null;
+
+            await pool.query(query, [pfno, qDate, qType, qDetails, mResponse, sDateVal, eDateVal, percent]);
+
+            res.json({ success: true });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
+        }
+    },
+
+    editQuery: async (req, res) => {
+        try {
+            const { pfno, originalQDate, qDate, qType, qDetails, mResponse, sDate, eDate, percent } = req.body;
+
+            const query = `
+                UPDATE tblquery 
+                SET QDate = ?, QType = ?, QDetails = ?, MResponse = ?, SDate = ?, EDate = ?, Percent = ?
+                WHERE PFNO = ? AND QDate = ?
+            `;
+
+            const sDateVal = sDate || null;
+            const eDateVal = eDate || null;
+            
+            await pool.query(query, [qDate, qType, qDetails, mResponse, sDateVal, eDateVal, percent, pfno, originalQDate]);
+
+            res.json({ success: true });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
         }
     },
 
@@ -1157,6 +1364,439 @@ const dataEntryController = {
             group: group,
             page: title
         });
+    },
+
+    // Appraisal
+    getAppraisal: async (req, res) => {
+        try {
+            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+            // Fetch Staff for dropdown
+            const [staffList] = await pool.query('SELECT PFNo, SName FROM tblstaff ORDER BY SName');
+            
+            // Fetch Assessment values
+            const [assessments] = await pool.query('SELECT Code, Assessment FROM tblassessment ORDER BY Code');
+
+            // Pagination
+            const { page = 1 } = req.query;
+            const limit = 10;
+            const offset = (page - 1) * limit;
+            
+            const countQuery = 'SELECT COUNT(*) as total FROM tblappraisal WHERE Approved = 0';
+            const [countRows] = await pool.query(countQuery);
+            const total = countRows[0].total;
+
+            const query = `
+                SELECT 
+                    a.AppraisalNo,
+                    a.PFNo,
+                    s.SName,
+                    j.JobTitle as JobTitleName,
+                    d.Dept as DeptName,
+                    a.StartDate,
+                    a.EndDate,
+                    a.Punctuality as Punc,
+                    a.Performance as Perf,
+                    a.Communication_Skills as Com,
+                    a.Leadership as Lead,
+                    a.TeamWork as Team,
+                    a.Relationship as Rela,
+                    a.Attitude as Attd,
+                    a.Output as Output,
+                    a.Manager_Comments,
+                    a.PostDate,
+                    a.Staff_Comments,
+                    a.StaffDate,
+                    a.StaffOption,
+                    a.Committee_Comments,
+                    a.CommitteeDate,
+                    a.Manager
+                FROM tblappraisal a
+                LEFT JOIN tblstaff s ON a.PFNo = s.PFNo
+                LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code
+                LEFT JOIN tbldept d ON s.CDept = d.Code
+                WHERE a.Approved = 0
+                ORDER BY a.StartDate DESC
+                LIMIT ? OFFSET ?
+            `;
+            const [appraisals] = await pool.query(query, [limit, offset]);
+            
+            res.render('data_entry/staff/appraisal', {
+                title: 'Staff Appraisal',
+                group: 'Staff',
+                path: '/data-entry/staff/appraisal',
+                user: { name: 'Data Entry Clerk' },
+                role: 'data_entry',
+                companyName,
+                staffList,
+                assessments,
+                appraisals,
+                pagination: {
+                    page: parseInt(page),
+                    totalPages: Math.ceil(total / limit)
+                }
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    searchAppraisals: async (req, res) => {
+         try {
+            const { pfno } = req.params;
+            
+            // Check staff existence and return details for form population
+            const query = `
+                SELECT 
+                    s.PFNo, 
+                    s.SName, 
+                    DATE_FORMAT(s.DOE, '%Y-%m-%d') as HireDate,
+                    j.JobTitle,
+                    d.Dept
+                FROM tblstaff s
+                LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code
+                LEFT JOIN tbldept d ON s.CDept = d.Code
+                WHERE s.PFNo = ?
+            `;
+            const [staffRows] = await pool.query(query, [pfno]);
+
+            if (staffRows.length === 0) {
+                 return res.status(404).json({ error: 'Staff not found' });
+            }
+
+            // Also fetch last review date from tblappraisal for this staff
+            const [lastReviewRow] = await pool.query('SELECT MAX(EndDate) as LastReview FROM tblappraisal WHERE PFNo = ?', [pfno]);
+            const lastReview = lastReviewRow[0].LastReview ? lastReviewRow[0].LastReview : 'N/A';
+
+            res.json({
+                staff: staffRows[0],
+                lastReview
+            });
+
+         } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
+         }
+    },
+
+    addAppraisal: async (req, res) => {
+        try {
+            const {
+                pfno, manager, startDate, endDate, 
+                punc, perf, com, lead, team, rela, attd, output,
+                managerComments, postDate,
+                staffComments, staffDate, staffOption,
+                committeeComments, committeeDate
+            } = req.body;
+            
+            // Get Max AppraisalNo
+            const [maxRows] = await pool.query('SELECT MAX(AppraisalNo) as maxNo FROM tblappraisal');
+            const nextNo = (maxRows[0].maxNo || 0) + 1;
+
+            const query = `
+                INSERT INTO tblappraisal (
+                    AppraisalNo, PFNo, Manager, StartDate, EndDate, 
+                    Punctuality, Performance, Communication_Skills, Leadership, TeamWork, Relationship, Attitude, Output,
+                    Manager_Comments, PostDate, 
+                    Staff_Comments, StaffDate, StaffOption,
+                    Committee_Comments, CommitteeDate,
+                    Approved, CompanyID, Operator, KeyedIn,
+                    Dept, JobTitle, HireDate
+                ) 
+                SELECT 
+                    ?, s.PFNo, ?, ?, ?, 
+                    ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, 
+                    ?, ?, ?,
+                    ?, ?, 
+                    0, 1, ?, NOW(),
+                    d.Dept, j.JobTitle, s.DOE
+                FROM tblstaff s
+                LEFT JOIN tbldept d ON s.CDept = d.Code
+                LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code
+                WHERE s.PFNo = ?
+            `;
+
+            // Handle dates
+            const sDate = startDate || null;
+            const eDate = endDate || null;
+            const pDate = postDate || null;
+            const stDate = staffDate || null;
+            const cDate = committeeDate || null;
+            const operator = req.user ? req.user.username : 'Data Entry Clerk';
+
+            await pool.query(query, [
+                nextNo, manager, sDate, eDate,
+                punc, perf, com, lead, team, rela, attd, output,
+                managerComments, pDate,
+                staffComments, stDate, staffOption,
+                committeeComments, cDate,
+                operator,
+                pfno
+            ]);
+
+            res.json({ success: true, message: 'Appraisal added successfully.' });
+
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
+        }
+    },
+    
+    editAppraisal: async (req, res) => {
+         try {
+            const {
+                appraisalNo, manager, startDate, endDate, 
+                punc, perf, com, lead, team, rela, attd, output,
+                managerComments, postDate,
+                staffComments, staffDate, staffOption,
+                committeeComments, committeeDate
+            } = req.body;
+
+            const query = `
+                UPDATE tblappraisal a
+                LEFT JOIN tblstaff s ON a.PFNo = s.PFNo
+                LEFT JOIN tbldept d ON s.CDept = d.Code
+                LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code
+                SET
+                    a.Manager = ?, a.StartDate = ?, a.EndDate = ?, 
+                    a.Punctuality = ?, a.Performance = ?, a.Communication_Skills = ?, a.Leadership = ?, a.TeamWork = ?, a.Relationship = ?, a.Attitude = ?, a.Output = ?,
+                    a.Manager_Comments = ?, a.PostDate = ?, 
+                    a.Staff_Comments = ?, a.StaffDate = ?, a.StaffOption = ?,
+                    a.Committee_Comments = ?, a.CommitteeDate = ?,
+                    a.Operator = ?, a.KeyedIn = NOW(),
+                    a.Dept = d.Dept, a.JobTitle = j.JobTitle, a.HireDate = s.DOE
+                WHERE a.AppraisalNo = ?
+            `;
+            
+            // Handle dates
+            const sDate = startDate || null;
+            const eDate = endDate || null;
+            const pDate = postDate || null;
+            const stDate = staffDate || null;
+            const cDate = committeeDate || null;
+            const operator = req.user ? req.user.username : 'Data Entry Clerk';
+
+            await pool.query(query, [
+                manager, sDate, eDate,
+                punc, perf, com, lead, team, rela, attd, output,
+                managerComments, pDate,
+                staffComments, stDate, staffOption,
+                committeeComments, cDate,
+                operator,
+                appraisalNo
+            ]);
+
+            res.json({ success: true, message: 'Appraisal updated successfully.' });
+
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
+        }
+    },
+
+
+    // Redundancy
+    getStaffRedundancy: async (req, res) => {
+        try {
+            const { search, page = 1 } = req.query;
+            const limit = 10;
+            const offset = (page - 1) * limit;
+
+            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+            let baseQuery = `
+                SELECT 
+                    s.PFNo,
+                    s.SName,
+                    s.DOE,
+                    d.Dept as Department,
+                    TIMESTAMPDIFF(YEAR, s.DOE, CURDATE()) as Served,
+                    s.Redundant,
+                    s.DateRedundant
+                FROM tblstaff s
+                LEFT JOIN tbldept d ON s.CDept = d.Code
+                WHERE 1=1
+            `;
+
+            const params = [];
+
+            if (search) {
+                baseQuery += ' AND (s.PFNo LIKE ? OR s.SName LIKE ?)';
+                params.push(`%${search}%`, `%${search}%`);
+            }
+
+            // Count for pagination
+            const countQuery = `SELECT COUNT(*) as total FROM (${baseQuery}) as sub`;
+            const [countRows] = await pool.query(countQuery, params);
+            const total = countRows[0].total;
+
+            // Fetch Data
+            const dataQuery = baseQuery + ' ORDER BY s.SName ASC LIMIT ? OFFSET ?';
+            params.push(limit, offset);
+            
+            const [staffList] = await pool.query(dataQuery, params);
+
+            res.render('data_entry/staff/redundancy', {
+                title: 'Staff Redundancy Management',
+                user: { name: 'Data Entry Clerk' },
+                companyName,
+                staffList,
+                search,
+                pagination: {
+                    page: parseInt(page),
+                    totalPages: Math.ceil(total / limit)
+                }
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    initiateRedundancy: async (req, res) => {
+        try {
+            const { pfno } = req.body;
+            // Set Redundant to 2 (Pending)
+            await pool.query('UPDATE tblstaff SET Redundant = 2 WHERE PFNo = ?', [pfno]);
+            res.redirect('/data-entry/staff/redundancy');
+        } catch (err) {
+            console.error(err);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    // Promotion & Demotion
+    getPromotionDemotion: async (req, res) => {
+        try {
+            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+            // Fetch Staff for dropdown
+            const [staffList] = await pool.query('SELECT PFNo, SName FROM tblstaff ORDER BY SName');
+
+            // Fetch Job Titles
+            const [jobTitles] = await pool.query('SELECT Code, JobTitle FROM tbljobtitle ORDER BY JobTitle');
+            
+            // Fetch Grades (for new grade selection)
+            const [grades] = await pool.query('SELECT GradeCode, Grade, JobTitle FROM tblgrade ORDER BY Grade');
+
+            // Fetch Pending Promotions
+             const query = `
+                SELECT 
+                    p.PFNO,
+                    s.SName,
+                    p.PDate,
+                    p.Mode,
+                    g1.Grade as PrevGradeDesc,
+                    g2.Grade as NewGradeDesc,
+                    j.JobTitle as NewJobTitleDesc
+                FROM tblpromotions p
+                LEFT JOIN tblstaff s ON p.PFNO = s.PFNo
+                LEFT JOIN (SELECT DISTINCT GradeCode, Grade FROM tblgrade) g1 ON p.PrevGrade = g1.GradeCode
+                LEFT JOIN (SELECT DISTINCT GradeCode, Grade FROM tblgrade) g2 ON p.CGrade = g2.GradeCode
+                LEFT JOIN tbljobtitle j ON p.JobTitle = j.Code
+                WHERE p.Approved = 0
+                ORDER BY p.dateKeyed DESC
+            `;
+            const [promotions] = await pool.query(query);
+
+            res.render('data_entry/staff/promotion', {
+                title: 'Staff Promotion / Demotion',
+                user: { name: 'Data Entry Clerk' },
+                companyName,
+                staffList,
+                jobTitles,
+                grades,
+                promotions
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    searchStaffPromotionDetails: async (req, res) => {
+        try {
+            const { pfno } = req.params;
+            
+            // Get Staff Details (Name, Current Grade, JobTitle)
+            const [staffRows] = await pool.query(`
+                SELECT s.SName, s.CGrade, s.JobTitle, g.Grade as GradeDesc 
+                FROM tblstaff s 
+                LEFT JOIN tblgrade g ON s.CGrade = g.GradeCode 
+                WHERE s.PFNo = ?`, [pfno]);
+                
+            if (staffRows.length === 0) return res.status(404).json({ error: 'Staff not found' });
+            
+            const staff = staffRows[0];
+            
+            // Get Previous Grade (Most recent promotion record)
+            const [promoRows] = await pool.query(`
+                SELECT PrevGrade, g.Grade as GradeDesc 
+                FROM tblpromotions p
+                LEFT JOIN tblgrade g ON p.PrevGrade = g.GradeCode
+                WHERE PFNO = ? 
+                ORDER BY PDate DESC LIMIT 1`, [pfno]);
+                
+            const prevGrade = promoRows.length > 0 ? promoRows[0] : null;
+            
+            res.json({
+                name: staff.SName,
+                currentGradeCode: staff.CGrade,
+                currentGradeDesc: staff.GradeDesc,
+                currentJobTitleCode: staff.JobTitle,
+                prevGradeCode: prevGrade ? prevGrade.PrevGrade : '',
+                prevGradeDesc: prevGrade ? prevGrade.GradeDesc : ''
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    addPromotion: async (req, res) => {
+        try {
+            const { 
+                pfno, 
+                promotionDate, 
+                currentGradeCode, 
+                newJobTitle,
+                newGrade,
+                type // 'promotion' or 'demotion'
+            } = req.body;
+
+            const prevGradeSafe = currentGradeCode || '';
+            const mode = type === 'demotion' ? 'D' : 'P';
+
+            // Activity = 0 (Pending/Promotion?) 
+            
+            const query = `
+                INSERT INTO tblpromotions (
+                    PFNO, PDate, PrevGrade, CGrade, JobTitle, 
+                    Activity, Mode, Approved, 
+                    Operator, dateKeyed, TimeKeyed, CompanyID
+                ) VALUES (
+                    ?, ?, ?, ?, ?, 
+                    1, ?, 0, 
+                    ?, NOW(), NOW(), 1
+                )
+            `;
+            
+            await pool.query(query, [
+                pfno, promotionDate, prevGradeSafe, newGrade, newJobTitle,
+                mode,
+                'DataEntry' // Operator
+            ]);
+
+            res.redirect('/data-entry/staff/promotion-demotion');
+        } catch (err) {
+            console.error(err);
+            res.status(500).send('Server Error');
+        }
     }
 };
 

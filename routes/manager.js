@@ -29,15 +29,20 @@ router.get('/approve/salary', managerController.getComingSoon);
 router.get('/approve/edited-payroll', managerController.getComingSoon);
 router.get('/approve/leave', managerController.getComingSoon);
 router.get('/approve/interview', managerController.getComingSoon);
-router.get('/approve/promotion-demotion', managerController.getComingSoon);
+router.get('/approve/promotion-demotion', managerController.getApprovePromotionDemotion);
+router.post('/approve/promotion-demotion', managerController.postApprovePromotion);
 router.get('/approve/transfer', managerController.getTransferApprovals);
 router.post('/approve/transfer', managerController.postTransferApproval);
-router.get('/approve/training', managerController.getComingSoon);
-router.get('/approve/query', managerController.getComingSoon);
+router.get('/approve/training', managerController.getApproveTraining);
+router.post('/api/approve/training', managerController.postApproveTraining);
+router.get('/approve/query', managerController.getApproveQuery);
+router.post('/approve/query', managerController.postApproveQuery);
 router.get('/approve/acting-allowance', managerController.getComingSoon);
 router.get('/approve/yearly', managerController.getComingSoon);
 router.get('/approve/exit', managerController.getComingSoon);
-router.get('/approve/appraisals', managerController.getComingSoon);
+router.get('/approve/appraisals', managerController.getApproveAppraisals);
+router.post('/approve/appraisals', managerController.postApproveAppraisal);
+
 router.get('/approve/attendance', managerController.getComingSoon);
 router.get('/approve/loan', managerController.getComingSoon);
 router.get('/approve/guarantee', managerController.getComingSoon);
@@ -45,7 +50,8 @@ router.get('/approve/salary-review', managerController.getComingSoon);
 router.get('/approve/increment', managerController.getComingSoon);
 router.get('/approve/bonus', managerController.getComingSoon);
 router.get('/approve/end-of-service', managerController.getComingSoon);
-router.get('/approve/redundancy', managerController.getComingSoon);
+router.get('/approve/redundancy', managerController.getApproveRedundancy);
+router.post('/approve/redundancy', managerController.approveRedundancy);
 router.get('/approve/entitlement', managerController.getComingSoon);
 
 // Reports

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · HR & Payroll</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2"><%= companyName %></h1>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-search"></i> Search Staff Training</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label for="searchPFNo" class="form-label">Staff ID / PFNo</label>
+                            <input type="text" class="form-control" id="searchPFNo" placeholder="Enter PFNo">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-primary w-100" id="btnSearch">
+                                <i class="bi bi-search"></i> Search
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="trainingSection" class="card shadow-sm mb-4 d-none">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-journal-text"></i> Training Records</h5>
+                    <button class="btn btn-light btn-sm" id="btnAddCourse">
+                        <i class="bi bi-plus-lg"></i> Add New Course
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover align-middle" id="trainingTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Course Name</th>
+                                    <th>Course Level</th>
+                                    <th>Duration</th>
+                                    <th>Start Date</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Rows loaded via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal -->
+    <div class="modal fade" id="trainingModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="trainingModalLabel">Add New Course</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="trainingForm">
+                        <input type="hidden" id="mode" name="mode" value="add">
+                        <input type="hidden" id="originalCourse" name="originalCourse">
+                        <input type="hidden" id="originalStartDate" name="originalStartDate">
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="pfno" class="form-label">Employee ID (PFNo)</label>
+                                <select class="form-select" id="pfno" name="pfno" required>
+                                    <option value="">Select Staff...</option>
+                                    <% staff.forEach(s => { %>
+                                        <option value="<%= s.PFNo %>"><%= s.PFNo %> - <%= s.SName %></option>
+                                    <% }); %>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="course" class="form-label">Course Name</label>
+                                <input type="text" class="form-control" id="course" name="course" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="level" class="form-label">Level</label>
+                                <select class="form-select" id="level" name="level">
+                                    <option value="">Select Level...</option>
+                                    <% levels.forEach(l => { %>
+                                        <option value="<%= l.CLCode %>"><%= l.CLevel %></option>
+                                    <% }); %>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="type" class="form-label">Type</label>
+                                <select class="form-select" id="type" name="type">
+                                    <option value="">Select Type...</option>
+                                    <% types.forEach(t => { %>
+                                        <option value="<%= t.CourseCode %>"><%= t.CType %></option>
+                                    <% }); %>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="organisedBy" class="form-label">Organized By</label>
+                                <input type="text" class="form-control" id="organisedBy" name="organisedBy">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="duration" class="form-label">Duration</label>
+                                <input type="text" class="form-control" id="duration" name="duration">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="country" class="form-label">Country</label>
+                                <input type="text" class="form-control" id="country" name="country">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="startDate" class="form-label">Start Date</label>
+                                <input type="datetime-local" class="form-control" id="startDate" name="startDate" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="cost" class="form-label">Cost</label>
+                                <input type="number" class="form-control" id="cost" name="cost" step="0.01">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="sponsor" class="form-label">Sponsor</label>
+                                <select class="form-select" id="sponsor" name="sponsor">
+                                    <option value="">Select Sponsor...</option>
+                                    <% sponsors.forEach(s => { %>
+                                        <option value="<%= s.SCode %>"><%= s.Sponsor %></option>
+                                    <% }); %>
+                                </select>
+                            </div>
+                            <div class="col-md-6 completion-field">
+                                <label for="yearCompleted" class="form-label">Year Completed</label>
+                                <input type="number" class="form-control" id="yearCompleted" name="yearCompleted" min="1900" max="2100">
+                            </div>
+                            <div class="col-md-6 d-flex align-items-end completion-field">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="completed" name="completed">
+                                    <label class="form-check-label" for="completed">
+                                        Completed
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="btnSaveTraining">Save changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const btnSearch = document.getElementById('btnSearch');
+        const searchPFNo = document.getElementById('searchPFNo');
+        const trainingSection = document.getElementById('trainingSection');
+        const trainingTableBody = document.querySelector('#trainingTable tbody');
+        const btnAddCourse = document.getElementById('btnAddCourse');
+        const trainingModal = new bootstrap.Modal(document.getElementById('trainingModal'));
+        const trainingForm = document.getElementById('trainingForm');
+        const btnSaveTraining = document.getElementById('btnSaveTraining');
+
+        // Store fetched data to populate edit form easily
+        let currentTrainingData = [];
+
+        btnSearch.addEventListener('click', async () => {
+            const pfno = searchPFNo.value.trim();
+            if (!pfno) {
+                alert('Please enter a PFNo');
+                return;
+            }
+
+            try {
+                const res = await fetch(`/data-entry/api/staff/training/search?pfno=${pfno}`);
+                if (!res.ok) throw new Error('Failed to fetch training records');
+                
+                const data = await res.json();
+                currentTrainingData = data;
+                
+                trainingTableBody.innerHTML = '';
+                if (data.length === 0) {
+                    trainingTableBody.innerHTML = '<tr><td colspan="5" class="text-center">No training records found.</td></tr>';
+                } else {
+                    data.forEach((row, index) => {
+                        // Format date for display
+                        const date = new Date(row.StartDate).toLocaleDateString();
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${row.Course}</td>
+                            <td>${row.CLevel || row.Level || ''}</td>
+                            <td>${row.Duration || ''}</td>
+                            <td>${date}</td>
+                            <td>
+                                <button class="btn btn-primary btn-sm btn-edit" data-index="${index}">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </button>
+                            </td>
+                        `;
+                        trainingTableBody.appendChild(tr);
+                    });
+                }
+                
+                trainingSection.classList.remove('d-none');
+                
+                // Add event listeners to edit buttons
+                document.querySelectorAll('.btn-edit').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const index = e.currentTarget.dataset.index;
+                        openEditModal(currentTrainingData[index]);
+                    });
+                });
+
+            } catch (err) {
+                console.error(err);
+                alert('Error searching for training records');
+            }
+        });
+
+        btnAddCourse.addEventListener('click', () => {
+            document.getElementById('trainingModalLabel').innerText = 'Add New Course';
+            document.getElementById('mode').value = 'add';
+            trainingForm.reset();
+            
+            // Hide completion fields for new courses
+            document.querySelectorAll('.completion-field').forEach(el => el.classList.add('d-none'));
+
+            // Pre-select PFNo if searched
+            const searchedPFNo = searchPFNo.value.trim();
+            if (searchedPFNo) {
+                const pfnoSelect = document.getElementById('pfno');
+                pfnoSelect.value = searchedPFNo;
+            }
+            
+            trainingModal.show();
+        });
+
+        function openEditModal(data) {
+            document.getElementById('trainingModalLabel').innerText = 'Edit Course';
+            document.getElementById('mode').value = 'edit';
+            
+            // Show completion fields for editing
+            document.querySelectorAll('.completion-field').forEach(el => el.classList.remove('d-none'));
+
+            // Populate form
+            document.getElementById('pfno').value = data.PFNo;
+            document.getElementById('course').value = data.Course;
+            document.getElementById('level').value = data.Level;
+            document.getElementById('type').value = data.Type;
+            document.getElementById('organisedBy').value = data.OrganisedBy;
+            document.getElementById('duration').value = data.Duration;
+            document.getElementById('country').value = data.Country;
+            
+            // Format datetime-local: YYYY-MM-DDTHH:mm
+            if (data.StartDate) {
+                const d = new Date(data.StartDate);
+                d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+                document.getElementById('startDate').value = d.toISOString().slice(0, 16);
+            }
+            
+            document.getElementById('cost').value = data.Cost;
+            document.getElementById('sponsor').value = data.SponsoredBy;
+            document.getElementById('yearCompleted').value = data.YCompleted;
+            document.getElementById('completed').checked = data.Completed === 1;
+
+            // Store original values for identification
+            document.getElementById('originalCourse').value = data.Course;
+            
+            // Keep original date string or format it as expected by backend if using string matching
+            // Since backend expects the exact value stored in DB for WHERE clause if using strict matching,
+            // we should be careful. 
+            // For now, let's assume we send back the ISO string or similar.
+            // If data.StartDate is "2024-08-09T00:00:00.000Z", we need to send that back.
+            document.getElementById('originalStartDate').value = data.StartDate;
+
+            trainingModal.show();
+        }
+
+        btnSaveTraining.addEventListener('click', async () => {
+            if (!trainingForm.checkValidity()) {
+                trainingForm.reportValidity();
+                return;
+            }
+
+            const formData = new FormData(trainingForm);
+            const data = Object.fromEntries(formData.entries());
+            
+            // Handle checkbox manually if unchecked (though FormData handles it if checked, unchecked is missing)
+            data.completed = document.getElementById('completed').checked;
+
+            const mode = document.getElementById('mode').value;
+            const url = '/data-entry/api/staff/training';
+            const method = mode === 'add' ? 'POST' : 'PUT';
+
+            try {
+                const res = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await res.json();
+                
+                if (res.ok) {
+                    alert(result.message);
+                    trainingModal.hide();
+                    btnSearch.click(); // Refresh table
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (err) {
+                console.error(err);
+                alert('An error occurred while saving.');
+            }
+        });
+    </script>
+</body>
+</html>

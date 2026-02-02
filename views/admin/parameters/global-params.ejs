@@ -191,15 +191,20 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', async () => {
+        (async () => {
             const form = document.getElementById('globalParamsForm');
             const saveBtn = document.getElementById('saveBtn');
 
             // Fetch existing data
             try {
                 const res = await fetch('/admin/api/parameters/global-params');
-                const json = await res.json();
-                const d = json; // Assuming API returns object directly
+                if (!res.ok) throw new Error('API response not ok');
+                
+                let d = await res.json();
+                console.log('Global Params Data:', d);
+                
+                // Handle if array is returned
+                if (Array.isArray(d)) d = d[0];
 
                 if (d && Object.keys(d).length > 0) {
                     // Helper to set value safely
@@ -211,11 +216,11 @@
                     setVal('SeqNo', d.SeqNo);
                     setVal('RegNo', d.RegNo);
                     
-                    if(d.NDate) setVal('NDate', d.NDate.split('T')[0]);
+                    if(d.NDate) setVal('NDate', String(d.NDate).split('T')[0]);
                     setVal('NRate', d.NRate);
                     setVal('NORate', d.NORate);
                     
-                    if(d.GDate) setVal('GDate', d.GDate.split('T')[0]);
+                    if(d.GDate) setVal('GDate', String(d.GDate).split('T')[0]);
                     setVal('GRate', d.GRate);
                     setVal('GORate', d.GORate);
 
@@ -233,17 +238,15 @@
 
                     setVal('QueryLimit', d.QueryLimit);
                     
-                    // ClockIn is likely datetime in DB, but we want time or date? 
-                    // User said "Clock In (ClockIn)". In DB it is datetime(3).
-                    // If it's just time, we extract time.
+                    // ClockIn
                     if (d.ClockIn) {
-                         // Check if it's a full ISO string
-                         if (d.ClockIn.includes('T')) {
-                             const timePart = d.ClockIn.split('T')[1].substring(0, 5);
+                         const cIn = String(d.ClockIn);
+                         if (cIn.includes('T')) {
+                             const timePart = cIn.split('T')[1].substring(0, 5);
                              setVal('ClockIn', timePart);
                          } else {
-                             // Maybe it's just a time string?
-                             setVal('ClockIn', d.ClockIn);
+                             // "09:00:00.000" -> "09:00"
+                             setVal('ClockIn', cIn.substring(0, 5));
                          }
                     }
 
@@ -255,13 +258,10 @@
                     setVal('DeptName', d.DeptName);
 
                     // VPolicy Checkbox
-                    // DB has '-1' or '1' or '0' maybe? 
-                    // Schema says varchar(11). Sample data has '-1'.
-                    // Usually -1 or 1 is true? Or maybe it's just checked if not null?
-                    // Let's assume '1' or '-1' or 'true' is checked.
                     const vp = d.VPolicy;
                     if (vp == '1' || vp == '-1' || vp == 'true') {
-                        document.getElementById('VPolicy').checked = true;
+                        const vpEl = document.getElementById('VPolicy');
+                        if(vpEl) vpEl.checked = true;
                     }
                 }
             } catch (err) {
@@ -269,41 +269,46 @@
             }
 
             // Handle Submit
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                saveBtn.disabled = true;
-                saveBtn.textContent = 'Saving...';
-
-                try {
-                    const formData = new FormData(form);
-                    const data = Object.fromEntries(formData.entries());
-                    
-                    // Handle Checkbox: if unchecked, it won't be in data. 
-                    // We need to send something.
-                    data.VPolicy = document.getElementById('VPolicy').checked ? '-1' : '0'; // Using -1 as seen in sample data
-
-                    const res = await fetch('/admin/api/parameters/global-params', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(data)
-                    });
-
-                    const result = await res.json();
-                    
-                    if (result.success) {
-                        alert('Global Params saved successfully!');
-                        location.reload(); 
-                    } else {
-                        alert('Error: ' + (result.error || 'Failed to save'));
+            if(form) {
+                form.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    if(saveBtn) {
+                        saveBtn.disabled = true;
+                        saveBtn.textContent = 'Saving...';
                     }
-                } catch (err) {
-                    console.error(err);
-                    alert('An error occurred while saving.');
-                } finally {
-                    saveBtn.disabled = false;
-                    saveBtn.textContent = 'Save';
-                }
-            });
+
+                    try {
+                        const formData = new FormData(form);
+                        const data = Object.fromEntries(formData.entries());
+                        
+                        // Handle Checkbox
+                        const vpEl = document.getElementById('VPolicy');
+                        data.VPolicy = (vpEl && vpEl.checked) ? '-1' : '0'; 
+
+                        const res = await fetch('/admin/api/parameters/global-params', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        });
+
+                        const result = await res.json();
+                        if (result.success) {
+                            alert('Global Parameters saved successfully!');
+                        } else {
+                            alert('Error saving: ' + (result.error || 'Unknown error'));
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        alert('Failed to save data.');
+                    } finally {
+                        if(saveBtn) {
+                            saveBtn.disabled = false;
+                            saveBtn.textContent = 'Save';
+                        }
+                    }
+                });
+            }
+        })();
     </script>
 </body>
 </html>

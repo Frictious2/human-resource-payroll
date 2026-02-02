@@ -1,4 +1,7 @@
 const pool = require('../config/db');
+const transporter = require('../config/mailer');
+const ejs = require('ejs');
+const path = require('path');
 
 const managerController = {
   getDashboard: async (req, res) => {
@@ -414,6 +417,421 @@ const managerController = {
           console.error(error);
           res.status(500).json({ error: 'Server error' });
       }
+  },
+
+  getApproveTraining: async (req, res) => {
+      try {
+          // Fetch Company Info
+          const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+          const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+          const query = `
+              SELECT 
+                  c.PFNo,
+                  s.SName,
+                  c.Course,
+                  c.Duration,
+                  c.Country,
+                  c.StartDate,
+                  sp.Sponsor as SponsorName,
+                  c.Cost
+              FROM tblcourse c
+              JOIN tblstaff s ON c.PFNo = s.PFNo
+              LEFT JOIN tblcoursesponsor sp ON c.SponsoredBy = sp.SCode
+              WHERE c.approved = 0
+              ORDER BY c.StartDate DESC
+          `;
+          
+          const [rows] = await pool.query(query);
+
+          res.render('manager/approve/training', {
+              title: 'Approve Training',
+              path: '/manager/approve/training',
+              user: req.user || { name: 'Manager' },
+              role: 'manager',
+              companyName,
+              trainings: rows
+          });
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+  },
+
+  postApproveTraining: async (req, res) => {
+      try {
+          const { pfno, course, startDate, action } = req.body;
+          const user = req.user ? req.user.username : 'Manager';
+          
+          // Convert startDate to ISO string (YYYY-MM-DD HH:mm:ss.SSS) for exact matching
+          const formatDate = (d) => {
+             const date = new Date(d);
+             const pad = (n) => n.toString().padStart(2, '0');
+             const pad3 = (n) => n.toString().padStart(3, '0');
+             return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad3(date.getMilliseconds())}`;
+          };
+
+          const exactDate = formatDate(startDate);
+
+          if (action === 'approve') {
+              const query = `
+                  UPDATE tblcourse 
+                  SET approved = -1, approvedby = ?, dateapproved = NOW()
+                  WHERE PFNo = ? AND Course = ? AND StartDate = ?
+              `;
+              const [result] = await pool.query(query, [user, pfno, course, exactDate]);
+              
+              if (result.affectedRows === 0) {
+                   return res.json({ success: false, message: 'Training record not found or already processed.' });
+              }
+              res.json({ success: true, message: 'Training approved.' });
+          } else if (action === 'reject') {
+               const query = `
+                  UPDATE tblcourse 
+                  SET approved = 2, approvedby = ?, dateapproved = NOW()
+                  WHERE PFNo = ? AND Course = ? AND StartDate = ?
+              `;
+              const [result] = await pool.query(query, [user, pfno, course, exactDate]);
+              
+              if (result.affectedRows === 0) {
+                   return res.json({ success: false, message: 'Training record not found or already processed.' });
+              }
+              res.json({ success: true, message: 'Training rejected.' });
+          } else {
+              res.status(400).json({ error: 'Invalid action' });
+          }
+      } catch (error) {
+          console.error(error);
+          res.status(500).json({ error: 'Server error' });
+      }
+  },
+
+  getApproveQuery: async (req, res) => {
+      try {
+          const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+          const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+          // Fetch unapproved queries (Approved = 0)
+          const query = `
+              SELECT 
+                  q.PFNO,
+                  s.SName,
+                  DATE_FORMAT(q.QDate, '%Y-%m-%d %H:%i:%s.%f') as QDateFull,
+                  DATE_FORMAT(q.QDate, '%Y-%m-%d %H:%i:%s') as QDateFormatted,
+                  q.QType as QTypeCode,
+                  qt.QType as QTypeName,
+                  q.MResponse as MResponseCode,
+                  mr.Reaction as MResponseName
+              FROM tblquery q
+              LEFT JOIN tblstaff s ON q.PFNO = s.PFNo
+              LEFT JOIN tblqtype qt ON q.QType = qt.Code
+              LEFT JOIN tblmreaction mr ON q.MResponse = mr.Code
+              WHERE q.Approved = 0
+              ORDER BY q.QDate ASC
+          `;
+          const [rows] = await pool.query(query);
+
+          res.render('manager/approve/query', {
+              title: 'Approve Queries',
+              group: 'Approve',
+              path: '/manager/approve/query',
+              user: { name: 'Manager' },
+              role: 'manager',
+              companyName,
+              queries: rows
+          });
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+  },
+
+  postApproveQuery: async (req, res) => {
+      try {
+          const { pfno, qDate } = req.body;
+          
+          // Update Approved = -1, ApprovedBy = User, DateApproved = NOW
+          const query = `
+              UPDATE tblquery 
+              SET Approved = -1, ApprovedBy = ?, DateApproved = NOW()
+              WHERE PFNO = ? AND QDate = ?
+          `;
+          
+          const [result] = await pool.query(query, [
+              req.user ? req.user.username : 'manager', 
+              pfno, 
+              qDate
+          ]);
+
+          if (result.affectedRows === 0) {
+              return res.json({ success: false, message: 'Query not found or already approved.' });
+          }
+
+          res.json({ success: true });
+      } catch (error) {
+          console.error(error);
+          res.status(500).json({ error: 'Server error' });
+      }
+  },
+
+    // Redundancy Approval
+    getApproveRedundancy: async (req, res) => {
+        try {
+            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+            // Fetch Pending Redundancy Requests (Redundant = 2)
+            const query = `
+                SELECT 
+                    s.PFNo,
+                    s.SName,
+                    s.DOE,
+                    d.Dept as Department,
+                    TIMESTAMPDIFF(YEAR, s.DOE, CURDATE()) as Served
+                FROM tblstaff s
+                LEFT JOIN tbldept d ON s.CDept = d.Code
+                WHERE s.Redundant = 2
+            `;
+            const [requests] = await pool.query(query);
+
+            res.render('manager/approve/redundancy', {
+                title: 'Approve Redundancy',
+                user: { name: 'Manager' },
+                companyName,
+                requests
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    approveRedundancy: async (req, res) => {
+        try {
+            const { pfno } = req.body;
+            // Approve Redundancy (Set Redundant = 1, DateRedundant = NOW)
+            await pool.query('UPDATE tblstaff SET Redundant = 1, DateRedundant = NOW() WHERE PFNo = ?', [pfno]);
+            res.redirect('/manager/approve/redundancy');
+        } catch (err) {
+            console.error(err);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    // Staff Appraisal
+    getApproveAppraisals: async (req, res) => {
+        try {
+            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+            // Fetch unapproved appraisals
+            const query = `
+                SELECT 
+                    a.AppraisalNo,
+                    a.PFNo,
+                    s.SName,
+                    a.Punctuality as Punc,
+                    a.Performance as Perf,
+                    a.Communication_Skills as Com,
+                    a.Leadership as Lead,
+                    a.TeamWork as Team,
+                    a.Relationship as Rela,
+                    a.Attitude as Attd,
+                    a.Output as Output
+                FROM tblappraisal a
+                LEFT JOIN tblstaff s ON a.PFNo = s.PFNo
+                WHERE a.Approved = 0
+                ORDER BY a.StartDate ASC
+            `;
+            const [rows] = await pool.query(query);
+
+            res.render('manager/approve/appraisals', {
+                title: 'Approve Appraisals',
+                group: 'Approve',
+                path: '/manager/approve/appraisals',
+                user: { name: 'Manager' },
+                role: 'manager',
+                companyName,
+                appraisals: rows
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    postApproveAppraisal: async (req, res) => {
+        try {
+            const { appraisalNo } = req.body;
+            
+            const query = `
+                UPDATE tblappraisal 
+                SET Approved = -1, ApprovedBy = ?, DateApproved = NOW()
+                WHERE AppraisalNo = ?
+            `;
+            
+            const [result] = await pool.query(query, [
+                req.user ? req.user.username : 'manager', 
+                appraisalNo
+            ]);
+
+            if (result.affectedRows === 0) {
+                return res.json({ success: false, message: 'Appraisal not found or already approved.' });
+            }
+
+            res.json({ success: true });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
+        }
+    },
+
+    getApprovePromotionDemotion: async (req, res) => {
+        try {
+            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+            const query = `
+                SELECT 
+                    p.PFNO,
+                    s.SName,
+                    p.PDate,
+                    p.Mode,
+                    g1.Grade as PrevGradeDesc,
+                    g2.Grade as NewGradeDesc,
+                    j.JobTitle as NewJobTitleDesc
+                FROM tblpromotions p
+                LEFT JOIN tblstaff s ON p.PFNO = s.PFNo
+                LEFT JOIN (SELECT DISTINCT GradeCode, Grade FROM tblgrade) g1 ON p.PrevGrade = g1.GradeCode
+                LEFT JOIN (SELECT DISTINCT GradeCode, Grade FROM tblgrade) g2 ON p.CGrade = g2.GradeCode
+                LEFT JOIN tbljobtitle j ON p.JobTitle = j.Code
+                WHERE p.Approved = 0
+                ORDER BY p.dateKeyed DESC
+            `;
+            const [rows] = await pool.query(query);
+
+            res.render('manager/approve/promotions', {
+                title: 'Approve Promotions / Demotions',
+                group: 'Approve',
+                path: '/manager/approve/promotion-demotion',
+                user: { name: 'Manager' },
+                role: 'manager',
+                companyName,
+                promotions: rows
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    postApprovePromotion: async (req, res) => {
+        try {
+            const { pfno, pDate } = req.body;
+            
+            const connection = await pool.getConnection();
+            try {
+                await connection.beginTransaction();
+
+                // 1. Update Staff Record (Apply Promotion)
+                const updateStaffQuery = `
+                    UPDATE tblstaff s
+                    JOIN tblpromotions p ON s.PFNo = p.PFNO
+                    SET s.CGrade = p.CGrade, 
+                        s.JobTitle = p.JobTitle, 
+                        s.GradeCode = p.CGrade, 
+                        s.CGradeDate = p.PDate
+                    WHERE p.PFNO = ? AND DATE(p.PDate) = DATE(?) AND p.Approved = 0
+                `;
+                
+                await connection.query(updateStaffQuery, [pfno, pDate]);
+
+                // 2. Mark Promotion as Approved
+                const updatePromoQuery = `
+                    UPDATE tblpromotions 
+                    SET Approved = -1, ApprovedBy = ?, Dateapproved = NOW()
+                    WHERE PFNO = ? AND DATE(PDate) = DATE(?)
+                `;
+                
+                await connection.query(updatePromoQuery, [
+                    req.user ? req.user.username : 'manager',
+                    pfno,
+                    pDate
+                ]);
+
+                await connection.commit();
+
+                // --- Generate Letter and Send Email ---
+                
+                // Fetch Staff Details
+                const [staffRows] = await pool.query('SELECT SName, Email FROM tblstaff WHERE PFNo = ?', [pfno]);
+                const staff = staffRows[0];
+
+                // Fetch Company Info
+                const [comRows] = await pool.query('SELECT Com_Name, Address, Logopath FROM tblcominfo LIMIT 1');
+                const company = comRows[0];
+
+                // Fetch HOD from Parameters
+                const [paramRows] = await pool.query('SELECT HOD FROM tblparams1 LIMIT 1');
+                const hod = paramRows[0] ? paramRows[0].HOD : '';
+
+                // Fetch Promotion Details (for Job Title Description)
+                const [promoRows] = await pool.query(`
+                    SELECT p.Mode, j.JobTitle 
+                    FROM tblpromotions p 
+                    LEFT JOIN tbljobtitle j ON p.JobTitle = j.Code 
+                    WHERE p.PFNO = ? AND DATE(p.PDate) = DATE(?)
+                `, [pfno, pDate]);
+                const promo = promoRows[0];
+
+                let letterHtml = null;
+                const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+                if (staff && promo) {
+                    // Render Letter HTML
+                    letterHtml = await ejs.renderFile(path.join(__dirname, '../views/manager/approve/promotion_letter.ejs'), {
+                        staff,
+                        company,
+                        hod,
+                        promo,
+                        pDate,
+                        baseUrl
+                    });
+
+                    // Send Email if address exists
+                    if (staff.Email) {
+                        const mailOptions = {
+                            from: process.env.SMTP_USER || 'info@hrpayroll.davisasmedia.com',
+                            to: staff.Email,
+                            subject: promo.Mode === 'D' ? 'LETTER OF DEMOTION' : 'LETTER OF PROMOTION',
+                            html: letterHtml
+                        };
+                        
+                        try {
+                            await transporter.sendMail(mailOptions);
+                            console.log(`Email sent to ${staff.Email}`);
+                        } catch (emailErr) {
+                            console.error('Failed to send email:', emailErr);
+                        }
+                    }
+                }
+
+                res.json({ success: true, letterHtml });
+
+            } catch (err) {
+                await connection.rollback();
+                throw err;
+            } finally {
+                connection.release();
+            }
+
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
+        }
+    },
+
+    getApproveActingAllowance: async (req, res) => {
   }
 };
 
