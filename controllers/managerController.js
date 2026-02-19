@@ -51,6 +51,90 @@ const managerController = {
     }
   },
 
+  getApproveIncomeSetup: async (req, res) => {
+      try {
+          const [rows] = await pool.query(`
+              SELECT a.ScaleDate, a.Grade, a.PayCurrency, a.StartLevel, a.EndLevel, a.Notches, a.Increment
+              FROM tblallowance a
+              WHERE a.Approved = 0
+              ORDER BY a.ScaleDate DESC
+          `);
+          res.render('manager/approve/income_setup', {
+              title: 'Approve Income Setup',
+              path: '/manager/approve/income-setup',
+              user: req.session.user || { name: 'Manager' },
+              role: 'manager',
+              allowances: rows
+          });
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+  },
+ 
+  getApproveIncomeSetupView: async (req, res) => {
+      try {
+          const { grade, scaleDate } = req.query;
+          if (!grade || !scaleDate) return res.status(400).send('Missing parameters');
+          const [rows] = await pool.query(
+              'SELECT * FROM tblallowance WHERE Grade = ? AND ScaleDate = ?',
+              [grade, scaleDate]
+          );
+          if (rows.length === 0) return res.status(404).send('Record not found');
+          const [grades] = await pool.query('SELECT GradeCode, Grade FROM tblgrade ORDER BY GradeCode');
+          const [currencies] = await pool.query('SELECT CurrCode, CurrName FROM tblcurrency ORDER BY CurrCode');
+          const [items] = await pool.query('SELECT Code, Income, Freq FROM tblpayrollitems ORDER BY Code');
+          res.render('manager/approve/income_setup_view', {
+              title: 'View Income Setup',
+              path: '/manager/approve/income-setup/view',
+              user: req.session.user || { name: 'Manager' },
+              role: 'manager',
+              record: rows[0],
+              grades,
+              currencies,
+              items
+          });
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+  },
+ 
+  postApproveIncomeSetup: async (req, res) => {
+      try {
+          const { gradeCode, scaleDate, action } = req.body;
+          const user = req.session.user ? req.session.user.name : 'Manager';
+          const now = new Date();
+          const status = action === 'reject' ? 2 : -1;
+          await pool.query(
+              'UPDATE tblallowance SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE Grade = ? AND ScaleDate = ? AND Approved = 0',
+              [status, user, now, now, gradeCode, scaleDate]
+          );
+          res.redirect('/manager/approve/income-setup');
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+  },
+
+  getPayrollReports: async (req, res) => {
+      try {
+          const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+          const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+          res.render('manager/reports/payroll', {
+              title: 'Payroll Reports',
+              group: 'Reports',
+              path: '/manager/reports/payroll',
+              user: req.session.user || { name: 'Manager' },
+              role: 'manager',
+              companyName
+          });
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+  },
+
   getStaffEnquiry: async (req, res) => {
       try {
           // Fetch Company Info
@@ -546,6 +630,74 @@ const managerController = {
       }
   },
 
+  getApproveEntitlement: async (req, res) => {
+      try {
+          const [rows] = await pool.query(`
+              SELECT e.PFNo, s.SName, e.PayThrough, e.Bank, e.AccountNo, e.PayingBBAN, e.KeyedIn, e.Operator
+              FROM tblentitle e
+              LEFT JOIN tblstaff s ON e.PFNo = s.PFNo
+              WHERE e.Approved = 0
+              ORDER BY e.KeyedIn DESC
+          `);
+          res.render('manager/approve/entitlement', {
+              title: 'Approve Entitlements',
+              path: '/manager/approve/entitlement',
+              user: req.session.user || { name: 'Manager' },
+              role: 'manager',
+              entitlements: rows
+          });
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+  },
+ 
+  getApproveEntitlementView: async (req, res) => {
+      try {
+          const { pfno } = req.query;
+          if (!pfno) return res.status(400).send('PFNo is required');
+          const [paythrough] = await pool.query('SELECT Code, PayThrough FROM tblpaythrough ORDER BY PayThrough');
+          const [banks] = await pool.query('SELECT Code, Bank FROM tblbanks ORDER BY Bank');
+          const [items] = await pool.query("SELECT Code, Income FROM tblpayrollitems WHERE Code BETWEEN '01' AND '20' ORDER BY Code");
+          const [eRows] = await pool.query('SELECT * FROM tblentitle WHERE PFNo = ?', [pfno]);
+          const [sRows] = await pool.query('SELECT PFNo, SName FROM tblstaff WHERE PFNo = ?', [pfno]);
+          if (eRows.length === 0) return res.status(404).send('Entitlement not found');
+          const entitle = eRows[0];
+          const staff = sRows[0] || { PFNo: pfno, SName: pfno };
+          res.render('manager/approve/entitlement_view', {
+              title: 'View Entitlement',
+              path: '/manager/approve/entitlement/view',
+              user: req.session.user || { name: 'Manager' },
+              role: 'manager',
+              entitle,
+              staff,
+              paythrough,
+              banks,
+              items
+          });
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+  },
+ 
+  postApproveEntitlement: async (req, res) => {
+      try {
+          const { pfno, action } = req.body;
+          const user = req.session.user ? req.session.user.name : 'Manager';
+          const now = new Date();
+          const approvedStatus = action === 'reject' ? 2 : -1;
+          await pool.query(
+              'UPDATE tblentitle SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE PFNo = ? AND Approved = 0',
+              [approvedStatus, user, now, now, pfno]
+          );
+          res.redirect('/manager/approve/entitlement');
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+  },
+ 
   postApproveQuery: async (req, res) => {
       try {
           const { pfno, qDate } = req.body;
@@ -831,8 +983,160 @@ const managerController = {
         }
     },
 
-    getApproveActingAllowance: async (req, res) => {
-  }
+    getApproveExit: async (req, res) => {
+        try {
+            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+            const query = `
+                SELECT 
+                    f.PFNo,
+                    s.SName,
+                    f.DateResigned,
+                    f.DateLeft,
+                    r.Reason as ReasonDesc,
+                    f.Reason as ReasonCode
+                FROM tblformer f
+                JOIN tblstaff s ON f.PFNo = s.PFNo
+                LEFT JOIN tblreason r ON f.Reason = r.ReasonCode
+                WHERE f.Approved = 0
+                ORDER BY f.DateKeyed DESC
+            `;
+            const [exitRequests] = await pool.query(query);
+
+            res.render('manager/approve/exit', {
+                title: 'Approve Staff Exit',
+                user: { name: 'Manager' },
+                companyName,
+                exitRequests
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    postApproveExit: async (req, res) => {
+        try {
+            const { pfno } = req.body;
+            const operator = req.user ? req.user.username : 'Manager';
+            
+            await pool.query(`
+                UPDATE tblformer 
+                SET Approved = -1, ApprovedBy = ?, DateApproved = NOW() 
+                WHERE PFNo = ?
+            `, [operator, pfno]);
+
+            res.redirect('/manager/approve/exit');
+        } catch (err) {
+            console.error(err);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getApproveNewStaff: async (req, res) => {
+        try {
+            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+            const query = `
+                    SELECT 
+                        s.PFNo, s.SName, s.KeyedIn, s.KeyedInBy,
+                        s.JobTitle as JobCode, s.CDept as DeptCode,
+                        j.JobTitle, d.Dept as DeptName
+                    FROM tblstaff s
+                    LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code
+                    LEFT JOIN tbldept d ON s.CDept = d.Code
+                    WHERE s.Approved = 0
+                    ORDER BY s.KeyedIn DESC
+                `;
+            const [staffList] = await pool.query(query);
+
+            res.render('manager/approve/new_staff', {
+                title: 'Approve New/Edited Staff',
+                path: '/manager/approve/new-staff',
+                user: req.session.user || { name: 'Manager' },
+                role: 'manager',
+                companyName,
+                staffList
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getApproveNewStaffView: async (req, res) => {
+        try {
+            const { pfno } = req.query;
+            if (!pfno) return res.status(400).send('PFNo is required');
+            const [params1] = await pool.query('SELECT RetireAge FROM tblparams1 LIMIT 1');
+            const retireAge = params1[0] ? params1[0].RetireAge : 60;
+            const [sex] = await pool.query('SELECT * FROM tblsex');
+            const [mstatus] = await pool.query('SELECT * FROM tblmstatus');
+            const [nations] = await pool.query('SELECT * FROM tblnation');
+            const [depts] = await pool.query('SELECT * FROM tbldept');
+            const [jobTitles] = await pool.query('SELECT * FROM tbljobtitle');
+            const [grades] = await pool.query('SELECT * FROM tblgrade');
+            const [empTypes] = await pool.query('SELECT * FROM tblemptype');
+            const [relations] = await pool.query('SELECT * FROM tblrelation');
+            const [empStatuses] = await pool.query('SELECT * FROM tblempstatus');
+            const [levels] = await pool.query('SELECT LCode, Level FROM tbllevel ORDER BY Level');
+            const [qualifTypes] = await pool.query('SELECT Code, QType FROM tblqualiftype ORDER BY QType');
+            const [vehicles] = await pool.query('SELECT VType FROM tblvehicle ORDER BY VType');
+            const [staffRows] = await pool.query('SELECT * FROM tblstaff WHERE PFNo = ?', [pfno]);
+            if (staffRows.length === 0) return res.status(404).send('Staff not found');
+            const staff = staffRows[0];
+            const [lastLeaveRows] = await pool.query('SELECT DATE_FORMAT(MAX(StartDate), "%Y-%m-%d") as LastLeave FROM tblleave WHERE PFNO = ?', [pfno]);
+            const lastLeave = lastLeaveRows[0] ? lastLeaveRows[0].LastLeave : null;
+            const [depRows] = await pool.query(`
+                SELECT d.Dependant, r.Relation, DATE_FORMAT(d.DOB, '%Y-%m-%d') as Birthdate
+                FROM tbldependant d
+                LEFT JOIN tblrelation r ON d.RCode = r.RCode
+                WHERE d.PFNo = ? AND (d.Closed = 0 OR d.Closed IS NULL)
+                ORDER BY d.DepNo
+            `, [pfno]);
+            const [qualifs] = await pool.query(`
+                SELECT q.Code, q.QName, qt.QType
+                FROM tblqualif q
+                LEFT JOIN tblqualiftype qt ON q.Code = qt.Code
+                WHERE q.PFNo = ?
+            `, [pfno]);
+            res.render('manager/approve/new_staff_view', {
+                title: 'View Staff',
+                path: '/manager/approve/new-staff/view',
+                user: req.session.user || { name: 'Manager' },
+                role: 'manager',
+                staff,
+                sex, mstatus, nations, depts, jobTitles, grades, empTypes, relations, empStatuses,
+                levels, qualifTypes, vehicles, retireAge,
+                lastLeave, dependants: depRows, qualifications: qualifs
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+ 
+    postApproveNewStaff: async (req, res) => {
+        try {
+            const { pfno, action } = req.body;
+            const user = req.session.user ? req.session.user.name : 'Manager';
+            const now = new Date();
+
+            const approvedStatus = action === 'reject' ? 2 : 1;
+
+            await pool.query(
+                'UPDATE tblstaff SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE PFNo = ?',
+                [approvedStatus, user, now, now, pfno]
+            );
+
+            res.redirect('/manager/approve/new-staff');
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    }
 };
 
 module.exports = managerController;

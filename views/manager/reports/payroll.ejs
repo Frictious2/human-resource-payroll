@@ -17,7 +17,6 @@
             transform: translateY(-5px);
         }
         
-        /* A4 Paper Style for Preview/Print */
         @media print {
             body * {
                 visibility: hidden;
@@ -34,7 +33,6 @@
                 padding: 0;
                 box-shadow: none !important;
             }
-            /* Hide modal backdrop and other UI elements */
             .modal-backdrop, .modal-header, .btn-close {
                 display: none !important;
             }
@@ -59,14 +57,11 @@
 
     <main class="main">
         <div class="container-fluid">
-            <!-- Page Title -->
             <div class="d-flex align-items-center justify-content-between mb-4">
                 <h2 class="mb-0"><%= title %></h2>
             </div>
 
-            <!-- Report Cards -->
             <div class="row g-4">
-                <!-- Payslip Card -->
                 <div class="col-md-4">
                     <div class="card shadow-sm h-100 report-card" data-bs-toggle="modal" data-bs-target="#payslipModal">
                         <div class="card-body text-center p-5">
@@ -77,7 +72,6 @@
                     </div>
                 </div>
 
-                <!-- Voucher Card -->
                 <div class="col-md-4">
                     <div class="card shadow-sm h-100 report-card">
                         <div class="card-body text-center p-5">
@@ -88,7 +82,6 @@
                     </div>
                 </div>
 
-                <!-- Bonus/Backlog Card -->
                 <div class="col-md-4">
                     <div class="card shadow-sm h-100 report-card">
                         <div class="card-body text-center p-5">
@@ -100,7 +93,6 @@
                 </div>
             </div>
 
-            <!-- Payslip Input Modal -->
             <div class="modal fade" id="payslipModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog">
                     <div class="modal-content">
@@ -110,7 +102,6 @@
                         </div>
                         <div class="modal-body">
                             <form id="payslipForm">
-                                <!-- Scope Selection -->
                                 <div class="mb-3">
                                     <label class="form-label d-block">Report Scope</label>
                                     <div class="form-check form-check-inline">
@@ -123,25 +114,21 @@
                                     </div>
                                 </div>
 
-                                <!-- Staff ID Input -->
                                 <div class="mb-3">
                                     <label for="staffId" class="form-label">Staff ID</label>
                                     <input type="text" class="form-control" id="staffId" name="staffId" readonly>
                                 </div>
 
-                                <!-- Staff Name Display -->
                                 <div class="mb-3">
                                     <label class="form-label">Name</label>
                                     <div id="staffNameDisplay" class="form-control bg-light text-muted" style="min-height: 38px;"></div>
                                 </div>
 
-                                <!-- Period -->
                                 <div class="mb-3">
                                     <label for="period" class="form-label">Period (Month/Year)</label>
                                     <input type="month" class="form-control" id="period" name="period" required>
                                 </div>
 
-                                <!-- Options -->
                                 <div class="form-check mb-4">
                                     <input class="form-check-input" type="checkbox" id="displayYearly" name="displayYearly">
                                     <label class="form-check-label" for="displayYearly">
@@ -149,7 +136,6 @@
                                     </label>
                                 </div>
 
-                                <!-- Actions -->
                                 <div class="d-flex gap-2 justify-content-end">
                                     <button type="button" class="btn btn-info text-white" id="btnPreview"><i class="bi bi-eye"></i> Preview</button>
                                     <button type="button" class="btn btn-secondary" id="btnPrint"><i class="bi bi-printer"></i> Print</button>
@@ -161,7 +147,6 @@
                 </div>
             </div>
 
-            <!-- Payslip Preview Modal (Fullscreen) -->
             <div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-fullscreen">
                     <div class="modal-content bg-light">
@@ -178,9 +163,7 @@
                             </div>
                         </div>
                         <div class="modal-body d-flex justify-content-center overflow-auto p-4">
-                            <!-- A4 Container -->
                             <div id="payslipContainer" class="bg-white shadow p-5 position-relative" style="width: 210mm; min-height: 297mm; color: black;">
-                                <!-- Dynamic Content Rendered Here -->
                             </div>
                         </div>
                     </div>
@@ -241,7 +224,6 @@
             const staffIdInput = document.getElementById('staffId');
             const staffNameDisplay = document.getElementById('staffNameDisplay');
             
-            // Toggle Readonly
             function updateStaffInputState() {
                 if (scopeAll.checked) {
                     staffIdInput.readOnly = true;
@@ -255,7 +237,6 @@
             scopeAll.addEventListener('change', updateStaffInputState);
             scopeStaff.addEventListener('change', updateStaffInputState);
 
-            // Fetch Staff Name
             staffIdInput.addEventListener('blur', async () => {
                 const pfno = staffIdInput.value.trim();
                 if (!pfno) {
@@ -264,7 +245,7 @@
                 }
                 try {
                     staffNameDisplay.textContent = 'Loading...';
-                    const response = await fetch(`/data-entry/api/staff/${pfno}/name`);
+                    const response = await fetch(`/manager/api/staff/${pfno}/name`);
                     const data = await response.json();
                     if (response.ok) {
                         staffNameDisplay.textContent = data.name;
@@ -276,12 +257,10 @@
                 }
             });
 
-            // Action Buttons
             document.getElementById('btnPreview').addEventListener('click', () => loadPayslip('preview'));
             document.getElementById('btnPrint').addEventListener('click', () => loadPayslip('print'));
             document.getElementById('btnPdf').addEventListener('click', () => loadPayslip('pdf'));
 
-            // Navigation
             document.getElementById('prevBtn').addEventListener('click', () => {
                 if (currentIndex > 0) {
                     currentIndex--;
@@ -312,11 +291,8 @@
             }
 
             try {
-                // Close input modal
                 const inputModal = bootstrap.Modal.getInstance(document.getElementById('payslipModal'));
-                
-                // Show loading state or similar if needed
-                const yearly = document.getElementById('displayYearly').checked ? '1' : '0';
+                const yearly = document.getElementById('displayYearly') ? (document.getElementById('displayYearly').checked ? '1' : '0') : '0';
                 const url = `/data-entry/api/reports/payslip?month=${parseInt(month)}&year=${year}&scope=${scope}&pfno=${pfno}&yearly=${yearly}`;
                 const response = await fetch(url);
                 const result = await response.json();
@@ -343,12 +319,10 @@
 
                 inputModal.hide();
                 
-                // If action is preview, show modal
                 const previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
                 renderPayslip(0);
                 previewModal.show();
 
-                // If direct print or pdf requested, we can trigger it after a slight delay to ensure rendering
                 if (action === 'print') {
                    setTimeout(() => {
                         if (currentScope === 'all') {
@@ -385,20 +359,13 @@
             const data = currentData[index];
             const container = document.getElementById('payslipContainer');
             
-            // Update Navigation State
             document.getElementById('prevBtn').disabled = index === 0;
             document.getElementById('nextBtn').disabled = index === currentData.length - 1;
             document.getElementById('recordCounter').textContent = `${index + 1} / ${currentData.length}`;
 
-            container.innerHTML = buildPayslipHtml(data);
-        }
-
-        function buildPayslipHtml(data) {
-            // Calculate Totals
             let totalAdditions = 0;
             let totalDeductions = 0;
             
-            // Render Additions Rows
             const additionsHtml = additionMap.map(item => {
                 const val = parseFloat(data[item.key] || 0);
                 totalAdditions += val;
@@ -410,7 +377,6 @@
                 `;
             }).join('');
 
-            // Render Deductions Rows
             const deductionsHtml = deductionMap.map(item => {
                 const val = parseFloat(data[item.key] || 0);
                 totalDeductions += val;
@@ -434,7 +400,6 @@
             const nassitTotal = cumNassitEmp + cumNassitInst;
             const provFundBalance = parseFloat(data.GratEmp || 0) + parseFloat(data.GratInst || 0);
 
-            // Build Yearly Payments section if enabled
             const yearlyItems = yearlyEnabled && yearlyMap[data.PFNo] ? yearlyMap[data.PFNo] : null;
             const yearlyHtml = yearlyEnabled ? `
                 <div class="mt-4">
@@ -465,7 +430,7 @@
                 </div>
             ` : '';
 
-            return `
+            container.innerHTML = `
                 <div class="payslip-header mb-3">
                     <div class="d-flex justify-content-center align-items-center mb-1">
                         ${companyInfo.logo ? `<img src="${companyInfo.logo}" alt="Company Logo" style="max-height: 60px;" class="me-3">` : ''}
@@ -552,6 +517,160 @@
                             <div class="d-flex justify-content-between info-row">
                                 <span>Prov. Fund Balance</span>
                                 <span>${formatCurrency(provFundBalance)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                ${yearlyHtml}
+                <div class="mt-5 pt-5 text-center text-muted" style="font-size: 0.8rem;">
+                    <p>Generated on ${new Date().toLocaleDateString()}</p>
+                </div>
+            `;
+        }
+
+        function buildPayslipHtml(data) {
+            let totalAdditions = 0;
+            let totalDeductions = 0;
+            const additionsHtml = additionMap.map(item => {
+                const val = parseFloat(data[item.key] || 0);
+                totalAdditions += val;
+                return `
+                    <div class="d-flex justify-content-between info-row">
+                        <span>${item.label}</span>
+                        <span>${formatCurrency(val)}</span>
+                    </div>
+                `;
+            }).join('');
+            const deductionsHtml = deductionMap.map(item => {
+                const val = parseFloat(data[item.key] || 0);
+                totalDeductions += val;
+                return `
+                    <div class="d-flex justify-content-between info-row">
+                        <span>${item.label}</span>
+                        <span>${formatCurrency(val)}</span>
+                    </div>
+                `;
+            }).join('');
+            const netPay = totalAdditions - totalDeductions;
+            const totalIncomeVal = (data.TotalIncome != null ? parseFloat(data.TotalIncome) : totalAdditions);
+            const taxableIncomeVal = (data.Taxable != null ? parseFloat(data.Taxable) : 0);
+            const cum = cumulativeMap[data.PFNo] || {};
+            const cumNassitEmp = parseFloat(cum.TotNassitEmp || 0);
+            const cumNassitInst = parseFloat(cum.TotNassitInst || 0);
+            const nassitTotal = cumNassitEmp + cumNassitInst;
+            const provFundBalance = parseFloat(data.GratEmp || 0) + parseFloat(data.GratInst || 0);
+            const yearlyItems = yearlyEnabled && yearlyMap[data.PFNo] ? yearlyMap[data.PFNo] : null;
+            const yearlyHtml = yearlyEnabled ? `
+                <div class="mt-4">
+                    <h5 class="payslip-section-title text-center">Yearly Payments</h5>
+                    <div class="row fw-bold text-decoration-underline mb-1">
+                        <div class="col-4">Allowance</div>
+                        <div class="col-2 text-end">Gross</div>
+                        <div class="col-2 text-end">Tax</div>
+                        <div class="col-2 text-end">Net</div>
+                    </div>
+                    ${
+                        yearlyItems && yearlyItems.length > 0
+                            ? yearlyItems.map(it => {
+                                const gross = parseFloat(it.amount || 0);
+                                const tax = parseFloat(it.tax || 0);
+                                const net = gross - tax;
+                                return `
+                                    <div class="row info-row">
+                                        <div class="col-4">${it.label}</div>
+                                        <div class="col-2 text-end">${formatCurrency(gross)}</div>
+                                        <div class="col-2 text-end">${formatCurrency(tax)}</div>
+                                        <div class="col-2 text-end">${formatCurrency(net)}</div>
+                                    </div>
+                                `;
+                              }).join('')
+                            : `<div class="text-center text-muted">No yearly payments</div>`
+                    }
+                </div>
+            ` : '';
+            return `
+                <div class="payslip-header mb-3">
+                    <div class="d-flex justify-content-center align-items-center mb-1">
+                        ${companyInfo.logo ? `<img src="${companyInfo.logo}" alt="Company Logo" style="max-height: 60px;" class="me-3">` : ''}
+                        <div class="text-center">
+                            <h3 class="mb-0">${companyInfo.name || 'Company Name'}</h3>
+                            <p class="mb-0">${companyInfo.address || 'Address'}</p>
+                        </div>
+                    </div>
+                    <h4 class="mt-2 text-center text-uppercase text-decoration-underline">Payslip for period ending ${getMonthName(periodInfo.month)} ${periodInfo.year}</h4>
+                </div>
+                <div class="row mb-4 border-bottom pb-3">
+                    <div class="col-6">
+                        <div class="d-flex justify-content-between mb-2"><strong>Name:</strong> <span>${data.SName || ''}</span></div>
+                        <div class="d-flex justify-content-between mb-2"><strong>Employee ID:</strong> <span>${data.PFNo || ''}</span></div>
+                        <div class="d-flex justify-content-between mb-2"><strong>Department:</strong> <span>${data.DeptName || ''}</span></div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex justify-content-between mb-2"><strong>Account No:</strong> <span>${data.AccountNo || ''}</span></div>
+                        <div class="d-flex justify-content-between mb-2"><strong>Job Title:</strong> <span>${data.JobTitleName || ''}</span></div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-6 border-end">
+                        <h5 class="payslip-section-title">Additions</h5>
+                        ${additionsHtml}
+                    </div>
+                    <div class="col-6">
+                        <h5 class="payslip-section-title">Deductions</h5>
+                        ${deductionsHtml}
+                        <div class="d-flex justify-content-between border-top mt-2 pt-2 fw-bold">
+                            <span>TOTAL DEDUCTIONS</span>
+                            <span>${formatCurrency(totalDeductions)}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mt-4 pt-2">
+                            <span class="fw-bold">NET INCOME</span>
+                            <span class="fw-bold">${formatCurrency(netPay)}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-6">
+                        <div class="d-flex justify-content-between info-row">
+                            <span class="fw-bold">TOTAL INCOME</span>
+                            <span class="fw-bold">${formatCurrency(totalIncomeVal)}</span>
+                        </div>
+                        <div class="d-flex justify-content-between info-row">
+                            <span class="fw-bold">Taxable Income</span>
+                            <span class="fw-bold">${formatCurrency(taxableIncomeVal)}</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex justify-content-between info-row">
+                            <span class="fw-bold">${labels.code42 || 'Code 42'}</span>
+                            <span class="fw-bold">${formatCurrency(data.GratInst || 0)}</span>
+                        </div>
+                        <div class="d-flex justify-content-between info-row">
+                            <span class="fw-bold">${labels.code41 || 'Code 41'}</span>
+                            <span class="fw-bold">${formatCurrency(data.NassitInst || 0)}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <h5 class="payslip-section-title">Cumulative Balances</h5>
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="d-flex justify-content-between info-row">
+                                <span>${labels.code32 || 'Code 32'}</span>
+                                <span>${formatCurrency(parseFloat(cumulativeMap[data.PFNo]?.TotNassitEmp || 0))}</span>
+                            </div>
+                            <div class="d-flex justify-content-between info-row">
+                                <span>NASSIT TOTAL</span>
+                                <span>${formatCurrency(parseFloat(cumulativeMap[data.PFNo]?.TotNassitEmp || 0) + parseFloat(cumulativeMap[data.PFNo]?.TotNassitInst || 0))}</span>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="d-flex justify-content-between info-row">
+                                <span>${labels.code41 || 'Code 41'}</span>
+                                <span>${formatCurrency(parseFloat(cumulativeMap[data.PFNo]?.TotNassitInst || 0))}</span>
+                            </div>
+                            <div class="d-flex justify-content-between info-row">
+                                <span>Prov. Fund Balance</span>
+                                <span>${formatCurrency(parseFloat(data.GratEmp || 0) + parseFloat(data.GratInst || 0))}</span>
                             </div>
                         </div>
                     </div>

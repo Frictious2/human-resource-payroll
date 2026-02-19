@@ -1,6 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const dataEntryController = require('../controllers/dataEntryController');
+const multer = require('multer');
+const path = require('path');
+
+// Multer Setup for Staff Photos
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, 'public/uploads/staff_photos/');
+    },
+    filename: function (req, file, cb) {
+        cb(null, req.body.pfno + '_' + Date.now() + path.extname(file.originalname));
+    }
+});
+const upload = multer({ storage: storage });
 
 // Dashboard
 router.get('/', (req, res) => res.redirect('/data-entry/dashboard'));
@@ -23,7 +36,11 @@ router.post('/staff/applications', dataEntryController.postApplications);
 router.get('/staff/interview', dataEntryController.getInterview);
 router.post('/staff/invite', dataEntryController.postInvite);
 router.get('/api/applicant/:refno', dataEntryController.getApplicantDetails);
-router.get('/staff/new-edit', dataEntryController.getComingSoon);
+router.get('/staff/new-edit', dataEntryController.getStaffNewEdit);
+router.get('/staff/new-edit/search', dataEntryController.searchStaffNewEdit);
+router.get('/api/staff/:pfno/last-leave', dataEntryController.getStaffLastLeave);
+router.get('/api/staff/:pfno/qualifications', dataEntryController.getStaffQualifications);
+router.post('/staff/new-edit', upload.single('photo'), dataEntryController.postStaffNewEdit);
 router.get('/staff/dependants', dataEntryController.getDependants);
 router.get('/api/staff/:pfno/dependants', dataEntryController.searchDependants);
 router.post('/api/staff/dependants', dataEntryController.addDependant);
@@ -49,14 +66,23 @@ router.get('/staff/promotion-demotion', dataEntryController.getPromotionDemotion
 router.get('/api/staff/:pfno/promotion-details', dataEntryController.searchStaffPromotionDetails);
 router.post('/staff/promotion-demotion', dataEntryController.addPromotion);
 router.get('/staff/redundancy', dataEntryController.getStaffRedundancy);
-router.post('/staff/redundancy/initiate', dataEntryController.initiateRedundancy);
-router.get('/staff/exit', dataEntryController.getComingSoon);
+router.post('/staff/redundancy', dataEntryController.initiateRedundancy);
+
+// Staff Exit
+router.get('/staff/exit', dataEntryController.getStaffExit);
+router.get('/staff/exit/search', dataEntryController.searchStaffExit);
+router.post('/staff/exit', dataEntryController.postStaffExit);
 router.get('/staff/import', dataEntryController.getComingSoon);
 router.get('/staff/travel', dataEntryController.getComingSoon);
 
 // 3. Payroll
-router.get('/payroll/entitle', dataEntryController.getComingSoon);
-router.get('/payroll/income-setup', dataEntryController.getComingSoon);
+router.get('/payroll/entitle', dataEntryController.getPayrollEntitle);
+router.get('/api/payroll/entitle/:pfno', dataEntryController.getEntitleByStaff);
+router.post('/payroll/entitle', dataEntryController.postPayrollEntitle);
+router.get('/payroll/income-setup', dataEntryController.getPayrollIncomeSetup);
+router.get('/api/payroll/income-setup', dataEntryController.getIncomeSetupByGrade);
+router.get('/api/payroll/income-setup/record', dataEntryController.getIncomeSetupRecord);
+router.post('/payroll/income-setup', dataEntryController.postPayrollIncomeSetup);
 router.get('/payroll/payroll-setup', dataEntryController.getComingSoon);
 router.get('/payroll/edit-payroll', dataEntryController.getComingSoon);
 router.get('/payroll/view-payroll', dataEntryController.getComingSoon);

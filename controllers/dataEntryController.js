@@ -9,6 +9,256 @@ const dataEntryController = {
         });
     },
 
+    getPayrollIncomeSetup: async (req, res) => {
+        try {
+            const [grades] = await pool.query('SELECT GradeCode, Grade FROM tblgrade ORDER BY GradeCode');
+            const [currencies] = await pool.query('SELECT CurrCode, CurrName FROM tblcurrency ORDER BY CurrCode');
+            const [items] = await pool.query('SELECT Code, Income, Freq FROM tblpayrollitems ORDER BY Code');
+            const [allowances] = await pool.query('SELECT * FROM tblallowance ORDER BY ScaleDate DESC');
+            res.render('data_entry/payroll/income_setup', {
+                title: 'Income Setup',
+                group: 'Payroll',
+                path: '/data-entry/payroll/income-setup',
+                user: { name: 'Data Entry Officer' },
+                grades,
+                currencies,
+                items,
+                allowances
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+ 
+    getIncomeSetupByGrade: async (req, res) => {
+        try {
+            const { grade } = req.query;
+            if (!grade) return res.json([]);
+            const [rows] = await pool.query('SELECT * FROM tblallowance WHERE Grade = ? ORDER BY ScaleDate DESC', [grade]);
+            res.json(rows);
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
+        }
+    },
+ 
+    getIncomeSetupRecord: async (req, res) => {
+        try {
+            const { grade, scaleDate } = req.query;
+            if (!grade || !scaleDate) return res.status(400).json({ error: 'Missing parameters' });
+            const [rows] = await pool.query('SELECT * FROM tblallowance WHERE Grade = ? AND DATE(ScaleDate) = ?', [grade, scaleDate]);
+            if (rows.length === 0) return res.json(null);
+            res.json(rows[0]);
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
+        }
+    },
+ 
+    postPayrollIncomeSetup: async (req, res) => {
+        try {
+            const {
+                scaleDate,
+                gradeCode,
+                currencyCode,
+                startLevel,
+                endLevel,
+                notches,
+                increment
+            } = req.body;
+ 
+            const now = new Date();
+            const operator = 'Data Entry Officer';
+ 
+            // Discover available columns in tblallowance to build resilient INSERT/UPDATE
+            const [colsRows] = await pool.query(`
+                SELECT COLUMN_NAME 
+                FROM information_schema.COLUMNS 
+                WHERE TABLE_NAME = 'tblallowance'
+            `);
+            const colSet = new Set(colsRows.map(r => r.COLUMN_NAME));
+ 
+            const baseData = {
+                ScaleDate: scaleDate || null,
+                Grade: gradeCode || null,
+                PayCurrency: currencyCode || null,
+                StartLevel: startLevel || null,
+                EndLevel: endLevel || null,
+                Notches: notches || null,
+                Increment: increment || null,
+                KeyedIn: now,
+                Operator: operator,
+                TimeKeyed: now,
+                Approved: 0
+            };
+ 
+            const fields = [];
+            const values = [];
+            Object.entries(baseData).forEach(([k, v]) => {
+                if (colSet.has(k)) {
+                    fields.push(k);
+                    values.push(v);
+                }
+            });
+ 
+            // Upsert by GradeCode + ScaleDate if possible
+            let whereClause = '';
+            const whereParams = [];
+            if (colSet.has('Grade') && colSet.has('ScaleDate')) {
+                whereClause = 'WHERE Grade = ? AND ScaleDate = ?';
+                whereParams.push(gradeCode || null, scaleDate || null);
+            }
+ 
+            let existing = [];
+            if (whereClause) {
+                const [ex] = await pool.query(`SELECT * FROM tblallowance ${whereClause}`, whereParams);
+                existing = ex;
+            }
+ 
+            if (existing.length > 0) {
+                const setClause = fields.map(f => `${f} = ?`).join(', ');
+                await pool.query(
+                    `UPDATE tblallowance SET ${setClause} ${whereClause}`,
+                    [...values, ...whereParams]
+                );
+            } else {
+                const placeholders = fields.map(() => '?').join(', ');
+                await pool.query(
+                    `INSERT INTO tblallowance (${fields.join(', ')}) VALUES (${placeholders})`,
+                    values
+                );
+            }
+ 
+            res.redirect('/data-entry/payroll/income-setup');
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+ 
+    getPayrollEntitle: async (req, res) => {
+        try {
+            const [paythrough] = await pool.query('SELECT Code, PayThrough FROM tblpaythrough ORDER BY PayThrough');
+            const [banks] = await pool.query('SELECT Code, Bank, Short FROM tblbanks ORDER BY Bank');
+            const [companyBBANs] = await pool.query('SELECT BBAN, Short, Bank FROM tblpayingbank ORDER BY Bank');
+            const [items] = await pool.query("SELECT Code, Income FROM tblpayrollitems WHERE Code BETWEEN '01' AND '20' ORDER BY Code");
+            const [entitledStaff] = await pool.query(`
+                SELECT e.PFNo, s.SName 
+                FROM tblentitle e 
+                JOIN tblstaff s ON e.PFNo = s.PFNo
+                ORDER BY s.SName
+            `);
+            const [staffList] = await pool.query('SELECT PFNo, SName FROM tblstaff ORDER BY SName');
+            res.render('data_entry/payroll/entitle', {
+                title: 'Staff Entitlement',
+                group: 'Payroll',
+                path: '/data-entry/payroll/entitle',
+                user: { name: 'Data Entry Officer' },
+                paythrough,
+                banks,
+                items,
+                entitledStaff,
+                staffList,
+                companyBBANs
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+ 
+    getEntitleByStaff: async (req, res) => {
+        try {
+            const { pfno } = req.params;
+            const [rows] = await pool.query('SELECT * FROM tblentitle WHERE PFNo = ?', [pfno]);
+            if (rows.length === 0) return res.json(null);
+            res.json(rows[0]);
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error' });
+        }
+    },
+ 
+    postPayrollEntitle: async (req, res) => {
+        try {
+            const {
+                pfno,
+                paythroughCode,
+                bankCode,
+                accountNo,
+                payingBBAN
+            } = req.body;
+ 
+            const now = new Date();
+            const operator = 'Data Entry Officer';
+ 
+            const [existing] = await pool.query('SELECT PFNo FROM tblentitle WHERE PFNo = ?', [pfno]);
+ 
+            const getFlag = (name) => {
+                return req.body[name] ? -1 : 0;
+            };
+ 
+            const salary = getFlag('item_01');
+            const flags = {};
+            for (let c = 2; c <= 20; c++) {
+                const code = c.toString().padStart(2, '0');
+                const key = `Allw${code}`;
+                flags[key] = getFlag(`item_${code}`);
+            }
+ 
+            if (existing.length > 0) {
+                const q = `
+                    UPDATE tblentitle SET
+                        Salary = ?, 
+                        Allw02 = ?, Allw03 = ?, Allw04 = ?, Allw05 = ?, Allw06 = ?, Allw07 = ?, Allw08 = ?, Allw09 = ?, 
+                        Allw10 = ?, Allw11 = ?, Allw12 = ?, Allw13 = ?, Allw14 = ?, Allw15 = ?, Allw16 = ?, Allw17 = ?, Allw18 = ?, Allw19 = ?, Allw20 = ?,
+                        KeyedIn = ?, Operator = ?, TimeKeyed = ?, Approved = 0,
+                        PayThrough = ?, Bank = ?, PayingBBAN = ?, AccountNo = ?
+                    WHERE PFNo = ?
+                `;
+                const params = [
+                    salary,
+                    flags.Allw02, flags.Allw03, flags.Allw04, flags.Allw05, flags.Allw06, flags.Allw07, flags.Allw08, flags.Allw09,
+                    flags.Allw10, flags.Allw11, flags.Allw12, flags.Allw13, flags.Allw14, flags.Allw15, flags.Allw16, flags.Allw17, flags.Allw18, flags.Allw19, flags.Allw20,
+                    now, operator, now, 
+                    paythroughCode || null, bankCode || null, payingBBAN || null, accountNo || null,
+                    pfno
+                ];
+                await pool.query(q, params);
+            } else {
+                const q = `
+                    INSERT INTO tblentitle (
+                        PFNo, Salary, 
+                        Allw02, Allw03, Allw04, Allw05, Allw06, Allw07, Allw08, Allw09,
+                        Allw10, Allw11, Allw12, Allw13, Allw14, Allw15, Allw16, Allw17, Allw18, Allw19, Allw20,
+                        KeyedIn, Operator, TimeKeyed, Approved,
+                        PayThrough, Bank, PayingBBAN, AccountNo, CompanyID
+                    ) VALUES (
+                        ?, ?, 
+                        ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, 0,
+                        ?, ?, ?, ?, 1
+                    )
+                `;
+                const params = [
+                    pfno, salary,
+                    flags.Allw02, flags.Allw03, flags.Allw04, flags.Allw05, flags.Allw06, flags.Allw07, flags.Allw08, flags.Allw09,
+                    flags.Allw10, flags.Allw11, flags.Allw12, flags.Allw13, flags.Allw14, flags.Allw15, flags.Allw16, flags.Allw17, flags.Allw18, flags.Allw19, flags.Allw20,
+                    now, operator, now,
+                    paythroughCode || null, bankCode || null, payingBBAN || null, accountNo || null
+                ];
+                await pool.query(q, params);
+            }
+ 
+            res.redirect('/data-entry/payroll/entitle');
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+ 
     getApplicationsEnquiry: async (req, res) => {
         try {
             const { ageFrom, ageTo, sex, scoreFrom, scoreTo, dateFrom, dateTo, page = 1 } = req.query;
@@ -426,21 +676,22 @@ const dataEntryController = {
 
     getPayslipData: async (req, res) => {
         try {
-            const { month, year, scope, pfno } = req.query;
+            const { month, year, scope, pfno, yearly } = req.query;
 
-            const [comRows] = await pool.query('SELECT Com_Name, Address FROM tblcominfo LIMIT 1');
-            const company = comRows[0] || { Com_Name: '', Address: '' };
+            const [comRows] = await pool.query('SELECT Com_Name, Address, Logopath FROM tblcominfo LIMIT 1');
+            const company = comRows[0] || { Com_Name: '', Address: '', Logopath: null };
 
             let query = `
                 SELECT 
                     p.PFNo, p.Salary, p.Allw02, p.Allw03, p.Allw04, p.Allw05, p.Allw06, p.Allw07, p.Allw08, p.Allw09, p.Allw10, p.Allw11, p.Allw12, p.Allw14, p.Allw16, p.Allw17, p.Allw19,
-                    p.Tax, p.NassitEmp, p.GratEmp, p.Ded1, p.Ded2, p.Ded3, p.Ded4, p.Ded5, p.NetIncome,
+                    p.TotalIncome, p.Taxable, p.Tax, p.NassitEmp, p.NassitInst, p.GratEmp, p.GratInst, 
+                    p.Ded1, p.Ded2, p.Ded3, p.Ded4, p.Ded5, p.NetIncome,
                     s.SName, s.AccountNo,
                     d.Dept AS DeptName,
                     j.JobTitle AS JobTitleName
                 FROM tblpayroll p
                 LEFT JOIN tblstaff s ON p.PFNo = s.PFNo
-                LEFT JOIN tbldept d ON s.Dept = d.Code
+                LEFT JOIN tbldept d ON s.CDept = d.Code
                 LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code
                 WHERE p.PMonth = ? AND p.PYear = ?
             `;
@@ -456,12 +707,105 @@ const dataEntryController = {
 
             const [rows] = await pool.query(query, params);
 
+            let cumSql = `
+                SELECT 
+                    PFNo,
+                    SUM(NassitEmp) AS TotNassitEmp,
+                    SUM(NassitInst) AS TotNassitInst,
+                    SUM(GratEmp) AS TotGratEmp,
+                    SUM(GratInst) AS TotGratInst
+                FROM tblpayroll
+                WHERE PYear = ? AND PMonth <= ?
+            `;
+            const cumParams = [year, month];
+            if (scope === 'staff' && pfno) {
+                cumSql += ' AND PFNo = ?';
+                cumParams.push(pfno);
+            }
+            cumSql += ' GROUP BY PFNo';
+            const [cumRows] = await pool.query(cumSql, cumParams);
+
+            const [items] = await pool.query('SELECT Code, Income FROM tblpayrollitems WHERE Code IN (32, 41, 42)');
+            const code32 = items.find(r => String(r.Code) === '32');
+            const code41 = items.find(r => String(r.Code) === '41');
+            const code42 = items.find(r => String(r.Code) === '42');
+
+            // Yearly payments (optional)
+            let yearlyTotals = null;
+            if (yearly === '1') {
+                // Get labels and percentage for Rent(02), Inducement(05), Leave(13)
+                const [yItems] = await pool.query(
+                    "SELECT Code, Income, Percent FROM tblpayrollitems WHERE Code IN ('02','05','13')"
+                );
+                const labelMap = {};
+                const percentMap = {};
+                yItems.forEach(it => {
+                    const code = it.Code.padStart(2, '0');
+                    labelMap[code] = it.Income;
+                    percentMap[code] = it.Percent != null ? parseFloat(it.Percent) : 0;
+                });
+
+                // Get yearly Tax values from tblyearlypayments for the selected year (any month)
+                const [taxRows] = await pool.query(
+                    "SELECT PFNo, PType, Tax FROM tblyearlypayments WHERE PYear = ? AND PType IN ('02','05','13') ORDER BY PMonth DESC, PDate DESC",
+                    [year]
+                );
+                const taxMap = {};
+                taxRows.forEach(tr => {
+                    const pf = tr.PFNo;
+                    const code = tr.PType.padStart(2, '0');
+                    if (!taxMap[pf]) taxMap[pf] = {};
+                    taxMap[pf][code] = tr.Tax != null ? parseFloat(tr.Tax) : 0;
+                });
+
+                const yearlyEntries = [
+                    { code: '02' },
+                    { code: '05' },
+                    { code: '13' }
+                ];
+                yearlyTotals = {};
+
+                // Build yearly amounts per staff based on Salary * Percent * 12 and attach Tax
+                rows.forEach(r => {
+                    const pf = r.PFNo;
+                    const salary = r.Salary != null ? parseFloat(r.Salary) : 0;
+                    if (!salary) {
+                        return;
+                    }
+                    const itemsArr = [];
+                    yearlyEntries.forEach(({ code }) => {
+                        const pct = percentMap[code] || 0;
+                        if (!pct) return;
+                        const gross = salary * (pct / 100) * 12;
+                        if (!gross) return;
+                        const label = labelMap[code] || (code === '13' ? 'LEAVE' : `Allw${code}`);
+                        const tax =
+                            taxMap[pf] && taxMap[pf][code] != null
+                                ? taxMap[pf][code]
+                                : 0;
+                        itemsArr.push({ code, label, amount: gross, tax });
+                    });
+                    if (itemsArr.length > 0) {
+                        yearlyTotals[pf] = itemsArr;
+                    }
+                });
+            }
+
             res.json({
                 company: {
                     name: company.Com_Name,
-                    address: company.Address
+                    address: company.Address,
+                    logo: company.Logopath
                 },
                 period: { month, year },
+                labels: {
+                    code32: code32 ? code32.Income : 'Code 32',
+                    code41: code41 ? code41.Income : 'Code 41',
+                    code42: code42 ? code42.Income : 'Code 42'
+                },
+                yearly: yearly === '1',
+                yearlyTotals,
+                cumulative: cumRows,
                 data: rows
             });
         } catch (error) {
@@ -500,6 +844,205 @@ const dataEntryController = {
             });
         } catch (error) {
             console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    // Staff New/Edit
+    getStaffNewEdit: async (req, res) => {
+        try {
+            const [sex] = await pool.query('SELECT * FROM tblsex');
+            const [mstatus] = await pool.query('SELECT * FROM tblmstatus');
+            const [nations] = await pool.query('SELECT * FROM tblnation');
+            const [depts] = await pool.query('SELECT * FROM tbldept');
+            const [jobTitles] = await pool.query('SELECT * FROM tbljobtitle');
+            const [grades] = await pool.query('SELECT * FROM tblgrade');
+            const [empTypes] = await pool.query('SELECT * FROM tblemptype');
+            const [relations] = await pool.query('SELECT * FROM tblrelation');
+            const [empStatuses] = await pool.query('SELECT * FROM tblempstatus');
+            const [levels] = await pool.query('SELECT LCode, Level FROM tbllevel ORDER BY Level');
+            const [qualifTypes] = await pool.query('SELECT Code, QType FROM tblqualiftype ORDER BY QType');
+            const [params1] = await pool.query('SELECT RetireAge FROM tblparams1 LIMIT 1');
+            const [vehicles] = await pool.query('SELECT VType FROM tblvehicle ORDER BY VType');
+
+            res.render('data_entry/staff/new_edit', {
+                title: 'Staff New/Edit',
+                sex,
+                mstatus,
+                nations,
+                depts,
+                jobTitles,
+                grades,
+                empTypes,
+                relations,
+                empStatuses,
+                levels,
+                qualifTypes,
+                retireAge: params1[0] ? params1[0].RetireAge : 60,
+                vehicles,
+                user: req.session.user || { name: 'Data Entry' }
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getStaffLastLeave: async (req, res) => {
+        try {
+            const { pfno } = req.params;
+            const [rows] = await pool.query(
+                'SELECT DATE_FORMAT(MAX(StartDate), "%Y-%m-%d") as LastLeave FROM tblleave WHERE PFNO = ?',
+                [pfno]
+            );
+            const lastLeave = rows[0] ? rows[0].LastLeave : null;
+            res.json({ lastLeave });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error fetching last leave' });
+        }
+    },
+ 
+    getStaffQualifications: async (req, res) => {
+        try {
+            const { pfno } = req.params;
+            const query = `
+                SELECT q.Code, q.QName, qt.QType
+                FROM tblqualif q
+                LEFT JOIN tblqualiftype qt ON q.Code = qt.Code
+                WHERE q.PFNo = ?
+            `;
+            const [rows] = await pool.query(query, [pfno]);
+            res.json(rows);
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server error fetching qualifications' });
+        }
+    },
+
+    searchStaffNewEdit: async (req, res) => {
+        try {
+            const { q } = req.query;
+            const [rows] = await pool.query(`
+                SELECT * FROM tblstaff
+                WHERE PFNo LIKE ? OR SName LIKE ?
+            `, [`%${q}%`, `%${q}%`]);
+            res.json(rows);
+        } catch (err) {
+            console.error(err);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    postStaffNewEdit: async (req, res) => {
+        try {
+            const {
+                sname, dob, sex, mstatus, nation, address, city, phone, email,
+                pfno, doe, dateConfirmed, jobTitle, cGrade, gradeEmployed, dept, empType, empStatus,
+                nkin, nkinRelationship, nkinAddr, nkinPhone,
+                accountNo, nassitNo,
+                cGradeDate, cDeptDate, dEmp, notch, level, unionMember, academic,
+                hod, hodStartDate, hodEndDate, vehicle, vehicleStartDate, vehicleEndDate, contractExp,
+                qualifCode, qualifName
+            } = req.body;
+
+            const operator = (req.session && req.session.user && req.session.user.name) ? req.session.user.name : 'Data Entry Officer';
+            const now = new Date();
+            const photoPath = req.file ? '/uploads/staff_photos/' + req.file.filename : null;
+            const unionMem = unionMember ? 'Y' : 'N';
+            const acad = academic ? 'Y' : 'N';
+            const hodVal = (hod === 'Y' || hod === 'Yes' || hod === 'true') ? 'Y' : 'N';
+            const vehicleVal = vehicle || 'NO';
+
+            // Check if staff exists
+            const [existing] = await pool.query('SELECT PFNo FROM tblstaff WHERE PFNo = ?', [pfno]);
+
+            if (existing.length > 0) {
+                // Update
+                const nassitR = nassitNo ? 1 : 0;
+                let updateQuery = `
+                    UPDATE tblstaff SET
+                        SName = ?, DOB = ?, SexCode = ?, MStatus = ?, NationCode = ?, Address = ?, City = ?, Phone = ?, Email = ?,
+                        DOE = ?, DateConfirmed = ?, JobTitle = ?, CGrade = ?, GradeCode = ?, CDept = ?, EmpType = ?, EmpStatus = ?,
+                        NKin = ?, NKinRelationship = ?, NKinAddr = ?, NKinPhone = ?,
+                        AccountNo = ?, NASSITNo = ?, NASSITR = ?,
+                        CGradeDate = ?, CDeptDate = ?, DEmp = ?, Notch = ?, Level = ?, UnionMember = ?, Academic = ?,
+                        HOD = ?, HOD_SDate = ?, HOD_EDate = ?, Vehicle = ?, CarSDate = ?, CarEDate = ?, Contract_Exp = ?,
+                        Approved = 0, KeyedInBy = ?, KeyedIn = ?, KeyTime = ?
+                `;
+                const params = [
+                    sname, dob || null, sex, mstatus, nation, address, city, phone, email,
+                    doe || null, dateConfirmed || null, jobTitle, cGrade, gradeEmployed, dept, empType, empStatus,
+                    nkin, nkinRelationship, nkinAddr, nkinPhone,
+                    accountNo, nassitNo, nassitR,
+                    cGradeDate || null, cDeptDate || null, dEmp, notch, level, unionMem, acad,
+                    hodVal, hodStartDate || null, hodEndDate || null, vehicleVal, vehicleStartDate || null, vehicleEndDate || null, contractExp || null,
+                    operator, now, now
+                ];
+
+                if (photoPath) {
+                    updateQuery += `, PhotoPath = ?`;
+                    params.push(photoPath);
+                }
+
+                updateQuery += ` WHERE PFNo = ?`;
+                params.push(pfno);
+
+                await pool.query(updateQuery, params);
+            } else {
+                // Insert
+                const nassitR = nassitNo ? 1 : 0;
+                const insertQuery = `
+                    INSERT INTO tblstaff (
+                        PFNo, SName, DOB, SexCode, MStatus, NationCode, Address, City, Phone, Email,
+                        DOE, DateConfirmed, JobTitle, CGrade, GradeCode, CDept, EmpType, EmpStatus,
+                        NKin, NKinRelationship, NKinAddr, NKinPhone,
+                        AccountNo, NASSITNo, NASSITR,
+                        CGradeDate, CDeptDate, DEmp, Notch, Level, UnionMember, Academic, PhotoPath,
+                        HOD, HOD_SDate, HOD_EDate, Vehicle, CarSDate, CarEDate, Contract_Exp,
+                        Redundant, Linked, Letter,
+                        Approved, KeyedInBy, KeyedIn, KeyTime, CompanyID
+                    ) VALUES (
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?,
+                        0, 0, 0,
+                        0, ?, ?, ?, 1
+                    )
+                `;
+                await pool.query(insertQuery, [
+                    pfno, sname, dob || null, sex, mstatus, nation, address, city, phone, email,
+                    doe || null, dateConfirmed || null, jobTitle, cGrade, gradeEmployed, dept, empType, empStatus,
+                    nkin, nkinRelationship, nkinAddr, nkinPhone,
+                    accountNo, nassitNo, nassitR,
+                    cGradeDate || null, cDeptDate || null, dEmp, notch, level, unionMem, acad, photoPath,
+                    hodVal, hodStartDate || null, hodEndDate || null, vehicleVal, vehicleStartDate || null, vehicleEndDate || null, contractExp || null,
+                    operator, now, now
+                ]);
+            }
+
+            // Handle Qualifications
+            if (acad === 'Y') {
+                await pool.query('DELETE FROM tblqualif WHERE PFNo = ?', [pfno]);
+
+                if (qualifCode && qualifName) {
+                    const codes = Array.isArray(qualifCode) ? qualifCode : [qualifCode];
+                    const names = Array.isArray(qualifName) ? qualifName : [qualifName];
+
+                    for (let i = 0; i < codes.length; i++) {
+                        if (codes[i] && names[i]) {
+                            await pool.query('INSERT INTO tblqualif (PFNo, Code, QName, CompanyID) VALUES (?, ?, ?, 1)', [pfno, codes[i], names[i]]);
+                        }
+                    }
+                }
+            }
+
+            res.redirect('/data-entry/staff/new-edit?success=Record saved successfully and sent for approval');
+        } catch (err) {
+            console.error(err);
             res.status(500).send('Server Error');
         }
     },
@@ -1793,6 +2336,122 @@ const dataEntryController = {
             ]);
 
             res.redirect('/data-entry/staff/promotion-demotion');
+        } catch (err) {
+            console.error(err);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    // Staff Exit
+    getStaffExit: async (req, res) => {
+        try {
+            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+            // Fetch Staff for dropdown
+            const [staffList] = await pool.query('SELECT PFNo, SName FROM tblstaff ORDER BY SName');
+
+            // Fetch Reasons
+            const [reasons] = await pool.query('SELECT ReasonCode, Reason FROM tblreason ORDER BY Reason');
+
+            res.render('data_entry/staff/exit', {
+                title: 'Staff Exit',
+                user: { name: 'Data Entry Clerk' },
+                companyName,
+                staffList,
+                reasons,
+                success: req.query.success
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    searchStaffExit: async (req, res) => {
+        try {
+            const { pfno } = req.query;
+            if (!pfno) return res.status(400).json({ error: 'PFNo is required' });
+
+            const [rows] = await pool.query('SELECT * FROM tblformer WHERE PFNo = ?', [pfno]);
+            if (rows.length > 0) {
+                // Format dates for input fields (YYYY-MM-DD)
+                const record = rows[0];
+                const formatDate = (d) => d ? new Date(d).toISOString().split('T')[0] : '';
+                
+                res.json({
+                    found: true,
+                    data: {
+                        Reason: record.Reason,
+                        DateResigned: formatDate(record.DateResigned),
+                        NoticeDate: formatDate(record.NoticeDate),
+                        ExpDate: formatDate(record.ExpDate),
+                        DateLeft: formatDate(record.DateLeft),
+                        BriefInfo: record.BriefInfo,
+                        DateAccepted: formatDate(record.DateAccepted),
+                        ExitInterview: record.ExitInterview,
+                        DateInterviewed: formatDate(record.DateInterviewed)
+                    }
+                });
+            } else {
+                res.json({ found: false });
+            }
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    postStaffExit: async (req, res) => {
+        try {
+            const {
+                pfno, reason, reasonDate, noticeDate, noticeExpiry, 
+                dateLeft, briefDetails, dateAccepted, interviewed, dateInterviewed
+            } = req.body;
+
+            const isInterviewed = interviewed === 'on' || interviewed === '1' ? 1 : 0;
+            const operator = req.user ? req.user.username : 'Data Entry Clerk';
+            const now = new Date();
+
+            // Check if record exists
+            const [rows] = await pool.query('SELECT PFNo FROM tblformer WHERE PFNo = ?', [pfno]);
+
+            if (rows.length > 0) {
+                // Update
+                const query = `
+                    UPDATE tblformer SET
+                        Reason = ?, DateResigned = ?, NoticeDate = ?, ExpDate = ?, 
+                        DateLeft = ?, BriefInfo = ?, DateAccepted = ?, 
+                        ExitInterview = ?, DateInterviewed = ?,
+                        Operator = ?, KeyedTime = ?, DateKeyed = ?, Approved = 0
+                    WHERE PFNo = ?
+                `;
+                await pool.query(query, [
+                    reason, reasonDate || null, noticeDate || null, noticeExpiry || null,
+                    dateLeft || null, briefDetails, dateAccepted || null,
+                    isInterviewed, dateInterviewed || null,
+                    operator, now, now,
+                    pfno
+                ]);
+            } else {
+                // Insert
+                const query = `
+                    INSERT INTO tblformer (
+                        PFNo, Reason, DateResigned, NoticeDate, ExpDate, 
+                        DateLeft, BriefInfo, DateAccepted, 
+                        ExitInterview, DateInterviewed,
+                        Operator, KeyedTime, DateKeyed, Approved
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                `;
+                await pool.query(query, [
+                    pfno, reason, reasonDate || null, noticeDate || null, noticeExpiry || null,
+                    dateLeft || null, briefDetails, dateAccepted || null,
+                    isInterviewed, dateInterviewed || null,
+                    operator, now, now
+                ]);
+            }
+
+            res.redirect('/data-entry/staff/exit?success=Record saved successfully');
         } catch (err) {
             console.error(err);
             res.status(500).send('Server Error');

@@ -20,10 +20,14 @@ router.get('/activity/run-salary-review', managerController.getComingSoon);
 router.get('/activity/medical-limits', managerController.getComingSoon);
 
 // Approve
-router.get('/approve/new-staff', managerController.getComingSoon);
+router.get('/approve/new-staff', managerController.getApproveNewStaff);
+router.post('/approve/new-staff', managerController.postApproveNewStaff);
+router.get('/approve/new-staff/view', managerController.getApproveNewStaffView);
 router.get('/approve/dependants', managerController.getApproveDependants);
 router.post('/approve/dependants', managerController.postApproveDependants);
-router.get('/approve/income-setup', managerController.getComingSoon);
+router.get('/approve/income-setup', managerController.getApproveIncomeSetup);
+router.get('/approve/income-setup/view', managerController.getApproveIncomeSetupView);
+router.post('/approve/income-setup', managerController.postApproveIncomeSetup);
 router.get('/approve/travel', managerController.getComingSoon);
 router.get('/approve/salary', managerController.getComingSoon);
 router.get('/approve/edited-payroll', managerController.getComingSoon);
@@ -39,9 +43,14 @@ router.get('/approve/query', managerController.getApproveQuery);
 router.post('/approve/query', managerController.postApproveQuery);
 router.get('/approve/acting-allowance', managerController.getComingSoon);
 router.get('/approve/yearly', managerController.getComingSoon);
-router.get('/approve/exit', managerController.getComingSoon);
+// Staff Exit Approval
+router.get('/approve/exit', managerController.getApproveExit);
+router.post('/approve/exit', managerController.postApproveExit);
 router.get('/approve/appraisals', managerController.getApproveAppraisals);
 router.post('/approve/appraisals', managerController.postApproveAppraisal);
+router.get('/approve/entitlement', managerController.getApproveEntitlement);
+router.get('/approve/entitlement/view', managerController.getApproveEntitlementView);
+router.post('/approve/entitlement', managerController.postApproveEntitlement);
 
 router.get('/approve/attendance', managerController.getComingSoon);
 router.get('/approve/loan', managerController.getComingSoon);
@@ -55,7 +64,7 @@ router.post('/approve/redundancy', managerController.approveRedundancy);
 router.get('/approve/entitlement', managerController.getComingSoon);
 
 // Reports
-router.get('/reports/payroll', managerController.getComingSoon);
+router.get('/reports/payroll', managerController.getPayrollReports);
 router.get('/reports/journal', managerController.getComingSoon);
 router.get('/reports/vehicle-insurance', managerController.getComingSoon);
 router.get('/reports/medical', managerController.getComingSoon);

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · HR & Payroll</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <div>
+                    <h2 class="mb-0">Income Setup</h2>
+                    <div class="text-muted">Configure salaries and allowances per grade</div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3" id="filterCard">
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label">Filter by Grade</label>
+                            <select class="form-select" id="filterGrade">
+                                <option value="">All</option>
+                                <% (grades || []).forEach(g => { %>
+                                    <option value="<%= g.GradeCode %>"><%= g.GradeCode %> — <%= g.Grade %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-primary w-100" onclick="filterAllowances()">
+                                <i class="bi bi-funnel"></i> Apply Filter
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-success w-100" onclick="showForm()">
+                                <i class="bi bi-plus-circle"></i> Add Salary and Allowances
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3" id="allowancesListCard">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Scale Date</th>
+                                    <th>Grade</th>
+                                    <th>Currency</th>
+                                    <th>Levels</th>
+                                    <th>Notches</th>
+                                    <th>Increment</th>
+                                    <th class="text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="allowancesBody">
+                                <% if ((allowances || []).length > 0) { %>
+                                    <% allowances.forEach(a => { %>
+                                        <tr>
+                                            <td><%= a.ScaleDate ? new Date(a.ScaleDate).toLocaleDateString() : '-' %></td>
+                                            <td><%= a.Grade || '-' %></td>
+                                            <td><%= a.PayCurrency || '-' %></td>
+                                            <td><%= (a.StartLevel || '-') %> - <%= (a.EndLevel || '-') %></td>
+                                            <td><%= a.Notches || '-' %></td>
+                                            <td><%= a.Increment || '-' %></td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-primary" onclick="editAllowance('<%= a.Grade || '' %>', '<%= a.ScaleDate ? new Date(a.ScaleDate).toISOString().slice(0,10) : '' %>')">
+                                                    <i class="bi bi-pencil"></i> Edit
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    <% }) %>
+                                <% } else { %>
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4 text-muted">No allowances configured yet</td>
+                                    </tr>
+                                <% } %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm" id="setupFormCard" style="display:none;">
+                <div class="card-body">
+                    <form action="/data-entry/payroll/income-setup" method="POST" id="incomeSetupForm">
+                        <h5 class="mb-3">Scale Details</h5>
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Scale Date</label>
+                                <input type="date" class="form-control" name="scaleDate" id="scaleDate" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Grade</label>
+                                <select class="form-select" name="gradeCode" id="gradeCode" required>
+                                    <option value="">Select Grade</option>
+                                    <% (grades || []).forEach(g => { %>
+                                        <option value="<%= g.GradeCode %>"><%= g.GradeCode %> — <%= g.Grade %></option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Currency</label>
+                                <select class="form-select" name="currencyCode" id="currencyCode" required>
+                                    <option value="">Select Currency</option>
+                                    <% (currencies || []).forEach(c => { %>
+                                        <option value="<%= c.CurrCode %>"><%= c.CurrName %></option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Start Level</label>
+                                <input type="number" class="form-control" name="startLevel" id="startLevel" min="0">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">End Level</label>
+                                <input type="number" class="form-control" name="endLevel" id="endLevel" min="0">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Notches</label>
+                                <input type="number" class="form-control" name="notches" id="notches" min="0">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Increment</label>
+                                <input type="number" step="0.01" class="form-control" name="increment" id="increment">
+                            </div>
+                        </div>
+
+                        <hr class="my-3">
+                        <h5 class="mb-3">Items Configuration</h5>
+                        <div class="table-responsive">
+                            <table class="table table-bordered align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Item</th>
+                                        <th>Tax</th>
+                                        <th>Threshold</th>
+                                        <th>Threshold %</th>
+                                        <th>Threshold Rate</th>
+                                        <th>Threshold Amount</th>
+                                        <th>Fix</th>
+                                        <th>Amount</th>
+                                        <th>Rate</th>
+                                        <th>Frequency</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% (items || []).forEach(it => { %>
+                                        <tr>
+                                            <td><%= it.Income %></td>
+                                            <td><input type="checkbox" class="form-check-input" name="tax_<%= it.Code %>"></td>
+                                            <td><input type="checkbox" class="form-check-input" name="thresh_<%= it.Code %>"></td>
+                                            <td><input type="checkbox" class="form-check-input" name="tpercent_<%= it.Code %>"></td>
+                                            <td><input type="number" step="0.01" class="form-control" name="tpercentage_<%= it.Code %>"></td>
+                                            <td><input type="number" step="0.01" class="form-control" name="tamount_<%= it.Code %>"></td>
+                                            <td><input type="checkbox" class="form-check-input" name="fix_<%= it.Code %>"></td>
+                                            <td><input type="number" step="0.01" class="form-control" name="amount_<%= it.Code %>"></td>
+                                            <td><input type="number" step="0.01" class="form-control" name="rate_<%= it.Code %>"></td>
+                                            <td><input type="text" class="form-control" value="<%= it.Freq || '-' %>" readonly></td>
+                                        </tr>
+                                    <% }) %>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="mt-3 text-end">
+                            <button type="submit" class="btn btn-success"><i class="bi bi-save"></i> Save</button>
+                            <button type="button" class="btn btn-secondary" onclick="hideForm()"><i class="bi bi-x-circle"></i> Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        async function filterAllowances() {
+            const grade = document.getElementById('filterGrade').value;
+            const body = document.getElementById('allowancesBody');
+            body.innerHTML = '<tr><td colspan="7" class="text-center py-4">Loading...</td></tr>';
+            try {
+                const url = grade ? ('/data-entry/api/payroll/income-setup?grade=' + encodeURIComponent(grade)) : '/data-entry/api/payroll/income-setup';
+                const resp = await fetch(url);
+                const data = await resp.json();
+                if (!data || data.length === 0) {
+                    body.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No allowances for selected grade</td></tr>';
+                    return;
+                }
+                body.innerHTML = data.map(a => {
+                    const scale = a.ScaleDate ? new Date(a.ScaleDate).toISOString().slice(0,10) : '';
+                    return `
+                    <tr>
+                        <td>${a.ScaleDate ? new Date(a.ScaleDate).toLocaleDateString() : '-'}</td>
+                        <td>${a.Grade || '-'}</td>
+                        <td>${a.PayCurrency || '-'}</td>
+                        <td>${(a.StartLevel ?? '-')} - ${(a.EndLevel ?? '-')}</td>
+                        <td>${a.Notches ?? '-'}</td>
+                        <td>${a.Increment ?? '-'}</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-primary" onclick="editAllowance('${a.Grade || ''}', '${scale}')">
+                                <i class="bi bi-pencil"></i> Edit
+                            </button>
+                        </td>
+                    </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error(e);
+                body.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-danger">Failed to load</td></tr>';
+            }
+        }
+        function showForm() {
+            document.getElementById('setupFormCard').style.display = '';
+            document.getElementById('allowancesListCard').style.display = 'none';
+            document.getElementById('filterCard').style.display = 'none';
+        }
+        function hideForm() {
+            document.getElementById('setupFormCard').style.display = 'none';
+            document.getElementById('allowancesListCard').style.display = '';
+            document.getElementById('filterCard').style.display = '';
+        }
+        async function editAllowance(gradeCode, scaleDate) {
+            showForm();
+            try {
+                const url = `/data-entry/api/payroll/income-setup/record?grade=${encodeURIComponent(gradeCode)}&scaleDate=${encodeURIComponent(scaleDate)}`;
+                const resp = await fetch(url);
+                const data = await resp.json();
+                if (!data) return;
+                const setSelect = (id, val) => {
+                    const sel = document.getElementById(id);
+                    if (!sel) return;
+                    const target = val != null ? String(val) : '';
+                    for (let i = 0; i < sel.options.length; i++) {
+                        if (String(sel.options[i].value) === target) {
+                            sel.selectedIndex = i;
+                            return;
+                        }
+                    }
+                };
+                setSelect('gradeCode', data.Grade);
+                const scaleSrc = data.ScaleDate || scaleDate;
+                if (scaleSrc) {
+                    const d = new Date(scaleSrc);
+                    if (!isNaN(d)) {
+                        document.getElementById('scaleDate').value = d.toISOString().slice(0, 10);
+                    }
+                }
+                setSelect('currencyCode', data.PayCurrency);
+                document.getElementById('startLevel').value = data.StartLevel ?? '';
+                document.getElementById('endLevel').value = data.EndLevel ?? '';
+                document.getElementById('notches').value = data.Notches ?? '';
+                document.getElementById('increment').value = data.Increment ?? '';
+                for (let c = 2; c <= 20; c++) {
+                    const code = c.toString().padStart(2, '0');
+                    const setChecked = (name, val) => {
+                        const el = document.querySelector(`[name="${name}"]`);
+                        if (el) {
+                            const num = Number(val);
+                            el.checked = num === 1 || num === -1;
+                        }
+                    };
+                    const setValue = (name, val) => {
+                        const el = document.querySelector(`[name="${name}"]`);
+                        if (el) el.value = val == null ? '' : val;
+                    };
+                    setChecked(`tax_${code}`, data['Taxable' + code]);
+                    setChecked(`thresh_${code}`, data['Thresh' + code]);
+                    setChecked(`tpercent_${code}`, data['TPercent' + code]);
+                    setValue(`tpercentage_${code}`, data['TPercentage' + code]);
+                    setValue(`tamount_${code}`, data['TAmount' + code]);
+                    setChecked(`fix_${code}`, data['Percent' + code]);
+                    setValue(`amount_${code}`, data['Amount' + code]);
+                    setValue(`rate_${code}`, data['Rate' + code]);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+    </script>
+</body>
+</html>

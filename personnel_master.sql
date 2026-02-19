@@ -3757,7 +3757,7 @@ CREATE TABLE `tblformer` (
   `NoticeDate` datetime(3) DEFAULT NULL,
   `ExpDate` datetime(3) DEFAULT NULL,
   `DateLeft` datetime(3) DEFAULT NULL,
-  `Operator` datetime(3) DEFAULT NULL,
+  `Operator` varchar(50) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
   `KeyedTime` datetime(3) DEFAULT NULL,
   `DateKeyed` datetime(3) DEFAULT NULL,
   `Approved` tinyint(4) NOT NULL,
@@ -8469,20 +8469,9 @@ INSERT INTO `tblqtype` (`Code`, `QType`, `CompanyID`) VALUES
 CREATE TABLE `tblqualif` (
   `PFNo` varchar(4) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
   `Code` varchar(2) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
-  `QName` varchar(50) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `Code1` varchar(2) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `QName1` varchar(50) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `Code2` varchar(2) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `QName2` varchar(50) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  `QName` varchar(50) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
   `CompanyID` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
-
---
--- Dumping data for table `tblqualif`
---
-
-INSERT INTO `tblqualif` (`PFNo`, `Code`, `QName`, `Code1`, `QName1`, `Code2`, `QName2`, `CompanyID`) VALUES
-('0489', '01', NULL, NULL, NULL, NULL, NULL, 1);
 
 -- --------------------------------------------------------
 

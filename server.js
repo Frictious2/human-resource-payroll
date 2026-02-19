@@ -1,4 +1,5 @@
 const express = require('express');
+const session = require('express-session');
 const path = require('path');
 require('dotenv').config();
 
@@ -14,6 +15,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Body parsing for form POSTs
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Session setup
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'secret_key',
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: false } // Set to true if using HTTPS
+}));
 
 // Routes
 app.get('/', (req, res) => {
@@ -33,8 +42,7 @@ app.post('/login', (req, res) => {
 
     // TODO: Replace with your actual authentication logic
     // For now, simulate success:
-    res.send(`Logged in as ${email}`);
-    // Simulate success: redirect to the dashboard
+    req.session.user = { name: email.split('@')[0], email };
     res.redirect('/dashboard');
 });
 

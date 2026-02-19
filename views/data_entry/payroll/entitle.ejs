@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · HR & Payroll</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <div>
+                    <h2 class="mb-0">Staff Entitlement</h2>
+                    <div class="text-muted">Add or edit staff payroll entitlements</div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Existing Entitlements</label>
+                            <select class="form-select" id="existingPfno">
+                                <option value="">Select...</option>
+                                <% entitledStaff.forEach(s => { %>
+                                    <option value="<%= s.PFNo %>"><%= s.PFNo %> - <%= s.SName %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button class="btn btn-primary w-100" onclick="loadExisting()">
+                                <i class="bi bi-search"></i> Load Selected
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Search By PFNo</label>
+                            <input type="text" class="form-control" id="searchPfno" placeholder="Enter PFNo">
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button class="btn btn-secondary w-100" onclick="loadBySearch()">
+                                <i class="bi bi-search"></i> Search
+                            </button>
+                        </div>
+                        <div class="col-md-12">
+                            <button class="btn btn-success" onclick="newEntitlement()">
+                                <i class="bi bi-plus-circle"></i> Add Staff Entitlement
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <form action="/data-entry/payroll/entitle" method="POST" id="entitleForm">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Staff</label>
+                                <select class="form-select" id="pfno" name="pfno" required>
+                                    <option value="">Select...</option>
+                                    <% staffList.forEach(s => { %>
+                                        <option value="<%= s.PFNo %>"><%= s.PFNo %> - <%= s.SName %></option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                        </div>
+
+                        <hr class="my-3">
+                        <h5 class="mb-3">Payment Details</h5>
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Paythrough</label>
+                                <select class="form-select" id="paythroughCode" name="paythroughCode">
+                                    <option value="">Select...</option>
+                                    <% paythrough.forEach(p => { %>
+                                        <option value="<%= p.Code %>"><%= p.PayThrough %></option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Bank</label>
+                                <select class="form-select" id="bankCode" name="bankCode">
+                                    <option value="">Select...</option>
+                                    <% banks.forEach(b => { %>
+                                        <option value="<%= b.Code %>"><%= b.Bank %></option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Account Number</label>
+                                <input type="text" class="form-control" id="accountNo" name="accountNo">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Company Account Number</label>
+                                <select class="form-select" id="payingBBAN" name="payingBBAN">
+                                    <option value="">Select...</option>
+                                    <% companyBBANs.forEach(cb => { %>
+                                        <option value="<%= cb.BBAN %>"><%= cb.Bank %> — <%= cb.Short %> — <%= cb.BBAN %></option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                        </div>
+
+                        <hr class="my-3">
+                        <h5 class="mb-3">Payroll Items</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="row row-cols-1">
+                                    <% items.forEach((it, idx) => { if (idx % 2 === 0) { %>
+                                        <div class="col mb-2">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="item_<%= it.Code %>" name="item_<%= it.Code %>">
+                                                <label class="form-check-label" for="item_<%= it.Code %>"><%= it.Income %></label>
+                                            </div>
+                                        </div>
+                                    <% } }) %>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="row row-cols-1">
+                                    <% items.forEach((it, idx) => { if (idx % 2 === 1) { %>
+                                        <div class="col mb-2">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="item_<%= it.Code %>" name="item_<%= it.Code %>">
+                                                <label class="form-check-label" for="item_<%= it.Code %>"><%= it.Income %></label>
+                                            </div>
+                                        </div>
+                                    <% } }) %>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 text-end">
+                            <button type="submit" class="btn btn-success"><i class="bi bi-save"></i> Save Entitlement</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        async function loadExisting() {
+            const pfno = document.getElementById('existingPfno').value;
+            if (!pfno) return;
+            await loadByPfno(pfno);
+        }
+        async function loadBySearch() {
+            const pfno = document.getElementById('searchPfno').value;
+            if (!pfno) return;
+            await loadByPfno(pfno);
+        }
+        function newEntitlement() {
+            document.getElementById('entitleForm').reset();
+        }
+        async function loadByPfno(pfno) {
+            try {
+                const resp = await fetch('/data-entry/api/payroll/entitle/' + pfno);
+                const data = await resp.json();
+                document.getElementById('pfno').value = pfno;
+                if (!data) {
+                    newEntitlement();
+                    document.getElementById('pfno').value = pfno;
+                    return;
+                }
+                const setSelect = (id, val) => {
+                    const sel = document.getElementById(id);
+                    if (!sel) return;
+                    const target = val != null ? String(val) : '';
+                    let matched = false;
+                    for (let i = 0; i < sel.options.length; i++) {
+                        if (String(sel.options[i].value) === target) {
+                            sel.selectedIndex = i;
+                            matched = true;
+                            break;
+                        }
+                    }
+                    if (!matched && target) {
+                        for (let i = 0; i < sel.options.length; i++) {
+                            if (String(sel.options[i].textContent).includes(target)) {
+                                sel.selectedIndex = i;
+                                break;
+                            }
+                        }
+                    }
+                };
+                const check = (code, val) => {
+                    const nodes = document.querySelectorAll('#item_' + code + ', [name="item_' + code + '"]');
+                    nodes.forEach(n => { n.checked = Number(val) === -1; });
+                };
+                setSelect('paythroughCode', data.PayThrough);
+                setSelect('bankCode', data.Bank);
+                document.getElementById('accountNo').value = data.AccountNo || '';
+                setSelect('payingBBAN', data.PayingBBAN);
+                check('01', data.Salary);
+                for (let c = 2; c <= 20; c++) {
+                    const code = c.toString().padStart(2, '0');
+                    const key = 'Allw' + code;
+                    check(code, data[key]);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+    </script>
+</body>
+</html>
