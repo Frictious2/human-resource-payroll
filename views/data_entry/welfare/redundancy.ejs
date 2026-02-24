@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · <%= group %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+    <style>
+        @media print {
+            @page {
+                size: A4 landscape;
+                margin: 10mm;
+            }
+            body.print-redundancy * { visibility: hidden; }
+            body.print-redundancy #redundancyContainer,
+            body.print-redundancy #redundancyContainer * { visibility: visible; }
+            body.print-redundancy #redundancyContainer {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                box-shadow: none !important;
+            }
+            body.print-redundancy .modal-backdrop,
+            body.print-redundancy .modal-header,
+            body.print-redundancy .btn-close { display: none !important; }
+        }
+        #redundancyContainer { font-size: 0.9rem; line-height: 1.25; }
+        .sheet-header h3 { font-weight: bold; margin-bottom: 4px; font-size: 1.05rem; }
+        .sheet-header p { margin-bottom: 2px; font-size: 0.85rem; }
+        .sheet-section-title { font-weight: bold; border-bottom: 2px solid #000; margin-bottom: 6px; padding-bottom: 3px; font-size: 0.95rem; }
+    </style>
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <h2 class="mb-0"><%= title %></h2>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <form id="redundancyForm" class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label d-block">Scope</label>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="scope" id="scopeAll" value="all" checked>
+                                <label class="form-check-label" for="scopeAll">All</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="scope" id="scopeStaff" value="staff">
+                                <label class="form-check-label" for="scopeStaff">Staff</label>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="pfno" class="form-label">Staff ID</label>
+                            <input type="text" class="form-control" id="pfno" name="pfno" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="sname" class="form-label">Staff Name</label>
+                            <input type="text" class="form-control" id="sname" name="sname" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="endDate" class="form-label">Enter End Date</label>
+                            <input type="date" class="form-control" id="endDate" name="endDate">
+                        </div>
+
+                        <div class="col-12 d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-info text-white" id="btnPreview"><i class="bi bi-eye"></i> Preview</button>
+                            <button type="button" class="btn btn-secondary" id="btnPrint"><i class="bi bi-printer"></i> Print</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-fullscreen">
+                    <div class="modal-content bg-light">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Redundancy Sheet Preview</h5>
+                            <div class="ms-auto d-flex gap-2 align-items-center">
+                                <button class="btn btn-secondary" onclick="downloadPrint()"><i class="bi bi-printer"></i> Print</button>
+                                <button type="button" class="btn-close ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                        </div>
+                        <div class="modal-body d-flex justify-content-center overflow-auto p-4">
+                            <div id="redundancyContainer" class="bg-white shadow p-5 position-relative" style="width: 297mm; min-height: 210mm; color: black;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="mt-4 py-3 text-center text-muted border-top">
+                <%- include('../partials/footer') %>
+            </footer>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let companyInfo = <%- JSON.stringify(company || {}) %>;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const scopeAll = document.getElementById('scopeAll');
+            const scopeStaff = document.getElementById('scopeStaff');
+            const pfno = document.getElementById('pfno');
+            const sname = document.getElementById('sname');
+            const endDate = document.getElementById('endDate');
+            const btnPreview = document.getElementById('btnPreview');
+            const btnPrint = document.getElementById('btnPrint');
+
+            function updateStaffInputState() {
+                if (scopeAll.checked) {
+                    pfno.readOnly = true;
+                    pfno.value = '';
+                    sname.value = '';
+                } else {
+                    pfno.readOnly = false;
+                    pfno.focus();
+                }
+            }
+            scopeAll.addEventListener('change', updateStaffInputState);
+            scopeStaff.addEventListener('change', updateStaffInputState);
+            updateStaffInputState();
+
+            pfno.addEventListener('blur', async () => {
+                const val = pfno.value.trim();
+                if (!val) {
+                    sname.value = '';
+                    return;
+                }
+                try {
+                    const resp = await fetch(`/data-entry/api/staff/${val}/name`);
+                    const data = await resp.json();
+                    if (resp.ok) {
+                        sname.value = data.name || '';
+                    } else {
+                        sname.value = '';
+                    }
+                } catch (e) {
+                    sname.value = '';
+                }
+            });
+
+            btnPreview.addEventListener('click', async () => {
+                await buildPreview();
+                const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+                modal.show();
+            });
+            btnPrint.addEventListener('click', async () => {
+                await buildPreview();
+                downloadPrint();
+            });
+        });
+
+        function formatDateStr(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            if (Number.isNaN(d.getTime())) return iso;
+            return d.toLocaleDateString();
+        }
+
+        function formatMonthYear(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            if (Number.isNaN(d.getTime())) return iso;
+            return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+        }
+
+        function formatNumber(value) {
+            if (value === null || value === undefined || value === '') return '';
+            const num = Number(value);
+            if (Number.isNaN(num)) return value;
+            return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        async function buildPreview() {
+            const scope = document.querySelector('input[name="scope"]:checked').value;
+            const pfno = document.getElementById('pfno').value.trim();
+            const sname = document.getElementById('sname').value.trim();
+            const endDate = document.getElementById('endDate').value;
+            const container = document.getElementById('redundancyContainer');
+
+            const headerHtml = `
+                <div class="sheet-header mb-3">
+                    <div class="d-flex justify-content-center align-items-center mb-1">
+                        ${companyInfo.Logopath ? `<img src="${companyInfo.Logopath}" alt="Company Logo" style="max-height: 60px;" class="me-3">` : ''}
+                        <div class="text-center">
+                            <h3 class="mb-0">${companyInfo.Com_Name || 'Company Name'}</h3>
+                            <p class="mb-0">${companyInfo.Address || ''}</p>
+                        </div>
+                    </div>
+                    <h4 class="mt-2 text-center text-uppercase text-decoration-underline">
+                        Staff Redundancy Sheet as at ${formatMonthYear(endDate)}
+                    </h4>
+                </div>
+            `;
+
+            if (scope === 'all') {
+                const infoHtml = `
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-2"><strong>Scope:</strong> <span>All</span></div>
+                        <div class="d-flex justify-content-between mb-2"><strong>End Date:</strong> <span>${formatDateStr(endDate)}</span></div>
+                    </div>
+                `;
+
+                let rows = [];
+                try {
+                    const resp = await fetch('/data-entry/api/welfare/redundancy');
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        rows = Array.isArray(data.rows) ? data.rows : [];
+                    }
+                } catch (e) {
+                    rows = [];
+                }
+
+                const bodyHtml = rows.map(r => `
+                    <tr>
+                        <td>${r.PFNo || ''}</td>
+                        <td>${r.SName || ''}</td>
+                        <td>${formatDateStr(r.DateEmp)}</td>
+                        <td>${r.GradeDesc || r.Grade || ''}</td>
+                        <td class="text-end">${formatNumber(r.Salary)}</td>
+                        <td class="text-end">${formatNumber(r.Benefit)}</td>
+                        <td class="text-end">${formatNumber(r.Tax)}</td>
+                        <td class="text-end">${r.Years !== null && r.Years !== undefined ? r.Years : ''}</td>
+                        <td>${r.Paid !== null && r.Paid !== undefined ? r.Paid : ''}</td>
+                    </tr>
+                `).join('');
+
+                const tableHtml = `
+                    <table class="table table-bordered table-sm mt-2">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Emp ID</th>
+                                <th>Staff Name</th>
+                                <th>Employed</th>
+                                <th>Grade</th>
+                                <th>Salary</th>
+                                <th>Benefit</th>
+                                <th>Tax</th>
+                                <th>Years</th>
+                                <th>Paid</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${bodyHtml || '<tr><td colspan="9" class="text-center">No data available</td></tr>'}
+                        </tbody>
+                    </table>
+                `;
+
+                container.innerHTML = headerHtml + infoHtml + tableHtml;
+            } else {
+                const infoHtml = `
+                    <div class="mb-3">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="d-flex justify-content-between mb-2"><strong>Staff ID:</strong> <span>${pfno}</span></div>
+                                <div class="d-flex justify-content-between mb-2"><strong>Name:</strong> <span>${sname}</span></div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex justify-content-between mb-2"><strong>End Date:</strong> <span>${formatDateStr(endDate)}</span></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML = headerHtml + infoHtml;
+            }
+        }
+
+        function downloadPrint() {
+            document.body.classList.add('print-redundancy');
+            window.print();
+            setTimeout(() => {
+                document.body.classList.remove('print-redundancy');
+            }, 500);
+        }
+    </script>
+</body>
+</html>

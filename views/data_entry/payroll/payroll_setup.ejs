@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · Data Entry</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid py-3">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <div>
+                    <h2 class="mb-0">Payroll Setup</h2>
+                    <div class="text-muted">Search, edit, or add staff payroll</div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-6">
+                            <label for="pfnoSelect" class="form-label">Select Staff</label>
+                            <select id="pfnoSelect" class="form-select">
+                                <option value="">-- Select Staff --</option>
+                                <% (staffList || []).forEach(s => { %>
+                                  <option value="<%= s.PFNo %>"><%= s.PFNo %> - <%= s.SName %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-md-6 d-flex gap-2">
+                            <button class="btn btn-primary" type="button" onclick="loadPayroll()">Load Staff Payroll</button>
+                            <button class="btn btn-outline-secondary" type="button" onclick="newPayroll()">Add Staff Payroll</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <form action="/data-entry/payroll/payroll-setup" method="POST" id="payrollForm">
+                <input type="hidden" name="pfno" id="pfnoHidden">
+
+                <ul class="nav nav-tabs mb-3" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-staff" type="button">Staff Information</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-additions" type="button">Monthly Additions</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-deductions" type="button">Monthly Deductions</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-benefits" type="button">Benefits</button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="tab-staff">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Date</label>
+                                <input type="date" class="form-control" name="pdate" id="pdate">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Staff Grade</label>
+                                <input type="text" class="form-control" id="gradeDisplay" readonly>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Annual Salary</label>
+                                <input type="number" step="0.01" class="form-control" name="annual" id="annual">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Job Title</label>
+                                <input type="text" class="form-control" id="jobTitleDisplay" readonly>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="tab-additions">
+                        <div class="row mt-2">
+                            <div class="col-md-6">
+                                <div class="d-flex align-items-center mb-2">
+                                    <label class="me-2 mb-0 flex-grow-1">Salary</label>
+                                    <input type="number" step="0.01" class="form-control form-control-sm" style="max-width: 180px;" name="salary" id="salary">
+                                </div>
+                                <% (addItems || []).forEach((it, idx) => { if (idx % 2 === 0) { %>
+                                    <% const nm = 'allw' + it.Code; %>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <label class="me-2 mb-0 flex-grow-1"><%= it.Income %></label>
+                                        <input type="number" step="0.01" class="form-control form-control-sm allowance" style="max-width: 180px;" name="<%= nm %>" id="<%= nm %>">
+                                    </div>
+                                <% } }) %>
+                            </div>
+                            <div class="col-md-6">
+                                <% (addItems || []).forEach((it, idx) => { if (idx % 2 === 1) { %>
+                                    <% const nm = 'allw' + it.Code; %>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <label class="me-2 mb-0 flex-grow-1"><%= it.Income %></label>
+                                        <input type="number" step="0.01" class="form-control form-control-sm allowance" style="max-width: 180px;" name="<%= nm %>" id="<%= nm %>">
+                                    </div>
+                                <% } }) %>
+                            </div>
+                        </div>
+                        <div class="row g-3 mt-2">
+                            <div class="col-md-6">
+                                <label class="form-label">Total Income</label>
+                                <input type="number" step="0.01" class="form-control" name="totalIncome" id="totalIncome">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Taxable Income</label>
+                                <input type="number" step="0.01" class="form-control" name="taxable" id="taxable">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="tab-deductions">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <% const d31 = (dedItems || []).find(d => d.Code === '31'); %>
+                                <% const d32 = (dedItems || []).find(d => d.Code === '32'); %>
+                                <% const d33 = (dedItems || []).find(d => d.Code === '33'); %>
+                                <% const d34 = (dedItems || []).find(d => d.Code === '34'); %>
+                                <% if (d31) { %>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <label class="me-2 mb-0 flex-grow-1"><%= d31.Income %> (Tax)</label>
+                                        <input type="number" step="0.01" class="form-control form-control-sm deduction" style="max-width: 180px;" name="tax" id="tax">
+                                    </div>
+                                <% } %>
+                                <% if (d32) { %>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <label class="me-2 mb-0 flex-grow-1"><%= d32.Income %> (NassitEmp)</label>
+                                        <input type="number" step="0.01" class="form-control form-control-sm deduction" style="max-width: 180px;" name="nassitEmp" id="nassitEmp">
+                                    </div>
+                                <% } %>
+                                <% if (d33) { %>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <label class="me-2 mb-0 flex-grow-1"><%= d33.Income %> (GratEmp)</label>
+                                        <input type="number" step="0.01" class="form-control form-control-sm deduction" style="max-width: 180px;" name="gratEmp" id="gratEmp">
+                                    </div>
+                                <% } %>
+                                <% if (d34) { %>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <label class="me-2 mb-0 flex-grow-1"><%= d34.Income %> (Ded1)</label>
+                                        <input type="number" step="0.01" class="form-control form-control-sm deduction" style="max-width: 180px;" name="ded1" id="ded1">
+                                    </div>
+                                <% } %>
+                            </div>
+                            <div class="col-md-6">
+                                <% const d35 = (dedItems || []).find(d => d.Code === '35'); %>
+                                <% const d36 = (dedItems || []).find(d => d.Code === '36'); %>
+                                <% const d37 = (dedItems || []).find(d => d.Code === '37'); %>
+                                <% if (d35) { %>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <label class="me-2 mb-0 flex-grow-1"><%= d35.Income %> (UnionDues)</label>
+                                        <input type="number" step="0.01" class="form-control form-control-sm deduction" style="max-width: 180px;" name="unionDues" id="unionDues">
+                                    </div>
+                                <% } %>
+                                <% if (d36) { %>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <label class="me-2 mb-0 flex-grow-1"><%= d36.Income %> (Ded3)</label>
+                                        <input type="number" step="0.01" class="form-control form-control-sm deduction" style="max-width: 180px;" name="ded3" id="ded3">
+                                    </div>
+                                <% } %>
+                                <% if (d37) { %>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <label class="me-2 mb-0 flex-grow-1"><%= d37.Income %> (Ded4)</label>
+                                        <input type="number" step="0.01" class="form-control form-control-sm deduction" style="max-width: 180px;" name="ded4" id="ded4">
+                                    </div>
+                                <% } %>
+                            </div>
+                        </div>
+                        <div class="my-3" style="height: 1rem;"></div>
+                        <div class="row g-3 mt-1">
+                            <div class="col-md-6">
+                                <label class="form-label">Total Deductions</label>
+                                <input type="number" step="0.01" class="form-control" name="totalDeduction" id="totalDeduction">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Net Income</label>
+                                <input type="number" step="0.01" class="form-control" name="netIncome" id="netIncome">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="tab-benefits">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">NASSIT-Institution</label>
+                                <input type="number" step="0.01" class="form-control" name="nassitInst" id="nassitInst">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Prov-Institution</label>
+                                <input type="number" step="0.01" class="form-control" name="gratInst" id="gratInst">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex justify-content-end">
+                    <button class="btn btn-success" type="submit">
+                        <i class="bi bi-save2"></i> Save Payroll
+                    </button>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let payrollMode = 'idle';
+
+        function resetFormValues() {
+            document.getElementById('annual').value = '';
+            document.getElementById('salary').value = '';
+            document.getElementById('totalIncome').value = '';
+            document.getElementById('taxable').value = '';
+            document.getElementById('tax').value = '';
+            document.getElementById('nassitEmp').value = '';
+            document.getElementById('gratEmp').value = '';
+            document.getElementById('ded1').value = '';
+            document.getElementById('unionDues').value = '';
+            document.getElementById('ded3').value = '';
+            document.getElementById('ded4').value = '';
+            document.getElementById('totalDeduction').value = '';
+            document.getElementById('netIncome').value = '';
+            document.getElementById('nassitInst').value = '';
+            document.getElementById('gratInst').value = '';
+            document.querySelectorAll('.allowance').forEach(el => el.value = '');
+        }
+
+        function todayYMD() {
+            const d = new Date();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        function newPayroll() {
+            const pfno = document.getElementById('pfnoSelect').value;
+            resetFormValues();
+            document.getElementById('pfnoHidden').value = pfno || '';
+            document.getElementById('gradeDisplay').value = '';
+            document.getElementById('jobTitleDisplay').value = '';
+            document.getElementById('pdate').value = todayYMD();
+            payrollMode = 'new';
+        }
+
+        async function loadPayroll() {
+            const pfno = document.getElementById('pfnoSelect').value;
+            if (!pfno) return;
+            try {
+                const resp = await fetch('/data-entry/api/payroll/payroll-setup/' + pfno);
+                const data = await resp.json();
+                resetFormValues();
+                document.getElementById('pfnoHidden').value = pfno;
+                if (data.staff) {
+                    document.getElementById('gradeDisplay').value = data.staff.GradeName || '';
+                    document.getElementById('jobTitleDisplay').value = data.staff.JobTitleName || '';
+                }
+                if (data.salary) {
+                    payrollMode = 'edit';
+                    const s = data.salary;
+                    document.getElementById('annual').value = s.Annual ?? '';
+                    document.getElementById('salary').value = s.Salary ?? '';
+                    <% (addItems || []).forEach(it => { %>
+                        (function() {
+                            const id = 'allw<%= it.Code %>';
+                            document.getElementById(id).value = (s['Allw<%= it.Code %>'] ?? '');
+                        })();
+                    <% }) %>
+                    document.getElementById('totalIncome').value = s.TotalIncome ?? '';
+                    document.getElementById('taxable').value = s.Taxable ?? '';
+                    document.getElementById('tax').value = s.Tax ?? '';
+                    document.getElementById('nassitEmp').value = s.NassitEmp ?? '';
+                    document.getElementById('gratEmp').value = s.GratEmp ?? '';
+                    document.getElementById('ded1').value = s.Ded1 ?? '';
+                    document.getElementById('unionDues').value = s.UnionDues ?? '';
+                    document.getElementById('ded3').value = s.Ded3 ?? '';
+                    document.getElementById('ded4').value = s.Ded4 ?? '';
+                    document.getElementById('totalDeduction').value = s.TotalDeduction ?? '';
+                    document.getElementById('netIncome').value = s.NetIncome ?? '';
+                    document.getElementById('nassitInst').value = s.NassitInst ?? '';
+                    document.getElementById('gratInst').value = s.GratInst ?? '';
+                    const dateVal = (function() {
+                        if (!s.PDate) return todayYMD();
+                        try {
+                            const d = new Date(s.PDate);
+                            const y = d.getFullYear();
+                            const m = String(d.getMonth() + 1).padStart(2, '0');
+                            const day = String(d.getDate()).padStart(2, '0');
+                            return `${y}-${m}-${day}`;
+                        } catch {
+                            return todayYMD();
+                        }
+                    })();
+                    document.getElementById('pdate').value = dateVal;
+                } else {
+                    payrollMode = 'new';
+                    document.getElementById('pdate').value = todayYMD();
+                }
+                computeTotals();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function numVal(id) {
+            const el = document.getElementById(id);
+            if (!el) return 0;
+            const v = parseFloat(el.value);
+            return isNaN(v) ? 0 : v;
+        }
+
+        function computeTotals() {
+            let totalIncome = numVal('salary');
+            document.querySelectorAll('.allowance').forEach(el => {
+                const v = parseFloat(el.value);
+                if (!isNaN(v)) totalIncome += v;
+            });
+            document.getElementById('totalIncome').value = totalIncome.toFixed(2);
+            // Simple assumption: Taxable Income equals Total Income
+            document.getElementById('taxable').value = totalIncome.toFixed(2);
+
+            let totalDed = 0;
+            ['tax','nassitEmp','gratEmp','ded1','unionDues','ded3','ded4'].forEach(id => {
+                const v = numVal(id);
+                totalDed += v;
+            });
+            document.getElementById('totalDeduction').value = totalDed.toFixed(2);
+
+            const net = totalIncome - totalDed;
+            document.getElementById('netIncome').value = net.toFixed(2);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Recompute totals on input changes
+            ['salary','tax','nassitEmp','gratEmp','ded1','unionDues','ded3','ded4'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('input', computeTotals);
+            });
+            document.querySelectorAll('.allowance').forEach(el => {
+                el.addEventListener('input', computeTotals);
+            });
+            // Default to today's date in new mode
+            document.getElementById('pdate').value = todayYMD();
+        });
+    </script>
+</body>
+</html>

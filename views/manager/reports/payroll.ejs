@@ -18,13 +18,14 @@
         }
         
         @media print {
-            body * {
+            body.print-payslip * {
                 visibility: hidden;
             }
-            #payslipContainer, #payslipContainer * {
+            body.print-payslip #payslipContainer,
+            body.print-payslip #payslipContainer * {
                 visibility: visible;
             }
-            #payslipContainer {
+            body.print-payslip #payslipContainer {
                 position: absolute;
                 left: 0;
                 top: 0;
@@ -33,7 +34,9 @@
                 padding: 0;
                 box-shadow: none !important;
             }
-            .modal-backdrop, .modal-header, .btn-close {
+            body.print-payslip .modal-backdrop,
+            body.print-payslip .modal-header,
+            body.print-payslip .btn-close {
                 display: none !important;
             }
         }
@@ -47,8 +50,10 @@
         .payslip-section-title { font-weight: bold; border-bottom: 2px solid #000; margin-bottom: 6px; padding-bottom: 3px; font-size: 0.9rem; }
         .info-row { margin-bottom: 3px; }
         .amount-col { text-align: right; }
-        .print-break { page-break-after: always; }
-        .payslip-page { min-height: 297mm; }
+        .payslip-page {
+            min-height: 297mm;
+            page-break-after: always;
+        }
     </style>
 </head>
 <body>
@@ -73,7 +78,7 @@
                 </div>
 
                 <div class="col-md-4">
-                    <div class="card shadow-sm h-100 report-card">
+                    <div class="card shadow-sm h-100 report-card" data-bs-toggle="modal" data-bs-target="#voucherModal">
                         <div class="card-body text-center p-5">
                             <i class="bi bi-receipt fs-1 text-success mb-3"></i>
                             <h4 class="card-title">Voucher</h4>
@@ -147,6 +152,141 @@
                 </div>
             </div>
 
+            <div class="modal fade" id="voucherModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Voucher Options</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="voucherForm">
+                                <div class="mb-3">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <h6 class="mb-2">Select</h6>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="voucherGroup" id="voucherGroupBank" value="bank" checked>
+                                                <label class="form-check-label" for="voucherGroupBank">Bank</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="voucherGroup" id="voucherGroupCheque" value="cheque">
+                                                <label class="form-check-label" for="voucherGroupCheque">Cheque</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="voucherGroup" id="voucherGroupMaster" value="master">
+                                                <label class="form-check-label" for="voucherGroupMaster">Master</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="voucherPeriod" class="form-label">Period</label>
+                                                <input type="month" class="form-control" id="voucherPeriod" name="voucherPeriod">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="voucherType" class="form-label">Type</label>
+                                                <select class="form-select" id="voucherType" name="voucherType">
+                                                    <option value="rent">Rent</option>
+                                                    <option value="inducement">Inducement</option>
+                                                    <option value="leave">Leave</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h6 class="mb-2">Payment</h6>
+                                            <div class="form-check">
+                                                <input class="form-check-input voucher-scope" type="checkbox" id="voucherScopeSalary" value="salary">
+                                                <label class="form-check-label" for="voucherScopeSalary">Salary</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input voucher-scope" type="checkbox" id="voucherScopeYearly" value="yearly">
+                                                <label class="form-check-label" for="voucherScopeYearly">Yearly</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input voucher-scope" type="checkbox" id="voucherScopeEos" value="eos">
+                                                <label class="form-check-label" for="voucherScopeEos">EOS</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="voucherPrintContractors" name="voucherPrintContractors">
+                                        <label class="form-check-label" for="voucherPrintContractors">Print Contractors</label>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <h6 class="mb-2">Signatures</h6>
+                                    <div class="row align-items-center mb-2">
+                                        <div class="col-md-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input signature-toggle" type="checkbox" id="signature1Toggle">
+                                                <label class="form-check-label" for="signature1Toggle">Signature 1</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4 d-none" id="signature1SelectCol">
+                                            <select class="form-select signature-select" id="signature1Select">
+                                                <option value="">Select staff</option>
+                                                <% if (typeof staffList !== 'undefined' && Array.isArray(staffList)) { %>
+                                                    <% staffList.forEach(function(st) { %>
+                                                        <option value="<%= st.PFNo %>" data-name="<%= st.SName %>"><%= st.PFNo %> - <%= st.SName %></option>
+                                                    <% }); %>
+                                                <% } %>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-5 d-none" id="signature1NameCol">
+                                            <input type="text" class="form-control" id="signature1Name" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="row align-items-center mb-2">
+                                        <div class="col-md-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input signature-toggle" type="checkbox" id="signature2Toggle">
+                                                <label class="form-check-label" for="signature2Toggle">Signature 2</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4 d-none" id="signature2SelectCol">
+                                            <select class="form-select signature-select" id="signature2Select">
+                                                <option value="">Select staff</option>
+                                                <% if (typeof staffList !== 'undefined' && Array.isArray(staffList)) { %>
+                                                    <% staffList.forEach(function(st) { %>
+                                                        <option value="<%= st.PFNo %>" data-name="<%= st.SName %>"><%= st.PFNo %> - <%= st.SName %></option>
+                                                    <% }); %>
+                                                <% } %>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-5 d-none" id="signature2NameCol">
+                                            <input type="text" class="form-control" id="signature2Name" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="row align-items-center mb-2">
+                                        <div class="col-md-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input signature-toggle" type="checkbox" id="signature3Toggle">
+                                                <label class="form-check-label" for="signature3Toggle">Signature 3</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4 d-none" id="signature3SelectCol">
+                                            <select class="form-select signature-select" id="signature3Select">
+                                                <option value="">Select staff</option>
+                                                <% if (typeof staffList !== 'undefined' && Array.isArray(staffList)) { %>
+                                                    <% staffList.forEach(function(st) { %>
+                                                        <option value="<%= st.PFNo %>" data-name="<%= st.SName %>"><%= st.PFNo %> - <%= st.SName %></option>
+                                                    <% }); %>
+                                                <% } %>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-5 d-none" id="signature3NameCol">
+                                            <input type="text" class="form-control" id="signature3Name" readonly>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-fullscreen">
                     <div class="modal-content bg-light">
@@ -157,8 +297,7 @@
                                 <span class="badge bg-secondary fs-6" id="recordCounter"></span>
                                 <button class="btn btn-secondary" id="nextBtn" disabled>Next <i class="bi bi-arrow-right"></i></button>
                                 <div class="vr mx-2"></div>
-                                <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
-                                <button class="btn btn-danger" onclick="downloadPdf()"><i class="bi bi-file-pdf"></i> PDF</button>
+                                <button class="btn btn-danger" onclick="downloadPdfWithScope()"><i class="bi bi-file-pdf"></i> PDF</button>
                                 <button type="button" class="btn-close ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                         </div>
@@ -273,6 +412,53 @@
                     renderPayslip(currentIndex);
                 }
             });
+
+            const voucherScopeInputs = document.querySelectorAll('.voucher-scope');
+            voucherScopeInputs.forEach(input => {
+                input.addEventListener('change', e => {
+                    if (e.target.checked) {
+                        voucherScopeInputs.forEach(other => {
+                            if (other !== e.target) {
+                                other.checked = false;
+                            }
+                        });
+                    }
+                });
+            });
+
+            const signatureToggles = [
+                { toggleId: 'signature1Toggle', selectId: 'signature1Select', nameId: 'signature1Name', selectColId: 'signature1SelectCol', nameColId: 'signature1NameCol' },
+                { toggleId: 'signature2Toggle', selectId: 'signature2Select', nameId: 'signature2Name', selectColId: 'signature2SelectCol', nameColId: 'signature2NameCol' },
+                { toggleId: 'signature3Toggle', selectId: 'signature3Select', nameId: 'signature3Name', selectColId: 'signature3SelectCol', nameColId: 'signature3NameCol' }
+            ];
+
+            signatureToggles.forEach(cfg => {
+                const toggle = document.getElementById(cfg.toggleId);
+                const select = document.getElementById(cfg.selectId);
+                const nameInput = document.getElementById(cfg.nameId);
+                const selectCol = document.getElementById(cfg.selectColId);
+                const nameCol = document.getElementById(cfg.nameColId);
+
+                if (toggle && select && nameInput && selectCol && nameCol) {
+                    toggle.addEventListener('change', () => {
+                        if (toggle.checked) {
+                            selectCol.classList.remove('d-none');
+                            nameCol.classList.remove('d-none');
+                        } else {
+                            selectCol.classList.add('d-none');
+                            nameCol.classList.add('d-none');
+                            select.value = '';
+                            nameInput.value = '';
+                        }
+                    });
+
+                    select.addEventListener('change', () => {
+                        const option = select.options[select.selectedIndex];
+                        const staffName = option ? option.getAttribute('data-name') || '' : '';
+                        nameInput.value = staffName;
+                    });
+                }
+            });
         });
 
         async function loadPayslip(action) {
@@ -328,7 +514,7 @@
                         if (currentScope === 'all') {
                             renderAllPayslips();
                         }
-                        window.print();
+                        triggerPrint();
                    }, 500);
                 } else if (action === 'pdf') {
                    setTimeout(() => {
@@ -684,10 +870,9 @@
 
         function renderAllPayslips() {
             const container = document.getElementById('payslipContainer');
-            const pages = currentData.map((rec, idx) => {
+            const pages = currentData.map(rec => {
                 const pageHtml = buildPayslipHtml(rec);
-                const sep = idx < currentData.length - 1 ? '<div class="print-break"></div>' : '';
-                return `<div class="payslip-page">${pageHtml}</div>${sep}`;
+                return `<div class="payslip-page">${pageHtml}</div>`;
             }).join('');
             container.innerHTML = pages;
         }
@@ -703,6 +888,21 @@
                 pagebreak:    { mode: ['css', 'legacy'] }
             };
             html2pdf().set(opt).from(element).save();
+        }
+        function triggerPrint() {
+            document.body.classList.add('print-payslip');
+            window.print();
+            setTimeout(() => {
+                document.body.classList.remove('print-payslip');
+            }, 500);
+        }
+        function downloadPdfWithScope() {
+            if (currentScope === 'all') {
+                renderAllPayslips();
+                setTimeout(() => downloadPdf(), 200);
+            } else {
+                downloadPdf();
+            }
         }
     </script>
 </body>

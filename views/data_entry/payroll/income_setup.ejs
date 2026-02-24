@@ -179,11 +179,29 @@
                     </form>
                 </div>
             </div>
+
+            <div class="modal fade" id="incomeExistsModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Income Already Exists</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            Income for Selected Grade Already Exists, Please Search for it and Edit
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        let incomeSetupMode = 'idle';
         async function filterAllowances() {
             const grade = document.getElementById('filterGrade').value;
             const body = document.getElementById('allowancesBody');
@@ -223,6 +241,7 @@
             document.getElementById('setupFormCard').style.display = '';
             document.getElementById('allowancesListCard').style.display = 'none';
             document.getElementById('filterCard').style.display = 'none';
+            incomeSetupMode = 'new';
         }
         function hideForm() {
             document.getElementById('setupFormCard').style.display = 'none';
@@ -231,6 +250,7 @@
         }
         async function editAllowance(gradeCode, scaleDate) {
             showForm();
+            incomeSetupMode = 'edit';
             try {
                 const url = `/data-entry/api/payroll/income-setup/record?grade=${encodeURIComponent(gradeCode)}&scaleDate=${encodeURIComponent(scaleDate)}`;
                 const resp = await fetch(url);
@@ -286,6 +306,33 @@
                 console.error(e);
             }
         }
+        document.addEventListener('DOMContentLoaded', () => {
+            const gradeSel = document.getElementById('gradeCode');
+            if (gradeSel) {
+                gradeSel.addEventListener('change', async () => {
+                    if (incomeSetupMode !== 'new') return;
+                    const val = gradeSel.value;
+                    if (!val) return;
+                    try {
+                        const resp = await fetch('/data-entry/api/payroll/income-setup?grade=' + encodeURIComponent(val));
+                        const data = await resp.json();
+                        if (Array.isArray(data) && data.length > 0) {
+                            gradeSel.value = '';
+                            hideForm();
+                            const modalEl = document.getElementById('incomeExistsModal');
+                            if (modalEl && window.bootstrap && bootstrap.Modal) {
+                                const modal = new bootstrap.Modal(modalEl);
+                                modal.show();
+                            } else {
+                                alert('Income for Selected Grade Already Exists, Please Search for it and Edit');
+                            }
+                        }
+                    } catch (e) {
+                        console.error(e);
+                    }
+                });
+            }
+        });
     </script>
 </body>
 </html>

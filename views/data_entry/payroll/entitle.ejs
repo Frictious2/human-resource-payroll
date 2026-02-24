@@ -142,11 +142,30 @@
                     </form>
                 </div>
             </div>
+
+            <div class="modal fade" id="entitleExistsModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Staff Entitlement Exists</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            Staff Entitlement Exists, Please Search for Staff and Edit
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        let entitleMode = 'idle';
+
         async function loadExisting() {
             const pfno = document.getElementById('existingPfno').value;
             if (!pfno) return;
@@ -159,6 +178,7 @@
         }
         function newEntitlement() {
             document.getElementById('entitleForm').reset();
+            entitleMode = 'new';
         }
         async function loadByPfno(pfno) {
             try {
@@ -170,6 +190,7 @@
                     document.getElementById('pfno').value = pfno;
                     return;
                 }
+                entitleMode = 'edit';
                 const setSelect = (id, val) => {
                     const sel = document.getElementById(id);
                     if (!sel) return;
@@ -209,6 +230,32 @@
                 console.error(e);
             }
         }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const pfSelect = document.getElementById('pfno');
+            if (!pfSelect) return;
+            pfSelect.addEventListener('change', async () => {
+                const pfno = pfSelect.value;
+                if (!pfno) return;
+                if (entitleMode !== 'new') return;
+                try {
+                    const resp = await fetch('/data-entry/api/payroll/entitle/' + pfno);
+                    const data = await resp.json();
+                    if (data) {
+                        pfSelect.value = '';
+                        const modalEl = document.getElementById('entitleExistsModal');
+                        if (modalEl && window.bootstrap && bootstrap.Modal) {
+                            const modal = new bootstrap.Modal(modalEl);
+                            modal.show();
+                        } else {
+                            alert('Staff Entitlement Exists, Please Search for Staff and Edit');
+                        }
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            });
+        });
     </script>
 </body>
 </html>
