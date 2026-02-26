@@ -477,18 +477,13 @@
                         input.parentElement.classList.add('cell-updated');
                         setTimeout(() => input.parentElement.classList.remove('cell-updated'), 1000);
                         
-                        // Update local data
+                        // Update local data with the returned item from server to ensure consistency
                         const itemIndex = allData.findIndex(i => i.GradeCode == code);
-                        if (itemIndex > -1) {
+                        if (itemIndex > -1 && json.item) {
+                            Object.assign(allData[itemIndex], json.item);
+                        } else if (itemIndex > -1) {
+                            // Fallback if item not returned
                             allData[itemIndex][fieldName] = value;
-                            if (fieldName === 'JobTitle') {
-                                // Assuming value is code, but we might need JobTitle text for search?
-                                // Actually JobTitle in table is select, so value is code.
-                                // But if search looks for JobTitle text, we might need to update that too if available
-                                // The select shows text, so value is code.
-                                // Let's keep it simple.
-                                allData[itemIndex]['JobTitleCode'] = value; 
-                            }
                         }
                     } else {
                         showError(input);

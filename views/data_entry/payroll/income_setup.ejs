@@ -104,7 +104,7 @@
                                 <select class="form-select" name="gradeCode" id="gradeCode" required>
                                     <option value="">Select Grade</option>
                                     <% (grades || []).forEach(g => { %>
-                                        <option value="<%= g.GradeCode %>"><%= g.GradeCode %> — <%= g.Grade %></option>
+                                        <option value="<%= g.GradeCode %>" data-notch="<%= g.NotchIncr %>"><%= g.GradeCode %> — <%= g.Grade %></option>
                                     <% }) %>
                                 </select>
                             </div>
@@ -248,6 +248,17 @@
             document.getElementById('allowancesListCard').style.display = '';
             document.getElementById('filterCard').style.display = '';
         }
+        function calculateIncrement() {
+            const start = parseFloat(document.getElementById('startLevel').value) || 0;
+            const end = parseFloat(document.getElementById('endLevel').value) || 0;
+            const notches = parseFloat(document.getElementById('notches').value) || 0;
+            
+            if (notches !== 0) {
+                const incr = (end - start) / notches;
+                document.getElementById('increment').value = incr.toFixed(2);
+            }
+        }
+
         async function editAllowance(gradeCode, scaleDate) {
             showForm();
             incomeSetupMode = 'edit';
@@ -260,8 +271,19 @@
                     const sel = document.getElementById(id);
                     if (!sel) return;
                     const target = val != null ? String(val) : '';
+                    
+                    // Try value match first
                     for (let i = 0; i < sel.options.length; i++) {
                         if (String(sel.options[i].value) === target) {
+                            sel.selectedIndex = i;
+                            return;
+                        }
+                    }
+                    
+                    // Try text match (case-insensitive) if value match failed
+                    const targetText = target.toLowerCase();
+                    for (let i = 0; i < sel.options.length; i++) {
+                        if (sel.options[i].text.toLowerCase() === targetText) {
                             sel.selectedIndex = i;
                             return;
                         }
@@ -308,8 +330,23 @@
         }
         document.addEventListener('DOMContentLoaded', () => {
             const gradeSel = document.getElementById('gradeCode');
+            const startInput = document.getElementById('startLevel');
+            const endInput = document.getElementById('endLevel');
+            const notchesInput = document.getElementById('notches');
+
+            if (startInput) startInput.addEventListener('input', calculateIncrement);
+            if (endInput) endInput.addEventListener('input', calculateIncrement);
+            if (notchesInput) notchesInput.addEventListener('input', calculateIncrement);
+
             if (gradeSel) {
                 gradeSel.addEventListener('change', async () => {
+                    const selectedOption = gradeSel.options[gradeSel.selectedIndex];
+                    const notch = selectedOption.getAttribute('data-notch');
+                    if (notch) {
+                        document.getElementById('notches').value = notch;
+                        calculateIncrement();
+                    }
+
                     if (incomeSetupMode !== 'new') return;
                     const val = gradeSel.value;
                     if (!val) return;
@@ -317,6 +354,9 @@
                         const resp = await fetch('/data-entry/api/payroll/income-setup?grade=' + encodeURIComponent(val));
                         const data = await resp.json();
                         if (Array.isArray(data) && data.length > 0) {
+                            // If user is adding new, but it exists, warn them.
+                            // But maybe they want to see existing data to edit?
+                            // The current logic clears value and hides form.
                             gradeSel.value = '';
                             hideForm();
                             const modalEl = document.getElementById('incomeExistsModal');

@@ -90,7 +90,9 @@ router.get('/payroll/edit-payroll', dataEntryController.getPayrollEdit);
 router.post('/payroll/edit-payroll', dataEntryController.postPayrollEdit);
 router.get('/payroll/view-payroll', dataEntryController.getPayrollView);
 router.post('/payroll/view-payroll/preview', dataEntryController.postPayrollViewPreview);
-router.get('/payroll/process-emoluments', dataEntryController.getComingSoon);
+router.get('/payroll/process-emoluments', dataEntryController.getProcessEmoluments);
+router.get('/api/payroll/check-process-status', dataEntryController.checkProcessStatus);
+router.post('/payroll/process-emoluments', dataEntryController.postProcessEmoluments);
 router.get('/payroll/post-to-accounts', dataEntryController.getComingSoon);
 router.get('/payroll/yearly-payments', dataEntryController.getComingSoon);
 router.get('/payroll/increments-pay-cut-backlog', dataEntryController.getComingSoon);
@@ -101,7 +103,7 @@ router.get('/payroll/salary-reviews', dataEntryController.getComingSoon);
 router.get('/payroll/vehicle-insurance', dataEntryController.getComingSoon);
 
 // 4. Welfare
-router.get('/welfare/leave', dataEntryController.getComingSoon);
+router.get('/welfare/leave', dataEntryController.getWelfareLeave);
 router.get('/welfare/medical', dataEntryController.getComingSoon);
 router.get('/welfare/loan', dataEntryController.getComingSoon);
 router.get('/welfare/guarantee', dataEntryController.getComingSoon);

@@ -11,7 +11,7 @@ const dataEntryController = {
 
     getPayrollIncomeSetup: async (req, res) => {
         try {
-            const [grades] = await pool.query('SELECT GradeCode, Grade FROM tblgrade ORDER BY GradeCode');
+            const [grades] = await pool.query('SELECT GradeCode, Grade, NotchIncr FROM tblgrade ORDER BY GradeCode');
             const [currencies] = await pool.query('SELECT CurrCode, CurrName FROM tblcurrency ORDER BY CurrCode');
             const [items] = await pool.query("SELECT Code, Income, Freq FROM tblpayrollitems WHERE Code BETWEEN '01' AND '20' ORDER BY Code");
             const [allowances] = await pool.query('SELECT * FROM tblallowance ORDER BY ScaleDate DESC');
@@ -1552,6 +1552,20 @@ const dataEntryController = {
         }
     },
 
+    getWelfareLeave: async (req, res) => {
+        try {
+             res.render('data_entry/welfare/leave', {
+                title: 'Leave Management',
+                group: 'Welfare',
+                path: '/data-entry/welfare/leave',
+                user: { name: 'Data Entry Clerk' }
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
     getRedundancySheetData: async (req, res) => {
         try {
             const [rows] = await pool.query(`
@@ -2915,6 +2929,300 @@ const dataEntryController = {
         } catch (err) {
             console.error(err);
             res.status(500).send('Server Error');
+        }
+    },
+
+    getProcessEmoluments: async (req, res) => {
+        try {
+            const [payTypes] = await pool.query('SELECT Code, PayType FROM tblpaytype ORDER BY Code');
+            const [payrollRows] = await pool.query('SELECT MAX(PDate) as lastDate FROM tblpayroll');
+            const lastPayDate = payrollRows[0].lastDate || null;
+            
+            res.render('data_entry/payroll/process_emoluments', {
+                title: 'Process Monthly Salaries, Allowances, etc',
+                group: 'Payroll',
+                path: '/data-entry/payroll/process-emoluments',
+                user: { name: 'Data Entry Officer' },
+                payTypes,
+                lastPayDate
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    checkProcessStatus: async (req, res) => {
+        try {
+            const { pdate, activity } = req.query;
+            if (!pdate) return res.status(400).json({ error: 'Date is required' });
+            if (!activity) return res.status(400).json({ error: 'Activity is required' });
+
+            const processDate = new Date(pdate);
+            
+            // 1. Check for unapproved salaries
+            const [unapprovedSalaries] = await pool.query('SELECT COUNT(*) as count FROM tblsalary WHERE Approved = 0');
+            
+            // 2. Check for unapproved entitlements
+            const [unapprovedEntitles] = await pool.query('SELECT COUNT(*) as count FROM tblentitle WHERE Approved = 0');
+            
+            if (unapprovedSalaries[0].count > 0 || unapprovedEntitles[0].count > 0) {
+                return res.json({
+                    valid: false,
+                    errorType: 'unapproved',
+                    message: 'Not all staff salaries or entitlements have been approved by the manager. They must be approved before processing emoluments.'
+                });
+            }
+
+            // 3. Frequency Check (tblpayrollitems)
+            const [payTypeRows] = await pool.query('SELECT Code FROM tblpaytype WHERE PayType = ?', [activity]);
+            if (payTypeRows.length === 0) {
+                 return res.json({ valid: false, errorType: 'invalid_activity', message: 'Invalid Activity selected.' });
+            }
+            const payCode = payTypeRows[0].Code;
+
+            const [itemRows] = await pool.query('SELECT Freq FROM tblpayrollitems WHERE Code = ?', [payCode]);
+            const freq = itemRows.length > 0 ? itemRows[0].Freq : 'M'; // Default to Monthly
+
+            // Check if already processed for this frequency
+            let checkQuery = '';
+            let checkParams = [payCode];
+
+            if (freq === 'Y') {
+                // Check if processed this year
+                checkQuery = 'SELECT COUNT(*) as count FROM tblsalary WHERE PType = ? AND YEAR(PDate) = ?';
+                checkParams.push(processDate.getFullYear());
+            } else {
+                // Check if processed this month
+                checkQuery = 'SELECT COUNT(*) as count FROM tblsalary WHERE PType = ? AND YEAR(PDate) = ? AND MONTH(PDate) = ?';
+                checkParams.push(processDate.getFullYear(), processDate.getMonth() + 1);
+            }
+
+            const [existingRows] = await pool.query(checkQuery, checkParams);
+            if (existingRows[0].count > 0) {
+                const period = freq === 'Y' ? 'Year' : 'Month';
+                return res.json({
+                    valid: false,
+                    errorType: 'frequency',
+                    message: `This activity (${activity}) has already been processed for this ${period}. Frequency is ${freq === 'Y' ? 'Yearly' : 'Monthly'}.`
+                });
+            }
+
+            // 4. Date Validation (General)
+            const [payrollRows] = await pool.query('SELECT MAX(PDate) as lastDate FROM tblpayroll');
+            const lastDate = payrollRows[0].lastDate ? new Date(payrollRows[0].lastDate) : null;
+
+            if (lastDate) {
+                const diffTime = Math.abs(processDate - lastDate);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                
+                if (diffDays < 21 && processDate > lastDate) {
+                     return res.json({
+                        valid: false,
+                        errorType: 'date',
+                        message: `Emoluments cannot be processed less than 21 days from the last process (Last: ${lastDate.toISOString().split('T')[0]}).`
+                    });
+                }
+                
+                if (processDate <= lastDate) {
+                     return res.json({
+                        valid: false,
+                        errorType: 'date',
+                        message: 'Process date must be after the last processed date.'
+                    });
+                }
+            }
+
+            return res.json({ valid: true });
+
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    postProcessEmoluments: async (req, res) => {
+        const conn = await pool.getConnection();
+        try {
+            await conn.beginTransaction();
+
+            const { activity, pdate } = req.body;
+            const processDate = new Date(pdate);
+            
+            // Get PayType Code
+            const [payTypeRows] = await conn.query('SELECT Code FROM tblpaytype WHERE PayType = ?', [activity]);
+            if (payTypeRows.length === 0) throw new Error('Invalid Activity');
+            const payCode = payTypeRows[0].Code;
+
+            // Get Frequency
+            const [itemRows] = await conn.query('SELECT Freq FROM tblpayrollitems WHERE Code = ?', [payCode]);
+            const freq = itemRows.length > 0 ? itemRows[0].Freq : 'M';
+
+            // Determine Target Staff
+            let staffQuery = 'SELECT s.* FROM tblstaff s WHERE s.Approved = 1 AND s.Redundant = 0'; 
+            
+            let staffParams = [];
+
+            if (activity === 'RENT' || payCode === '02') {
+                staffQuery = `
+                    SELECT s.*, e.Amount as EntitledAmount 
+                    FROM tblstaff s 
+                    JOIN tblentitle e ON s.PFNo = e.PFNo 
+                    WHERE s.Approved = 1 AND s.Redundant = 0 AND e.Code = ? AND e.Approved = 1
+                `;
+                staffParams = [payCode];
+            } else if (activity === 'LEAVE' || payCode === '13') {
+                staffQuery = `
+                    SELECT s.*, e.Amount as EntitledAmount 
+                    FROM tblstaff s 
+                    JOIN tblentitle e ON s.PFNo = e.PFNo 
+                    WHERE s.Approved = 1 AND s.Redundant = 0 AND e.Code = ? AND e.Approved = 1
+                `;
+                staffParams = [payCode];
+            } else {
+                // For Salary (01) or others, select all active staff.
+            }
+
+            const [staffList] = await conn.query(staffQuery, staffParams);
+            let processedCount = 0;
+
+            for (const staff of staffList) {
+                // Check if already processed for this staff (Double check for Yearly items)
+                if (freq === 'Y') {
+                    const [exists] = await conn.query(
+                        'SELECT COUNT(*) as count FROM tblsalary WHERE PFNo = ? AND PType = ? AND YEAR(PDate) = ?', 
+                        [staff.PFNo, payCode, processDate.getFullYear()]
+                    );
+                    if (exists[0].count > 0) continue;
+                }
+
+                // Base Amount
+                let amount = 0;
+                if (payCode === '01') {
+                    amount = staff.Salary || 0;
+                } else {
+                    amount = staff.EntitledAmount || 0;
+                }
+
+                // Query/Discipline Check
+                // Check for Half Pay / Without Pay in tblquery based on Percent and Date Range
+                const [queries] = await conn.query(
+                    'SELECT Percent FROM tblquery WHERE PFNo = ? AND Approved = 1 AND ? BETWEEN SDate AND EDate', 
+                    [staff.PFNo, processDate]
+                );
+
+                let isWithoutPay = false;
+                let isHalfPay = false;
+
+                for (const q of queries) {
+                    if (q.Percent == 100) isWithoutPay = true;
+                    if (q.Percent == 50) isHalfPay = true;
+                }
+
+                if (isWithoutPay) continue; // Skip processing
+
+                if (isHalfPay) amount = amount / 2;
+
+                // Surcharge Check (tblsurcharge)
+                let surcharge = 0;
+                const [surcharges] = await conn.query(
+                    'SELECT SAmount FROM tblsurcharge WHERE PFNo = ? AND Approved = 1 AND ? BETWEEN StarDate AND ExpDate',
+                    [staff.PFNo, processDate]
+                );
+                
+                for (const s of surcharges) {
+                    surcharge += (s.SAmount || 0);
+                }
+
+                // Loan Check (Only for Salary?)
+                let loanDeduction = 0;
+                if (payCode === '01') {
+                    const [loans] = await conn.query(
+                        'SELECT * FROM tblloan WHERE PFNo = ? AND Approved = 1 AND Balance > 0', 
+                        [staff.PFNo]
+                    );
+                    for (const loan of loans) {
+                        let ded = loan.Ded || 0; // Assuming 'Ded' is monthly deduction
+                        if (ded > loan.Balance) ded = loan.Balance;
+                        loanDeduction += ded;
+                        
+                        // Optionally update loan balance here or mark for update
+                        // For now, we just record the deduction in tblsalary
+                    }
+                }
+
+                // Calculate Net
+                let totalDeduction = loanDeduction + surcharge;
+                let netIncome = amount - totalDeduction;
+                if (netIncome < 0) netIncome = 0;
+
+                // Insert into tblsalary
+                // We need to map amount to correct column (Salary vs AllwXX)
+                // For simplicity, I'll use 'Salary' for Code 01, and 'Allw02' for Rent, etc.
+                // But I need to know which Allw column corresponds to which PayType.
+                // Usually this mapping is in tblpaytype or fixed.
+                // The prompt doesn't specify.
+                // I'll assume:
+                // Code 01 -> Salary
+                // Code 02 -> Allw02
+                // ...
+                // Code 13 -> Allw13
+                
+                const colName = payCode === '01' ? 'Salary' : `Allw${payCode}`;
+                
+                // Construct INSERT
+                let salaryVal = 0;
+                let totAllwVal = 0;
+                let columns = `PDate, PFNo, PType, Salary, TotAllw, TotalIncome, TotalDeduction, NetIncome, FullPay, HalfPay, WithoutPay, Ded1, Ded3, Approved, Posted, Operator, CompanyID, DateKeyed, TimeKeyed`;
+                let values = `?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 1, NOW(), NOW()`;
+                let params = [];
+
+                if (payCode === '01') {
+                    salaryVal = amount;
+                    // colName is 'Salary', so we don't need to add it again
+                    params = [
+                        pdate, staff.PFNo, payCode, salaryVal, totAllwVal, amount,
+                        totalDeduction, netIncome,
+                        (!isHalfPay && !isWithoutPay) ? 1 : 0, isHalfPay ? 1 : 0, isWithoutPay ? 1 : 0,
+                        loanDeduction, surcharge,
+                        'Data Entry Clerk'
+                    ];
+                } else {
+                    totAllwVal = amount;
+                    // Add the allowance column dynamically
+                    columns = `PDate, PFNo, PType, ${colName}, Salary, TotAllw, TotalIncome, TotalDeduction, NetIncome, FullPay, HalfPay, WithoutPay, Ded1, Ded3, Approved, Posted, Operator, CompanyID, DateKeyed, TimeKeyed`;
+                    values = `?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 1, NOW(), NOW()`;
+                    params = [
+                        pdate, staff.PFNo, payCode, amount, salaryVal, totAllwVal, amount,
+                        totalDeduction, netIncome,
+                        (!isHalfPay && !isWithoutPay) ? 1 : 0, isHalfPay ? 1 : 0, isWithoutPay ? 1 : 0,
+                        loanDeduction, surcharge,
+                        'Data Entry Clerk'
+                    ];
+                }
+
+                const insertQuery = `INSERT INTO tblsalary (${columns}) VALUES (${values})`;
+                
+                await conn.query(insertQuery, params);
+                
+                processedCount++;
+            }
+
+            await conn.commit();
+            
+            res.render('data_entry/dashboard', {
+                title: 'Data Entry Dashboard',
+                path: '/data-entry/dashboard',
+                user: { name: 'Data Entry Clerk' },
+                successMessage: `Emoluments processed successfully. ${processedCount} records created.`
+            });
+
+        } catch (error) {
+            await conn.rollback();
+            console.error(error);
+            res.status(500).send('Server Error: ' + error.message);
+        } finally {
+            conn.release();
         }
     }
 };

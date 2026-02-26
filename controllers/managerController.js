@@ -51,7 +51,20 @@ const managerController = {
     }
   },
 
-  getApproveIncomeSetup: async (req, res) => {
+    getApproveLeave: async (req, res) => {
+        try {
+            res.render('manager/approve/leave', {
+                title: 'Approve Leave',
+                path: '/manager/approve/leave',
+                user: req.session.user || { name: 'Manager' }
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getApproveIncomeSetup: async (req, res) => {
       try {
           const [rows] = await pool.query(`
               SELECT a.ScaleDate, a.Grade, a.PayCurrency, a.StartLevel, a.EndLevel, a.Notches, a.Increment
