@@ -1324,6 +1324,185 @@ const managerController = {
             console.error(error);
             res.status(500).send('Server Error');
         }
+    },
+
+    // Leave Approval
+    getLeaveApplicationApproval: async (req, res) => {
+        try {
+            const [pendingLeaves] = await pool.query(`
+                SELECT l.*, s.SName, t.LeaveType 
+                FROM tblleave l 
+                LEFT JOIN tblstaff s ON l.PFNO = s.PFNo 
+                LEFT JOIN tblleavetype t ON l.LType = t.Code
+                WHERE l.Approved = 0
+                ORDER BY l.StartDate DESC
+            `);
+
+            res.render('manager/approve/leave_application', {
+                title: 'Approve Leave Applications',
+                group: 'Approve',
+                path: '/manager/approve/leave-application',
+                user: req.session.user || { name: 'Manager' },
+                pendingLeaves
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    postLeaveApproval: async (req, res) => {
+        try {
+            const { id, pfno, action } = req.body;
+            const operator = req.session.user ? req.session.user.name : 'Manager';
+            const now = new Date();
+            
+            // 1 = Approved, 2 = Rejected
+            const status = action === 'approve' ? 1 : 2;
+
+            await pool.query(
+                'UPDATE tblleave SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE LCount = ?',
+                [status, operator, now, now, id]
+            );
+
+            res.json({ success: true });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    // Leave Recall Approval
+    getLeaveRecallApproval: async (req, res) => {
+        try {
+            const query = `
+                SELECT 
+                    l.LCount,
+                    l.PFNO,
+                    s.SName,
+                    t.LeaveType,
+                    l.StartDate,
+                    l.ResumptionDate,
+                    l.DateRecalled,
+                    l.LYear
+                FROM tblleave l
+                JOIN tblstaff s ON l.PFNO = s.PFNo
+                LEFT JOIN tblleavetype t ON l.LType = t.Code
+                WHERE l.Recalled = 2
+                ORDER BY l.DateRecalled DESC
+            `;
+            
+            const [recallRequests] = await pool.query(query);
+
+            res.render('manager/approve/leave_recall', {
+                title: 'Approve Leave Recall',
+                path: '/manager/approve/leave-recall',
+                user: req.session.user || { name: 'Manager' },
+                recallRequests
+            });
+
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    postLeaveRecallApproval: async (req, res) => {
+        try {
+            const { lCount, action } = req.body;
+            // action: 'approve' or 'reject'
+            
+            if (action === 'approve') {
+                // Fetch leave details to calculate days remaining
+                const [rows] = await pool.query('SELECT StartDate, ResumptionDate, DateRecalled, Part FROM tblleave WHERE LCount = ?', [lCount]);
+                if (rows.length === 0) return res.status(404).json({ error: 'Leave record not found' });
+                
+                const leave = rows[0];
+                const recallDate = new Date(leave.DateRecalled);
+                const resumptionDate = new Date(leave.ResumptionDate);
+                
+                let daysRemaining = 0;
+                if (recallDate < resumptionDate) {
+                    const diffTime = Math.abs(resumptionDate - recallDate);
+                    daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                }
+                
+                const newPart = (leave.Part || 0) - daysRemaining;
+                const finalPart = newPart < 0 ? 0 : newPart; // Safety check
+                
+                await pool.query(
+                    'UPDATE tblleave SET Recalled = 1, Part = ? WHERE LCount = ?',
+                    [finalPart, lCount]
+                );
+            } else {
+                await pool.query(
+                    'UPDATE tblleave SET Recalled = 0, DateRecalled = NULL WHERE LCount = ?',
+                    [lCount]
+                );
+            }
+            
+            res.json({ success: true });
+            
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    // Leave Purchase Approval
+    getApproveLeavePurchase: async (req, res) => {
+        try {
+            const query = `
+                SELECT 
+                    l.LCount,
+                    l.PFNO,
+                    s.SName,
+                    l.LYear,
+                    l.DaysPurchased,
+                    l.Allowance,
+                    l.DatePurchased,
+                    l.Method,
+                    l.Bank,
+                    l.BBAN
+                FROM tblleave l
+                JOIN tblstaff s ON l.PFNO = s.PFNo
+                WHERE l.Approved = 0 AND l.LType = '08'
+                ORDER BY l.DatePurchased DESC
+            `;
+            
+            const [pendingPurchases] = await pool.query(query);
+
+            res.render('manager/approve/leave_purchase', {
+                title: 'Approve Leave Purchase',
+                path: '/manager/approve/leave-purchase',
+                user: req.session.user || { name: 'Manager' },
+                pendingPurchases
+            });
+
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    postApproveLeavePurchase: async (req, res) => {
+        try {
+            const { id, status } = req.body;
+            const operator = req.session.user ? req.session.user.name : 'Manager';
+            const now = new Date();
+            
+            // 1 = Approved, 2 = Rejected
+            
+            await pool.query(
+                'UPDATE tblleave SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE LCount = ?',
+                [status, operator, now, now, id]
+            );
+
+            res.json({ success: true });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
+        }
     }
 };
 

@@ -1,0 +1,389 @@
+
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <h2 class="mb-0"><%= title %></h2>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#leaveModal">
+                    <i class="bi bi-plus-lg"></i> New Application
+                </button>
+            </div>
+
+            <!-- Leave History Table -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Leave Applications</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Staff ID</th>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Year</th>
+                                    <th>Start Date</th>
+                                    <th>End Date</th>
+                                    <th>Days</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaveTableBody">
+                                <!-- Populated via JS or server-side if needed, but user focused on Modal -->
+                                <% if (recentLeaves && recentLeaves.length > 0) { %>
+                                    <% recentLeaves.forEach(leave => { %>
+                                        <tr>
+                                            <td><%= leave.PFNO %></td>
+                                            <td><%= leave.SName %></td>
+                                            <td><%= leave.LeaveType %></td>
+                                            <td><%= leave.LYear %></td>
+                                            <td><%= leave.StartDate ? new Date(leave.StartDate).toLocaleDateString() : '' %></td>
+                                            <td><%= leave.ResumptionDate ? new Date(leave.ResumptionDate).toLocaleDateString() : '' %></td>
+                                            <td><%= leave.Part || leave.LDays %></td>
+                                            <td>
+                                                <% if(leave.Approved == 1) { %>
+                                                    <span class="badge bg-success">Approved</span>
+                                                <% } else if(leave.Approved == -1) { %>
+                                                    <span class="badge bg-danger">Rejected</span>
+                                                <% } else { %>
+                                                    <span class="badge bg-warning text-dark">Pending</span>
+                                                <% } %>
+                                            </td>
+                                        </tr>
+                                    <% }); %>
+                                <% } else { %>
+                                    <tr><td colspan="8" class="text-center text-muted">No recent applications</td></tr>
+                                <% } %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="mt-4 py-3 text-center text-muted border-top">
+                <%- include('../partials/footer') %>
+            </footer>
+        </div>
+    </main>
+
+    <!-- Leave Application Modal -->
+    <div class="modal fade" id="leaveModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Leave Application Form</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="leaveForm">
+                        <!-- Employee Selection -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="pfnoSelect" class="form-label">Employee ID</label>
+                                <select class="form-select" id="pfnoSelect" required>
+                                    <option value="">Select Employee...</option>
+                                    <% staffList.forEach(staff => { %>
+                                        <option value="<%= staff.PFNo %>" data-name="<%= staff.SName %>"><%= staff.PFNo %> - <%= staff.SName %></option>
+                                    <% }); %>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="staffName" class="form-label">Staff Name</label>
+                                <input type="text" class="form-control" id="staffName" readonly>
+                            </div>
+                        </div>
+
+                        <!-- Year & Type -->
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="leaveYear" class="form-label">Year</label>
+                                <input type="number" class="form-control" id="leaveYear" value="<%= new Date().getFullYear() %>" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="leaveType" class="form-label">Type</label>
+                                <select class="form-select" id="leaveType" required>
+                                    <option value="">Select Type...</option>
+                                    <% leaveTypes.forEach(type => { %>
+                                        <option value="<%= type.Code %>"><%= type.LeaveType %></option>
+                                    <% }); %>
+                                </select>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="deductible" checked>
+                                    <label class="form-check-label" for="deductible">Deductible</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Days Info -->
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="entitledDays" class="form-label">Leave Days (Entitled)</label>
+                                <input type="number" class="form-control" id="entitledDays" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="availableDays" class="form-label">Available</label>
+                                <input type="number" class="form-control" id="availableDays" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="allowance" class="form-label">Allowance</label>
+                                <input type="number" class="form-control" id="allowance" readonly>
+                            </div>
+                        </div>
+
+                        <!-- Purchased Leave (Hidden by default) -->
+                        <div class="row mb-3 d-none" id="purchasedRow">
+                            <div class="col-md-6">
+                                <label for="daysPurchased" class="form-label">Days Purchased</label>
+                                <input type="number" class="form-control" id="daysPurchased" min="0">
+                            </div>
+                        </div>
+
+                        <!-- Dates -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="proposedDate" class="form-label">Proposed Date</label>
+                                <input type="date" class="form-control" id="proposedDate">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="startDate" class="form-label">Start Date</label>
+                                <input type="date" class="form-control" id="startDate" required>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="partDays" class="form-label">Part (Days Applying)</label>
+                                <input type="number" class="form-control" id="partDays" min="1">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="holidays" class="form-label">Holidays</label>
+                                <input type="number" class="form-control" id="holidays" value="0">
+                            </div>
+                             <div class="col-md-4 d-flex align-items-end">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="withPay" checked>
+                                    <label class="form-check-label" for="withPay">With Pay</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="resumptionDate" class="form-label">Resumption Date</label>
+                                <input type="date" class="form-control" id="resumptionDate" required>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Resumption Info -->
+                        <div class="row mb-3 bg-light p-2 rounded">
+                            <div class="col-md-6">
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" type="checkbox" id="resumed">
+                                    <label class="form-check-label" for="resumed">Resumed</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="dateResumed" class="form-label">Date Resumed</label>
+                                <input type="date" class="form-control" id="dateResumed" disabled>
+                            </div>
+                        </div>
+
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="saveLeaveBtn">Save Application</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const pfnoSelect = document.getElementById('pfnoSelect');
+            const staffNameInput = document.getElementById('staffName');
+            const yearInput = document.getElementById('leaveYear');
+            
+            const entitledInput = document.getElementById('entitledDays');
+            const availableInput = document.getElementById('availableDays');
+            const allowanceInput = document.getElementById('allowance');
+            
+            const partDaysInput = document.getElementById('partDays');
+            const startDateInput = document.getElementById('startDate');
+            const resumptionDateInput = document.getElementById('resumptionDate');
+            
+            const resumedCheck = document.getElementById('resumed');
+            const dateResumedInput = document.getElementById('dateResumed');
+
+            const saveBtn = document.getElementById('saveLeaveBtn');
+            const modal = new bootstrap.Modal(document.getElementById('leaveModal'));
+
+            // Staff Selection Change
+            pfnoSelect.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                const name = selectedOption.getAttribute('data-name');
+                staffNameInput.value = name || '';
+                
+                if (this.value) {
+                    fetchLeaveData(this.value, yearInput.value);
+                } else {
+                    resetFields();
+                }
+            });
+
+            // Year Change
+            yearInput.addEventListener('change', function() {
+                if (pfnoSelect.value) {
+                    fetchLeaveData(pfnoSelect.value, this.value);
+                }
+            });
+
+            // Resumed Checkbox
+            resumedCheck.addEventListener('change', function() {
+                dateResumedInput.disabled = !this.checked;
+                if (!this.checked) dateResumedInput.value = '';
+            });
+
+            async function fetchLeaveData(pfno, year) {
+                try {
+                    const response = await fetch(`/data-entry/api/leave/staff/${pfno}/${year}`);
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+
+                    // Populate fields
+                    entitledInput.value = data.entitled || 0;
+                    availableInput.value = data.available || 0;
+                    allowanceInput.value = data.allowance ? data.allowance.toFixed(2) : '0.00';
+                    
+                    // If staff has leave records, we might want to alert or show info
+                    // But requirements say "populate the form with latest leave info"
+                    // If we treat this as a NEW application, we just show available balance.
+                    // If there was a previous partial leave, available balance reflects that.
+                    
+                } catch (error) {
+                    console.error('Error fetching leave data:', error);
+                }
+            }
+
+            function resetFields() {
+                entitledInput.value = '';
+                availableInput.value = '';
+                allowanceInput.value = '';
+                partDaysInput.value = '';
+                startDateInput.value = '';
+                resumptionDateInput.value = '';
+            }
+            
+            // Auto-calculate Resumption Date based on Part Days (Simple logic, skipping holidays for now or just adding days)
+            // Ideally should be done via API to account for holidays/weekends, but simple JS addition for now
+            partDaysInput.addEventListener('input', updateResumption);
+            startDateInput.addEventListener('change', updateResumption);
+            
+            function updateResumption() {
+                const days = parseInt(partDaysInput.value);
+                const start = new Date(startDateInput.value);
+                
+                if (days && !isNaN(start.getTime())) {
+                    const resDate = new Date(start);
+                    resDate.setDate(resDate.getDate() + days);
+                    resumptionDateInput.valueAsDate = resDate;
+                }
+            }
+
+            const leaveTypeSelect = document.getElementById('leaveType');
+            const purchasedRow = document.getElementById('purchasedRow');
+            const daysPurchasedInput = document.getElementById('daysPurchased');
+            
+            // Leave Type Change
+            leaveTypeSelect.addEventListener('change', function() {
+                const selectedText = this.options[this.selectedIndex].text.toLowerCase();
+                if (selectedText.includes('purchased')) {
+                    purchasedRow.classList.remove('d-none');
+                    daysPurchasedInput.required = true;
+                } else {
+                    purchasedRow.classList.add('d-none');
+                    daysPurchasedInput.required = false;
+                    daysPurchasedInput.value = '';
+                }
+            });
+
+            // Save
+            saveBtn.addEventListener('click', async () => {
+                const isPurchased = leaveTypeSelect.options[leaveTypeSelect.selectedIndex].text.toLowerCase().includes('purchased');
+                const daysPurchased = isPurchased ? daysPurchasedInput.value : 0;
+                
+                const payload = {
+                    pfno: pfnoSelect.value,
+                    lType: leaveTypeSelect.value,
+                    lYear: yearInput.value,
+                    deduct: document.getElementById('deductible').checked ? -1 : 0,
+                    proposed: document.getElementById('proposedDate').value,
+                    available: availableInput.value,
+                    lDays: entitledInput.value,
+                    startDate: startDateInput.value,
+                    part: partDaysInput.value,
+                    holidays: document.getElementById('holidays').value,
+                    withPay: document.getElementById('withPay').checked ? -1 : 0,
+                    resumptionDate: resumptionDateInput.value,
+                    allowance: allowanceInput.value,
+                    resumed: resumedCheck.checked ? -1 : 0,
+                    dateResumed: dateResumedInput.value,
+                    purchased: isPurchased ? -1 : 0,
+                    daysPurchased: daysPurchased,
+                    datePurchased: isPurchased ? new Date().toISOString() : null,
+                    recalled: 0 // Default value
+                };
+
+                if (!payload.pfno || !payload.lType || !payload.startDate) {
+                    alert('Please fill required fields (Staff, Type, Start Date)');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/data-entry/api/leave/application', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    const result = await response.json();
+                    if (result.success) {
+                        alert('Leave application saved successfully');
+                        location.reload(); 
+                    } else {
+                        alert(result.error || 'Error saving leave application');
+                    }
+                } catch (error) {
+                    console.error(error);
+                    alert('Server Error');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

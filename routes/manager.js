@@ -36,6 +36,12 @@ router.get('/approve/edited-payroll', managerController.getApproveEditedPayroll)
 router.get('/approve/edited-payroll/view', managerController.getApproveEditedPayrollView);
 router.post('/approve/edited-payroll', managerController.postApproveEditedPayroll);
 router.get('/approve/leave', managerController.getApproveLeave);
+router.get('/approve/leave-application', managerController.getLeaveApplicationApproval);
+router.post('/api/approve/leave', managerController.postLeaveApproval);
+router.get('/approve/leave-recall', managerController.getLeaveRecallApproval);
+router.post('/api/approve/leave-recall', managerController.postLeaveRecallApproval);
+router.get('/approve/leave-purchase', managerController.getApproveLeavePurchase);
+router.post('/api/approve/leave-purchase', managerController.postApproveLeavePurchase);
 router.get('/approve/interview', managerController.getComingSoon);
 router.get('/approve/promotion-demotion', managerController.getApprovePromotionDemotion);
 router.post('/approve/promotion-demotion', managerController.postApprovePromotion);

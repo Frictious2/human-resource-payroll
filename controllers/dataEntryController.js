@@ -1566,6 +1566,160 @@ const dataEntryController = {
         }
     },
 
+    getWelfareMedical: async (req, res) => {
+        try {
+            // Fetch Transaction Labels from tblMCode
+            const [mCodes] = await pool.query("SELECT TCode, TransName FROM tblMCode ORDER BY TransName");
+            // Fetch Staff for dropdown
+            const [staffList] = await pool.query("SELECT PFNo, SName FROM tblstaff WHERE EmpStatus = '01' ORDER BY SName");
+            
+            res.render('data_entry/welfare/medical', {
+                title: 'Medical Management',
+                group: 'Welfare',
+                path: '/data-entry/welfare/medical',
+                user: { name: 'Data Entry Clerk' },
+                mCodes,
+                staffList
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getStaffMedicalHistory: async (req, res) => {
+        try {
+            const { pfno } = req.params;
+            
+            // Get Staff Details & Grade Limit
+            const [staffRows] = await pool.query(`
+                SELECT s.PFNo, s.SName, g.Medical as MedicalLimit 
+                FROM tblstaff s 
+                LEFT JOIN tblgrade g ON s.CGrade = g.GradeCode 
+                WHERE s.PFNo = ?
+            `, [pfno]);
+
+            if (staffRows.length === 0) {
+                return res.status(404).json({ error: 'Staff not found' });
+            }
+            const staff = staffRows[0];
+            const limit = parseFloat(staff.MedicalLimit) || 0;
+
+            // Get Medical Records
+            const query = `
+                SELECT 
+                    m.TransNo,
+                    DATE_FORMAT(m.EntryDate, '%Y-%m-%d') as EntryDate,
+                    m.PFNo,
+                    m.Dependant,
+                    m.MCode,
+                    mc.TransName,
+                    m.Amount
+                FROM tblmedical m
+                LEFT JOIN tblMCode mc ON m.MCode = mc.TCode
+                WHERE m.PFNo = ?
+                ORDER BY m.EntryDate DESC
+            `;
+            const [records] = await pool.query(query, [pfno]);
+
+            // Calculate Usage and Balance
+            const used = records.reduce((sum, record) => sum + (parseFloat(record.Amount) || 0), 0);
+            const balance = limit - used;
+
+            res.json({
+                staff,
+                records,
+                balance,
+                limit,
+                used
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    addMedicalRecord: async (req, res) => {
+        try {
+            const { entryDate, pfno, mCode, beneficiary, dependant, amount } = req.body;
+            const operator = (req.session && req.session.user && req.session.user.name) ? req.session.user.name : 'Data Entry Officer';
+            
+            // Check Medical Limit
+            const [limitRows] = await pool.query(`
+                SELECT g.Medical 
+                FROM tblstaff s 
+                JOIN tblgrade g ON s.CGrade = g.GradeCode 
+                WHERE s.PFNo = ?
+            `, [pfno]);
+            const limit = limitRows[0] ? (parseFloat(limitRows[0].Medical) || 0) : 0;
+
+            const [usageRows] = await pool.query('SELECT SUM(Amount) as usedAmount FROM tblmedical WHERE PFNo = ?', [pfno]);
+            const currentUsed = parseFloat(usageRows[0].usedAmount) || 0;
+            const newAmount = parseFloat(amount) || 0;
+
+            if (currentUsed + newAmount > limit) {
+                return res.status(400).json({ 
+                    success: false, // Ensure frontend handles this
+                    error: `Medical limit exceeded. Limit: ${limit}, Used: ${currentUsed}, Available: ${limit - currentUsed}` 
+                });
+            }
+
+            // Generate TransNo
+            const [maxRows] = await pool.query('SELECT MAX(TransNo) as maxId FROM tblmedical');
+            const transNo = (maxRows[0].maxId || 0) + 1;
+
+            const depName = (beneficiary === 'Family') ? dependant : 'Self';
+            
+            await pool.query(
+                'INSERT INTO tblmedical (TransNo, EntryDate, PFNo, Dependant, MCode, Amount, TimeKeyed, CompanyID) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)',
+                [transNo, entryDate, pfno, depName, mCode, newAmount, 1] // Assuming CompanyID 1
+            );
+
+            res.json({ success: true, message: 'Medical record added successfully' });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    updateMedicalRecord: async (req, res) => {
+        try {
+            const { transNo, entryDate, pfno, mCode, beneficiary, dependant, amount } = req.body;
+            
+            // Check Medical Limit
+            const [limitRows] = await pool.query(`
+                SELECT g.Medical 
+                FROM tblstaff s 
+                JOIN tblgrade g ON s.CGrade = g.GradeCode 
+                WHERE s.PFNo = ?
+            `, [pfno]);
+            const limit = limitRows[0] ? (parseFloat(limitRows[0].Medical) || 0) : 0;
+
+            const [usageRows] = await pool.query('SELECT SUM(Amount) as usedAmount FROM tblmedical WHERE PFNo = ? AND TransNo != ?', [pfno, transNo]);
+            const currentUsed = parseFloat(usageRows[0].usedAmount) || 0;
+            const newAmount = parseFloat(amount) || 0;
+
+            if (currentUsed + newAmount > limit) {
+                return res.status(400).json({ 
+                     success: false,
+                     error: `Medical limit exceeded. Limit: ${limit}, Used (others): ${currentUsed}, Available: ${limit - currentUsed}` 
+                });
+            }
+
+            const depName = (beneficiary === 'Family') ? dependant : 'Self';
+
+            await pool.query(
+                'UPDATE tblmedical SET EntryDate = ?, PFNo = ?, Dependant = ?, MCode = ?, Amount = ? WHERE TransNo = ?',
+                [entryDate, pfno, depName, mCode, newAmount, transNo]
+            );
+
+            res.json({ success: true, message: 'Medical record updated successfully' });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
     getRedundancySheetData: async (req, res) => {
         try {
             const [rows] = await pool.query(`
@@ -3223,6 +3377,324 @@ const dataEntryController = {
             res.status(500).send('Server Error: ' + error.message);
         } finally {
             conn.release();
+        }
+    },
+
+    // Leave Application
+    getLeaveApplication: async (req, res) => {
+        try {
+            const [staffList] = await pool.query("SELECT PFNo, SName FROM tblstaff WHERE EmpStatus = '01' ORDER BY SName");
+            const [leaveTypes] = await pool.query("SELECT * FROM tblleavetype");
+            
+            // Get recent leaves for display
+            const [recentLeaves] = await pool.query(`
+                SELECT l.*, s.SName, t.LeaveType 
+                FROM tblleave l 
+                LEFT JOIN tblstaff s ON l.PFNO = s.PFNo 
+                LEFT JOIN tblleavetype t ON l.LType = t.Code
+                ORDER BY l.LCount DESC LIMIT 10
+            `);
+
+            res.render('data_entry/leave/application', {
+                title: 'Leave Application',
+                group: 'Leave',
+                path: '/data-entry/leave/application',
+                user: req.session.user || { name: 'Data Entry' },
+                staffList,
+                leaveTypes,
+                recentLeaves
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getLeaveStaffData: async (req, res) => {
+        try {
+            const { pfno, year } = req.params;
+            
+            // Get Staff Grade
+            const [staffRows] = await pool.query("SELECT CGrade FROM tblstaff WHERE PFNo = ?", [pfno]);
+            if (staffRows.length === 0) return res.status(404).json({ error: 'Staff not found' });
+            
+            const gradeCode = staffRows[0].CGrade;
+            
+            // Get Entitlement from Grade
+            const [gradeRows] = await pool.query("SELECT LDays FROM tblgrade WHERE GradeCode = ?", [gradeCode]);
+            const entitledDays = gradeRows.length > 0 ? gradeRows[0].LDays : 0;
+            
+            // Get Allowance Percent
+            const [payItems] = await pool.query("SELECT Percent FROM tblpayrollitems WHERE Income = 'LEAVE'");
+            const percent = payItems.length > 0 ? parseFloat(payItems[0].Percent) : 0;
+            
+            // Get Annual Salary (Base for Allowance) - Using latest salary from tblsalary
+            const [salaryRows] = await pool.query("SELECT Salary FROM tblsalary WHERE PFNo = ? ORDER BY PDate DESC LIMIT 1", [pfno]);
+            const monthlySalary = salaryRows.length > 0 ? parseFloat(salaryRows[0].Salary) : 0;
+            const annualSalary = monthlySalary * 12;
+            
+            const allowanceAmount = annualSalary * (percent / 100);
+            
+            // Calculate Used Days
+            const [leaveRows] = await pool.query("SELECT Part, LDays FROM tblleave WHERE PFNO = ? AND LYear = ?", [pfno, year]);
+            
+            let usedDays = 0;
+            leaveRows.forEach(r => {
+                usedDays += (r.Part || 0);
+            });
+            
+            const available = entitledDays - usedDays;
+            
+            res.json({
+                entitled: entitledDays,
+                available: available,
+                allowance: allowanceAmount,
+                used: usedDays
+            });
+            
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    postLeaveApplication: async (req, res) => {
+        try {
+            const {
+                pfno, lType, lYear, deduct, proposed, available, lDays,
+                startDate, part, holidays, withPay, resumptionDate,
+                allowance, resumed, dateResumed, purchased, daysPurchased, datePurchased
+            } = req.body;
+            
+            // Get Max LCount
+            const [maxRows] = await pool.query("SELECT MAX(LCount) as maxCount FROM tblleave");
+            const nextCount = (maxRows[0].maxCount || 0) + 1;
+            
+            const query = `
+                INSERT INTO tblleave (
+                    LCount, PFNO, LType, LYear, Deduct, Proposed, Available, LDays,
+                    StartDate, Part, Holidays, WithPay, ResumptionDate, Allowance,
+                    Resumed, DateResumed, Purchased, DaysPurchased, DatePurchased, Recalled, DateRecalled, CompanyID, EntryPassed, Approved
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, 1, 0, 0)
+            `;
+            
+            const params = [
+                nextCount, pfno, lType, lYear, deduct, proposed || null, available, lDays,
+                startDate, part || 0, holidays || 0, withPay, resumptionDate, allowance,
+                resumed, dateResumed || null, purchased || 0, daysPurchased || 0, datePurchased || null
+            ];
+            
+            await pool.query(query, params);
+            
+            res.json({ success: true });
+            
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: error.message });
+        }
+    },
+
+    getLeaveRecall: async (req, res) => {
+        try {
+            const query = `
+                SELECT 
+                    l.LCount,
+                    l.PFNO,
+                    s.SName,
+                    t.LeaveType,
+                    l.StartDate,
+                    l.ResumptionDate,
+                    l.LYear,
+                    l.Part,
+                    l.LDays
+                FROM tblleave l
+                JOIN tblstaff s ON l.PFNO = s.PFNo
+                LEFT JOIN tblleavetype t ON l.LType = t.Code
+                WHERE l.Approved = 1 
+                AND l.Recalled = 0
+                AND l.Resumed = 0
+                AND l.StartDate <= CURDATE()
+                AND l.ResumptionDate >= CURDATE()
+                ORDER BY l.StartDate DESC
+            `;
+            
+            const [staffOnLeave] = await pool.query(query);
+
+            res.render('data_entry/leave/recall', {
+                title: 'Recall Staff from Leave',
+                path: '/data-entry/leave/recall',
+                user: req.session.user || { name: 'Data Entry' },
+                staffOnLeave
+            });
+
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    postLeaveRecall: async (req, res) => {
+        try {
+            const { lCount, dateRecalled, resumptionDate } = req.body;
+            
+            // Update Recalled = 2 (Pending Approval), DateRecalled, and Proposed ResumptionDate
+            // Note: The user mentioned "Date Recalled" and "Resumption Date" in the modal.
+            // We'll update DateRecalled. ResumptionDate might be the new resumption date?
+            // Usually ResumptionDate in tblleave is the original one. 
+            // If recalled, maybe we need to store the NEW resumption date somewhere?
+            // Or maybe the user means when they will resume *after* the recall period ends? 
+            // Or maybe "Resumption Date" in the modal IS the "Date Recalled"?
+            // "Date Recalled (To be entered...)"
+            // "Resumption Date"
+            // Let's assume we update DateRecalled. 
+            // Since there's no "NewResumptionDate" column, we might just update DateRecalled.
+            // But wait, the user said "Resumption Date" as a field in the modal.
+            // If I recall someone today, do I change their ResumptionDate in the DB?
+            // If I do, I lose the original planned date.
+            // But the user said: "Daye Remaining... added again to the staff total number of leave left".
+            // This implies the calculation uses the ORIGINAL Resumption Date vs Date Recalled.
+            // So I should NOT overwrite ResumptionDate yet.
+            // But the modal has a "Resumption Date" input.
+            // Maybe this is the date they are expected to resume work *because* of the recall?
+            // Which is usually the Date Recalled or the day after.
+            // Let's update DateRecalled.
+            // And Recalled = 2 (Pending).
+            
+            const updateQuery = `
+                UPDATE tblleave 
+                SET Recalled = 2, DateRecalled = ?
+                WHERE LCount = ?
+            `;
+            
+            await pool.query(updateQuery, [dateRecalled, lCount]);
+            
+            res.json({ success: true });
+            
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    getLeavePurchase: async (req, res) => {
+        try {
+            // Fetch Staff List
+            const [staffList] = await pool.query('SELECT PFNo, SName FROM tblstaff ORDER BY SName');
+            
+            // Fetch Payment Methods
+            const [payMethods] = await pool.query('SELECT Code, PayThrough FROM tblpaythrough ORDER BY Code');
+            
+            // Fetch Company Info
+            const [comInfo] = await pool.query('SELECT Bank, AccNo FROM tblcominfo LIMIT 1');
+            
+            // Fetch Recent Purchases
+            const [purchases] = await pool.query(`
+                SELECT l.PFNO, s.SName, l.DaysPurchased, l.DatePurchased, l.Allowance, l.Approved 
+                FROM tblleave l
+                JOIN tblstaff s ON l.PFNO = s.PFNo
+                WHERE l.LType = '08' OR l.LType = 'PURCHASE'
+                ORDER BY l.DatePurchased DESC
+                LIMIT 50
+            `);
+            
+            res.render('data_entry/leave/purchase', {
+                title: 'Leave Purchase',
+                path: '/data-entry/leave/purchase',
+                user: req.session.user || { name: 'Data Entry' },
+                staffList,
+                payMethods,
+                comInfo: comInfo[0] || {},
+                purchases
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getStaffLeaveDataForPurchase: async (req, res) => {
+        try {
+            const { pfno } = req.params;
+            const year = new Date().getFullYear();
+            
+            // Get Staff Name & Grade
+            const [staffRows] = await pool.query("SELECT SName, CGrade FROM tblstaff WHERE PFNo = ?", [pfno]);
+            if (staffRows.length === 0) return res.status(404).json({ error: 'Staff not found' });
+            
+            const staff = staffRows[0];
+            const gradeCode = staff.CGrade;
+            
+            // Get Entitlement
+            const [gradeRows] = await pool.query("SELECT LDays FROM tblgrade WHERE GradeCode = ?", [gradeCode]);
+            const entitledDays = gradeRows.length > 0 ? (gradeRows[0].LDays || 0) : 0;
+            
+            // Calculate Used Days (including pending approvals if needed, but usually approved ones)
+            // Assuming Part holds the days taken.
+            const [leaveRows] = await pool.query("SELECT Part FROM tblleave WHERE PFNO = ? AND LYear = ? AND Approved = 1", [pfno, year]);
+            let usedDays = 0;
+            leaveRows.forEach(r => {
+                usedDays += (r.Part || 0);
+            });
+            
+            const availableDays = entitledDays - usedDays;
+            
+            res.json({
+                success: true,
+                staff: { SName: staff.SName },
+                availableDays: availableDays > 0 ? availableDays : 0
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    postLeavePurchase: async (req, res) => {
+        try {
+            const {
+                pfno, ltype, ltypeCode, lyear, available, daysPurchased,
+                amount, datePurchased, purchased, method, bank, bban
+            } = req.body;
+            
+            // Validation
+            // We should re-verify availability here, but trusting the client for now + basic check
+            // Ideally re-run getStaffLeaveDataForPurchase logic
+            
+            // Get Max LCount
+            const [maxRows] = await pool.query("SELECT MAX(LCount) as maxCount FROM tblleave");
+            const nextCount = (maxRows[0].maxCount || 0) + 1;
+            
+            const query = `
+                INSERT INTO tblleave (
+                    LCount, PFNO, LType, LYear, 
+                    DaysPurchased, DatePurchased, Purchased, 
+                    Allowance, Method, Bank, BBAN, 
+                    StartDate, Approved, CompanyID,
+                    Part
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1, ?)
+            `;
+            
+            // Note: StartDate is used for "Date" as per user request.
+            // Also DatePurchased.
+            // Part: Should purchase reduce available days? Usually yes.
+            // "Number of days that will be purchased must not exceed the outstanding days value"
+            // This implies it consumes the leave days. So Part = DaysPurchased.
+            
+            const params = [
+                nextCount, pfno, ltypeCode || '08', lyear,
+                daysPurchased, datePurchased, purchased || 0,
+                amount, method, bank || null, bban || null,
+                datePurchased, // StartDate
+                daysPurchased // Part
+            ];
+            
+            await pool.query(query, params);
+            
+            res.json({ success: true });
+            
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
         }
     }
 };

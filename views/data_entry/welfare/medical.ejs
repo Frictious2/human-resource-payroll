@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <h2 class="mb-0"><%= title %></h2>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#medicalModal">
+                    <i class="bi bi-plus-lg"></i> Add Medical
+                </button>
+            </div>
+
+            <!-- Search Section -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label for="searchPfno" class="form-label">Staff ID / PFNo</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                <input type="text" class="form-control" id="searchPfno" placeholder="Enter Staff ID">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-primary w-100" id="btnLoad">Load Data</button>
+                        </div>
+                        <div class="col-md-6 text-end">
+                             <div class="p-2 border rounded bg-light d-inline-block">
+                                 <span class="me-3 fw-bold text-secondary">Limit: <span id="limitDisplay" class="text-dark">0.00</span></span>
+                                 <span class="me-3 fw-bold text-warning">Used: <span id="usedDisplay" class="text-dark">0.00</span></span>
+                                 <span class="fw-bold text-success">Balance: <span id="balanceDisplay" class="text-dark">0.00</span></span>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Section -->
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>EMP-ID</th>
+                                    <th>Name</th>
+                                    <th>Transaction</th>
+                                    <th>Beneficiary</th>
+                                    <th>Amount</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="medicalTableBody">
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-4">
+                                        Enter Staff ID and click Load Data to view records
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="mt-4 py-3 text-center text-muted border-top">
+                <%- include('../partials/footer') %>
+            </footer>
+        </div>
+    </main>
+
+    <!-- Medical Modal -->
+    <div class="modal fade" id="medicalModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="medicalModalLabel">Add Medical Record</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="medicalForm">
+                        <!-- Entry Date -->
+                        <div class="mb-3">
+                            <label for="entryDate" class="form-label">Entry Date</label>
+                            <input type="date" class="form-control" id="entryDate" required>
+                        </div>
+
+                        <!-- Emp-ID -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="empIdSelect" class="form-label">Emp-ID</label>
+                                <select class="form-select" id="empIdSelect">
+                                    <option value="">Select Staff...</option>
+                                    <% staffList.forEach(staff => { %>
+                                        <option value="<%= staff.PFNo %>" data-name="<%= staff.SName %>"><%= staff.PFNo %> - <%= staff.SName %></option>
+                                    <% }); %>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="empName" class="form-label">Staff Name</label>
+                                <input type="text" class="form-control" id="empName" readonly>
+                            </div>
+                        </div>
+
+                        <!-- Transaction Label -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="transLabelSelect" class="form-label">Transaction Label</label>
+                                <select class="form-select" id="transLabelSelect">
+                                    <option value="">Select Transaction...</option>
+                                    <% mCodes.forEach(code => { %>
+                                        <option value="<%= code.TCode %>" data-name="<%= code.TransName %>"><%= code.TCode %> - <%= code.TransName %></option>
+                                    <% }); %>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="transName" class="form-label">Trans Name</label>
+                                <input type="text" class="form-control" id="transName" readonly>
+                            </div>
+                        </div>
+
+                        <!-- Amount Field -->
+                        <div class="mb-3">
+                            <label for="amount" class="form-label">Amount</label>
+                            <input type="number" class="form-control" id="amount" step="0.01" min="0" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Beneficiary</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="beneficiary" id="beneficiarySelf" value="Self" checked>
+                                <label class="form-check-label" for="beneficiarySelf">Self</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="beneficiary" id="beneficiaryFamily" value="Family">
+                                <label class="form-check-label" for="beneficiaryFamily">Family</label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3 d-none" id="dependantDiv">
+                            <label for="dependantSelect" class="form-label">Dependant</label>
+                            <select class="form-select" id="dependantSelect">
+                                <option value="">Select Dependant...</option>
+                            </select>
+                        </div>
+                        <input type="hidden" id="transNo">
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="saveMedicalBtn">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const loadDataBtn = document.getElementById('btnLoad');
+            const addMedicalBtn = document.querySelector('[data-bs-target="#medicalModal"]');
+            const saveMedicalBtn = document.getElementById('saveMedicalBtn');
+            const empIdSearch = document.getElementById('searchPfno');
+            const medicalTableBody = document.getElementById('medicalTableBody');
+            const medicalModal = new bootstrap.Modal(document.getElementById('medicalModal'));
+            
+            const empSelect = document.getElementById('empIdSelect');
+            const empNameInput = document.getElementById('empName');
+            const transSelect = document.getElementById('transLabelSelect');
+            const transNameInput = document.getElementById('transName');
+            const beneficiaryRadios = document.getElementsByName('beneficiary');
+            const dependantDiv = document.getElementById('dependantDiv');
+            const dependantSelect = document.getElementById('dependantSelect');
+            const amountInput = document.getElementById('amount');
+            const entryDateInput = document.getElementById('entryDate');
+            const transNoInput = document.getElementById('transNo');
+
+            // Initialize Date
+            entryDateInput.valueAsDate = new Date();
+
+            // Load Data
+            loadDataBtn.addEventListener('click', async () => {
+                const pfno = empIdSearch.value.trim();
+                if (!pfno) {
+                    alert('Please enter a Staff ID / PFNo');
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/data-entry/api/welfare/medical/${pfno}`);
+                    if (!response.ok) throw new Error('Failed to fetch data');
+                    
+                    const data = await response.json();
+                    
+                    // Update Summary
+                    const limit = data.limit || 0;
+                    const used = data.used || 0;
+                    const balance = data.balance || 0;
+                    
+                    document.getElementById('limitDisplay').textContent = limit.toFixed(2);
+                    document.getElementById('usedDisplay').textContent = used.toFixed(2);
+                    document.getElementById('balanceDisplay').textContent = balance.toFixed(2);
+                    
+                    // Clear table
+                    medicalTableBody.innerHTML = '';
+                    
+                    if (data.records.length === 0) {
+                        medicalTableBody.innerHTML = '<tr><td colspan="7" class="text-center">No records found</td></tr>';
+                    } else {
+                        data.records.forEach(record => {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${record.EntryDate}</td>
+                                <td>${record.PFNo}</td>
+                                <td>${data.staff.SName}</td>
+                                <td>${record.TransName || record.MCode || '-'}</td>
+                                <td>${record.Dependant}</td>
+                                <td>${parseFloat(record.Amount).toFixed(2)}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary edit-btn" 
+                                        data-record='${JSON.stringify(record)}'
+                                        data-staff-name="${data.staff.SName}">
+                                        Edit
+                                    </button>
+                                </td>
+                            `;
+                            medicalTableBody.appendChild(row);
+                        });
+                    }
+
+                    // Attach Edit Listeners
+                    document.querySelectorAll('.edit-btn').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const record = JSON.parse(this.getAttribute('data-record'));
+                            const staffName = this.getAttribute('data-staff-name');
+                            openModalForEdit(record, staffName);
+                        });
+                    });
+
+                } catch (error) {
+                    console.error(error);
+                    alert('Error loading data');
+                }
+            });
+
+            // Add Medical Button
+            if (addMedicalBtn) {
+                addMedicalBtn.addEventListener('click', () => {
+                    resetForm();
+                    // Modal opens via data-bs-toggle
+                });
+            }
+
+            // Emp-ID Change Handler
+            empSelect.addEventListener('change', async function() {
+                const selectedOption = this.options[this.selectedIndex];
+                const name = selectedOption.getAttribute('data-name');
+                empNameInput.value = name || '';
+
+                // Fetch dependants if family is selected
+                if (document.querySelector('input[name="beneficiary"]:checked').value === 'Family') {
+                    await fetchDependants(this.value);
+                }
+            });
+
+            // Transaction Label Change Handler
+            transSelect.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                const name = selectedOption.getAttribute('data-name');
+                transNameInput.value = name || '';
+            });
+
+            // Beneficiary Change Handler
+            beneficiaryRadios.forEach(radio => {
+                radio.addEventListener('change', async function() {
+                    if (this.value === 'Family') {
+                        dependantDiv.classList.remove('d-none');
+                        const pfno = empSelect.value;
+                        if (pfno) {
+                            await fetchDependants(pfno);
+                        }
+                    } else {
+                        dependantDiv.classList.add('d-none');
+                        dependantSelect.innerHTML = '<option value="">Select Dependant...</option>';
+                    }
+                });
+            });
+
+            // Fetch Dependants Function
+            async function fetchDependants(pfno) {
+                try {
+                    const response = await fetch(`/data-entry/api/staff/${pfno}/dependants`);
+                    const data = await response.json();
+                    
+                    dependantSelect.innerHTML = '<option value="">Select Dependant...</option>';
+                    data.dependants.forEach(dep => {
+                        const option = document.createElement('option');
+                        option.value = dep.DepNo; 
+                        option.textContent = dep.Dependant;
+                        dependantSelect.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Error fetching dependants:', error);
+                }
+            }
+
+            // Save Medical Record
+            saveMedicalBtn.addEventListener('click', async () => {
+                const isUpdate = transNoInput.value !== '';
+                const url = isUpdate ? '/data-entry/api/welfare/medical/update' : '/data-entry/api/welfare/medical/add';
+                
+                const beneficiary = document.querySelector('input[name="beneficiary"]:checked').value;
+                
+                const payload = {
+                    transNo: transNoInput.value,
+                    entryDate: entryDateInput.value,
+                    pfno: empSelect.value,
+                    mCode: transSelect.value,
+                    beneficiary: beneficiary,
+                    dependant: beneficiary === 'Family' ? dependantSelect.options[dependantSelect.selectedIndex].text : 'Self',
+                    amount: amountInput.value
+                };
+
+                if (!payload.entryDate || !payload.pfno || !payload.mCode || !payload.amount) {
+                    alert('Please fill all required fields');
+                    return;
+                }
+                
+                if (beneficiary === 'Family' && (!payload.dependant || payload.dependant === 'Select Dependant...')) {
+                     alert('Please select a dependant');
+                     return;
+                }
+
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    const result = await response.json();
+                    if (result.success) {
+                        alert(result.message);
+                        medicalModal.hide();
+                        // Reload data if search field matches
+                        if (empIdSearch.value === payload.pfno) {
+                            loadDataBtn.click();
+                        }
+                    } else {
+                        alert(result.error || 'Error saving record');
+                    }
+                } catch (error) {
+                    console.error(error);
+                    alert('Server Error');
+                }
+            });
+
+            function resetForm() {
+                transNoInput.value = '';
+                entryDateInput.value = new Date().toISOString().split('T')[0];
+                empSelect.value = '';
+                empNameInput.value = '';
+                transSelect.value = '';
+                transNameInput.value = '';
+                amountInput.value = '';
+                document.getElementById('beneficiarySelf').checked = true;
+                dependantDiv.classList.add('d-none');
+                dependantSelect.innerHTML = '<option value="">Select Dependant...</option>';
+                
+                // If coming from search, pre-select staff
+                if (empIdSearch.value) {
+                     for(let i=0; i<empSelect.options.length; i++) {
+                         if(empSelect.options[i].value === empIdSearch.value) {
+                             empSelect.selectedIndex = i;
+                             empSelect.dispatchEvent(new Event('change'));
+                             break;
+                         }
+                     }
+                }
+            }
+
+            async function openModalForEdit(record, staffName) {
+                resetForm();
+                transNoInput.value = record.TransNo;
+                entryDateInput.value = record.EntryDate;
+                
+                // Select Staff
+                empSelect.value = record.PFNo;
+                empNameInput.value = staffName;
+                
+                // Select MCode
+                transSelect.value = record.MCode;
+                const mOption = transSelect.querySelector(`option[value="${record.MCode}"]`);
+                if(mOption) transNameInput.value = mOption.getAttribute('data-name');
+
+                amountInput.value = record.Amount;
+
+                // Handle Beneficiary
+                if (record.Dependant === 'Self') {
+                    document.getElementById('beneficiarySelf').checked = true;
+                    dependantDiv.classList.add('d-none');
+                } else {
+                    document.getElementById('beneficiaryFamily').checked = true;
+                    dependantDiv.classList.remove('d-none');
+                    await fetchDependants(record.PFNo);
+                    
+                    // Select dependant by text (Name)
+                    for(let i=0; i<dependantSelect.options.length; i++) {
+                        if(dependantSelect.options[i].text === record.Dependant) {
+                            dependantSelect.selectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+                
+                medicalModal.show();
+            }
+        });
+    </script>
+</body>
+</html>

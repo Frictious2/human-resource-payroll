@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../../partials/topbar', { user }) %>
+    <%- include('../../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <h2 class="mb-0"><%= title %></h2>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#purchaseModal">
+                    <i class="bi bi-plus-lg"></i> New Purchase
+                </button>
+            </div>
+
+            <!-- List of Purchases -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Recent Purchases</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Emp-ID</th>
+                                    <th>Name</th>
+                                    <th>Days Purchased</th>
+                                    <th>Date Purchased</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% if (purchases && purchases.length > 0) { %>
+                                    <% purchases.forEach(purchase => { %>
+                                        <tr>
+                                            <td><%= purchase.PFNO %></td>
+                                            <td><%= purchase.SName %></td>
+                                            <td><%= purchase.DaysPurchased %></td>
+                                            <td><%= new Date(purchase.DatePurchased).toLocaleDateString() %></td>
+                                            <td><%= purchase.Allowance %></td>
+                                            <td>
+                                                <% if (purchase.Approved === 1) { %>
+                                                    <span class="badge bg-success">Approved</span>
+                                                <% } else if (purchase.Approved === 2) { %>
+                                                    <span class="badge bg-danger">Rejected</span>
+                                                <% } else { %>
+                                                    <span class="badge bg-warning text-dark">Pending</span>
+                                                <% } %>
+                                            </td>
+                                        </tr>
+                                    <% }); %>
+                                <% } else { %>
+                                    <tr>
+                                        <td colspan="6" class="text-center py-4 text-muted">
+                                            No recent leave purchases found
+                                        </td>
+                                    </tr>
+                                <% } %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="mt-4 py-3 text-center text-muted border-top">
+                <%- include('../../partials/footer') %>
+            </footer>
+        </div>
+    </main>
+
+    <!-- Purchase Modal -->
+    <div class="modal fade" id="purchaseModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Leave Purchase Form</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="purchaseForm">
+                        <div class="row g-3">
+                            <!-- Staff Selection -->
+                            <div class="col-md-6">
+                                <label class="form-label">EMP-ID</label>
+                                <select class="form-select" id="pfno" name="pfno" required>
+                                    <option value="">Select Staff...</option>
+                                    <% staffList.forEach(staff => { %>
+                                        <option value="<%= staff.PFNo %>"><%= staff.PFNo %> - <%= staff.SName %></option>
+                                    <% }); %>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Staff Name</label>
+                                <input type="text" class="form-control" id="sname" readonly>
+                            </div>
+
+                            <!-- Leave Details -->
+                            <div class="col-md-4">
+                                <label class="form-label">Leave Type</label>
+                                <input type="text" class="form-control" name="ltype" value="PURCHASE" readonly>
+                                <input type="hidden" name="ltypeCode" value="08">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Leave Year</label>
+                                <input type="number" class="form-control" name="lyear" value="<%= new Date().getFullYear() %>" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Available Days</label>
+                                <input type="number" class="form-control" id="available" readonly>
+                            </div>
+
+                            <!-- Purchase Info -->
+                            <div class="col-md-6">
+                                <label class="form-label">No of Days</label>
+                                <input type="number" class="form-control" id="daysPurchased" name="daysPurchased" min="1" required>
+                                <div class="form-text text-danger d-none" id="daysError">Cannot exceed available days</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Purchase Amount</label>
+                                <input type="number" class="form-control" name="amount" step="0.01" required>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label class="form-label">Date Purchased</label>
+                                <input type="date" class="form-control" name="datePurchased" required>
+                            </div>
+                            <div class="col-md-6 d-flex align-items-end">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="purchased" id="purchasedCheck" value="1">
+                                    <label class="form-check-label" for="purchasedCheck">Purchased</label>
+                                </div>
+                            </div>
+
+                            <!-- Payment Method -->
+                            <div class="col-md-12">
+                                <label class="form-label">Method</label>
+                                <select class="form-select" id="method" name="method" required>
+                                    <option value="">Select Method...</option>
+                                    <% payMethods.forEach(method => { %>
+                                        <option value="<%= method.Code %>"><%= method.PayThrough %></option>
+                                    <% }); %>
+                                </select>
+                            </div>
+
+                            <!-- Bank Details (Hidden by default) -->
+                            <div id="bankDetails" class="row g-3 d-none">
+                                <div class="col-md-6">
+                                    <label class="form-label">Bank</label>
+                                    <input type="text" class="form-control" id="bankName" name="bank" readonly>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">BBAN</label>
+                                    <input type="text" class="form-control" id="bban" name="bban" readonly>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="saveBtn">Save Purchase</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Company Info for JS access -->
+    <div id="companyInfo" 
+         data-bank="<%= comInfo.Bank || '' %>" 
+         data-bban="<%= comInfo.AccNo || '' %>" 
+         class="d-none"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const pfnoSelect = document.getElementById('pfno');
+            const methodSelect = document.getElementById('method');
+            const bankDetailsDiv = document.getElementById('bankDetails');
+            const companyInfo = document.getElementById('companyInfo');
+            const saveBtn = document.getElementById('saveBtn');
+            const daysPurchasedInput = document.getElementById('daysPurchased');
+            const availableInput = document.getElementById('available');
+
+            // Handle Staff Selection
+            pfnoSelect.addEventListener('change', async function() {
+                const pfno = this.value;
+                if (!pfno) {
+                    document.getElementById('sname').value = '';
+                    document.getElementById('available').value = '';
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/data-entry/api/staff-leave-data/${pfno}`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        document.getElementById('sname').value = data.staff.SName;
+                        // Assuming API returns available days based on entitlement logic
+                        document.getElementById('available').value = data.availableDays; 
+                    }
+                } catch (error) {
+                    console.error('Error fetching staff data:', error);
+                }
+            });
+
+            // Handle Method Selection
+            methodSelect.addEventListener('change', function() {
+                const selectedText = this.options[this.selectedIndex].text;
+                if (selectedText.includes('BANK')) {
+                    bankDetailsDiv.classList.remove('d-none');
+                    document.getElementById('bankName').value = companyInfo.dataset.bank;
+                    document.getElementById('bban').value = companyInfo.dataset.bban;
+                } else {
+                    bankDetailsDiv.classList.add('d-none');
+                    document.getElementById('bankName').value = '';
+                    document.getElementById('bban').value = '';
+                }
+            });
+
+            // Validate Days
+            daysPurchasedInput.addEventListener('input', function() {
+                const available = parseInt(availableInput.value) || 0;
+                const requested = parseInt(this.value) || 0;
+                const errorDiv = document.getElementById('daysError');
+
+                if (requested > available) {
+                    errorDiv.classList.remove('d-none');
+                    saveBtn.disabled = true;
+                } else {
+                    errorDiv.classList.add('d-none');
+                    saveBtn.disabled = false;
+                }
+            });
+
+            // Save Purchase
+            saveBtn.addEventListener('click', async function() {
+                if (!document.getElementById('purchaseForm').checkValidity()) {
+                    document.getElementById('purchaseForm').reportValidity();
+                    return;
+                }
+
+                const formData = new FormData(document.getElementById('purchaseForm'));
+                const data = Object.fromEntries(formData.entries());
+                
+                // Add unchecked checkbox value
+                if (!data.purchased) data.purchased = '0';
+
+                try {
+                    const response = await fetch('/data-entry/api/leave/purchase', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    
+                    const result = await response.json();
+                    if (result.success) {
+                        alert('Purchase saved successfully!');
+                        location.reload();
+                    } else {
+                        alert(result.error || 'Error saving purchase');
+                    }
+                } catch (error) {
+                    console.error(error);
+                    alert('Server Error');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

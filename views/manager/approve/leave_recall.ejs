@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <h2 class="mb-0"><%= title %></h2>
+                <a href="/manager/approve/leave" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Back
+                </a>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Pending Recall Requests</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Emp-ID</th>
+                                    <th>Name</th>
+                                    <th>Leave Type</th>
+                                    <th>Start Date</th>
+                                    <th>Original End</th>
+                                    <th>Date Recalled</th>
+                                    <th>Days Remaining</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% if (recallRequests && recallRequests.length > 0) { %>
+                                    <% recallRequests.forEach(request => { %>
+                                        <% 
+                                            // Calculate Days Remaining
+                                            const recallDate = new Date(request.DateRecalled);
+                                            const resumptionDate = new Date(request.ResumptionDate);
+                                            let daysRemaining = 0;
+                                            if (recallDate < resumptionDate) {
+                                                const diffTime = Math.abs(resumptionDate - recallDate);
+                                                daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                            }
+                                        %>
+                                        <tr id="row-<%= request.LCount %>">
+                                            <td><%= request.PFNO %></td>
+                                            <td><%= request.SName %></td>
+                                            <td><%= request.LeaveType %></td>
+                                            <td><%= new Date(request.StartDate).toLocaleDateString() %></td>
+                                            <td><%= new Date(request.ResumptionDate).toLocaleDateString() %></td>
+                                            <td><%= new Date(request.DateRecalled).toLocaleDateString() %></td>
+                                            <td><%= daysRemaining %></td>
+                                            <td>
+                                                <button class="btn btn-sm btn-info view-btn" 
+                                                        data-bs-toggle="modal" 
+                                                        data-bs-target="#viewModal"
+                                                        data-id="<%= request.LCount %>"
+                                                        data-pfno="<%= request.PFNO %>"
+                                                        data-name="<%= request.SName %>"
+                                                        data-type="<%= request.LeaveType %>"
+                                                        data-start="<%= new Date(request.StartDate).toLocaleDateString() %>"
+                                                        data-end="<%= new Date(request.ResumptionDate).toLocaleDateString() %>"
+                                                        data-recalled="<%= new Date(request.DateRecalled).toLocaleDateString() %>"
+                                                        data-remaining="<%= daysRemaining %>"
+                                                        data-year="<%= request.LYear %>">
+                                                    View
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    <% }); %>
+                                <% } else { %>
+                                    <tr>
+                                        <td colspan="8" class="text-center py-4 text-muted">
+                                            No pending recall requests
+                                        </td>
+                                    </tr>
+                                <% } %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="mt-4 py-3 text-center text-muted border-top">
+                <%- include('../partials/footer') %>
+            </footer>
+        </div>
+    </main>
+
+    <!-- View Modal -->
+    <div class="modal fade" id="viewModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Recall Request Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="viewForm">
+                        <input type="hidden" id="modalLCount">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Emp-ID</label>
+                                <input type="text" class="form-control" id="modalPFNO" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Name</label>
+                                <input type="text" class="form-control" id="modalName" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Leave Type</label>
+                                <input type="text" class="form-control" id="modalType" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Leave Year</label>
+                                <input type="text" class="form-control" id="modalYear" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Start Date</label>
+                                <input type="text" class="form-control" id="modalStart" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Original End Date</label>
+                                <input type="text" class="form-control" id="modalEnd" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Date Recalled</label>
+                                <input type="text" class="form-control" id="modalRecalled" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Days Remaining (To be returned)</label>
+                                <input type="text" class="form-control" id="modalRemaining" readonly>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-danger" id="modalRejectBtn">Reject</button>
+                    <button type="button" class="btn btn-success" id="modalApproveBtn">Approve</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const viewModal = document.getElementById('viewModal');
+            const modalApproveBtn = document.getElementById('modalApproveBtn');
+            const modalRejectBtn = document.getElementById('modalRejectBtn');
+            const bsModal = new bootstrap.Modal(viewModal);
+
+            viewModal.addEventListener('show.bs.modal', function(event) {
+                const button = event.relatedTarget;
+                
+                document.getElementById('modalLCount').value = button.getAttribute('data-id');
+                document.getElementById('modalPFNO').value = button.getAttribute('data-pfno');
+                document.getElementById('modalName').value = button.getAttribute('data-name');
+                document.getElementById('modalType').value = button.getAttribute('data-type');
+                document.getElementById('modalYear').value = button.getAttribute('data-year');
+                document.getElementById('modalStart').value = button.getAttribute('data-start');
+                document.getElementById('modalEnd').value = button.getAttribute('data-end');
+                document.getElementById('modalRecalled').value = button.getAttribute('data-recalled');
+                document.getElementById('modalRemaining').value = button.getAttribute('data-remaining');
+            });
+
+            async function handleAction(action) {
+                const id = document.getElementById('modalLCount').value;
+                if (!id) return;
+                
+                if (!confirm(`Are you sure you want to ${action} this recall request?`)) return;
+
+                try {
+                    const response = await fetch('/manager/api/approve/leave-recall', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ lCount: id, action })
+                    });
+                    
+                    const result = await response.json();
+                    if (result.success) {
+                        // Close modal
+                        bsModal.hide();
+                        // Remove row
+                        const row = document.getElementById(`row-${id}`);
+                        if (row) row.remove();
+                        
+                        // Check if table empty
+                        const tbody = document.querySelector('tbody');
+                        if (tbody.children.length === 0) {
+                            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-muted">No pending recall requests</td></tr>`;
+                        }
+                    } else {
+                        alert(result.error || 'Error processing request');
+                    }
+                } catch (error) {
+                    console.error(error);
+                    alert('Server Error');
+                }
+            }
+
+            modalApproveBtn.addEventListener('click', () => handleAction('approve'));
+            modalRejectBtn.addEventListener('click', () => handleAction('reject'));
+        });
+    </script>
+</body>
+</html>

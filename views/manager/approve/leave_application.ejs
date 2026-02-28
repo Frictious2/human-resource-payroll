@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <h2 class="mb-0"><%= title %></h2>
+                <a href="/manager/approve/leave" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Back
+                </a>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Pending Leave Applications</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Staff</th>
+                                    <th>Type</th>
+                                    <th>Year</th>
+                                    <th>Start Date</th>
+                                    <th>Days</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% if (pendingLeaves.length > 0) { %>
+                                    <% pendingLeaves.forEach(leave => { %>
+                                        <tr>
+                                            <td>
+                                                <div class="fw-bold"><%= leave.SName %></div>
+                                                <small class="text-muted"><%= leave.PFNO %></small>
+                                            </td>
+                                            <td><%= leave.LeaveType %></td>
+                                            <td><%= leave.LYear %></td>
+                                            <td><%= new Date(leave.StartDate).toLocaleDateString() %></td>
+                                            <td><%= leave.Part || 0 %></td>
+                                            <td>
+                                                <span class="badge bg-warning text-dark">Pending</span>
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-info text-white view-btn"
+                                                    data-leave='<%- JSON.stringify(leave) %>'>
+                                                    <i class="bi bi-eye"></i> View
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    <% }); %>
+                                <% } else { %>
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4 text-muted">
+                                            No pending leave applications found
+                                        </td>
+                                    </tr>
+                                <% } %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="mt-4 py-3 text-center text-muted border-top">
+                <%- include('../partials/footer') %>
+            </footer>
+        </div>
+    </main>
+
+    <!-- Leave Details Modal -->
+    <div class="modal fade" id="leaveModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Leave Application Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="leaveForm">
+                        <input type="hidden" id="leaveId">
+                        <input type="hidden" id="leavePFNo">
+                        
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Staff Name</label>
+                                <input type="text" class="form-control" id="staffName" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Leave Type</label>
+                                <input type="text" class="form-control" id="leaveType" readonly>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label class="form-label">Year</label>
+                                <input type="text" class="form-control" id="leaveYear" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Available Days</label>
+                                <input type="text" class="form-control" id="availableDays" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Entitled Days</label>
+                                <input type="text" class="form-control" id="entitledDays" readonly>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Start Date</label>
+                                <input type="text" class="form-control" id="startDate" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Days Applied</label>
+                                <input type="text" class="form-control" id="daysApplied" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Resumption Date</label>
+                                <input type="text" class="form-control" id="resumptionDate" readonly>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="form-check mt-4">
+                                    <input class="form-check-input" type="checkbox" id="deductible" disabled>
+                                    <label class="form-check-label">Deductible</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check mt-4">
+                                    <input class="form-check-input" type="checkbox" id="withPay" disabled>
+                                    <label class="form-check-label">With Pay</label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-12">
+                                <label class="form-label">Allowance</label>
+                                <input type="text" class="form-control" id="allowance" readonly>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-danger" id="modalRejectBtn">Reject</button>
+                    <button type="button" class="btn btn-success" id="modalApproveBtn">Approve</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const leaveModal = new bootstrap.Modal(document.getElementById('leaveModal'));
+            const viewBtns = document.querySelectorAll('.view-btn');
+            const modalApproveBtn = document.getElementById('modalApproveBtn');
+            const modalRejectBtn = document.getElementById('modalRejectBtn');
+
+            viewBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const leave = JSON.parse(this.dataset.leave);
+                    
+                    // Populate modal
+                    document.getElementById('leaveId').value = leave.LCount;
+                    document.getElementById('leavePFNo').value = leave.PFNO;
+                    document.getElementById('staffName').value = leave.SName || leave.PFNO;
+                    document.getElementById('leaveType').value = leave.LeaveType || leave.LType;
+                    document.getElementById('leaveYear').value = leave.LYear;
+                    document.getElementById('availableDays').value = leave.Available || 0;
+                    document.getElementById('entitledDays').value = leave.LDays || 0;
+                    
+                    document.getElementById('startDate').value = new Date(leave.StartDate).toLocaleDateString();
+                    document.getElementById('daysApplied').value = leave.Part || 0;
+                    document.getElementById('resumptionDate').value = leave.ResumptionDate ? new Date(leave.ResumptionDate).toLocaleDateString() : '';
+                    
+                    document.getElementById('deductible').checked = leave.Deduct == -1;
+                    document.getElementById('withPay').checked = leave.WithPay == -1;
+                    document.getElementById('allowance').value = leave.Allowance || 0;
+
+                    leaveModal.show();
+                });
+            });
+
+            modalApproveBtn.addEventListener('click', function() {
+                const id = document.getElementById('leaveId').value;
+                const pfno = document.getElementById('leavePFNo').value;
+                handleApproval(id, pfno, 'approve');
+            });
+
+            modalRejectBtn.addEventListener('click', function() {
+                const id = document.getElementById('leaveId').value;
+                const pfno = document.getElementById('leavePFNo').value;
+                if(confirm('Are you sure you want to reject this application?')) {
+                    handleApproval(id, pfno, 'reject');
+                }
+            });
+
+            async function handleApproval(id, pfno, action) {
+                try {
+                    const response = await fetch('/manager/api/approve/leave', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id, pfno, action })
+                    });
+                    
+                    const result = await response.json();
+                    if (result.success) {
+                        alert(`Leave application ${action}d successfully`);
+                        location.reload();
+                    } else {
+                        alert(result.error || 'Error processing request');
+                    }
+                } catch (error) {
+                    console.error(error);
+                    alert('Server Error');
+                }
+            }
+        });
+    </script>
+</body>
+</html>

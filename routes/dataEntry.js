@@ -75,6 +75,16 @@ router.post('/staff/exit', dataEntryController.postStaffExit);
 router.get('/staff/import', dataEntryController.getComingSoon);
 router.get('/staff/travel', dataEntryController.getComingSoon);
 
+// Leave
+router.get('/leave/application', dataEntryController.getLeaveApplication);
+router.get('/leave/recall', dataEntryController.getLeaveRecall);
+router.get('/leave/purchase', dataEntryController.getLeavePurchase);
+router.post('/api/leave/recall', dataEntryController.postLeaveRecall);
+router.post('/api/leave/purchase', dataEntryController.postLeavePurchase);
+router.get('/api/leave/staff/:pfno/:year', dataEntryController.getLeaveStaffData);
+router.get('/api/staff-leave-data/:pfno', dataEntryController.getStaffLeaveDataForPurchase);
+router.post('/api/leave/application', dataEntryController.postLeaveApplication);
+
 // 3. Payroll
 router.get('/payroll/entitle', dataEntryController.getPayrollEntitle);
 router.get('/api/payroll/entitle/:pfno', dataEntryController.getEntitleByStaff);
@@ -104,7 +114,10 @@ router.get('/payroll/vehicle-insurance', dataEntryController.getComingSoon);
 
 // 4. Welfare
 router.get('/welfare/leave', dataEntryController.getWelfareLeave);
-router.get('/welfare/medical', dataEntryController.getComingSoon);
+router.get('/welfare/medical', dataEntryController.getWelfareMedical);
+router.get('/api/welfare/medical/:pfno', dataEntryController.getStaffMedicalHistory);
+router.post('/api/welfare/medical/add', dataEntryController.addMedicalRecord);
+router.post('/api/welfare/medical/update', dataEntryController.updateMedicalRecord);
 router.get('/welfare/loan', dataEntryController.getComingSoon);
 router.get('/welfare/guarantee', dataEntryController.getComingSoon);
 router.get('/welfare/benefits', dataEntryController.getComingSoon);
