@@ -136,6 +136,12 @@
                             <input type="number" class="form-control" id="amount" step="0.01" min="0" required>
                         </div>
 
+                        <!-- Picture Field -->
+                        <div class="mb-3">
+                            <label for="picture" class="form-label">Receipt Picture (Proof)</label>
+                            <input type="file" class="form-control" id="picture" name="picture" accept="image/*">
+                        </div>
+
                         <div class="mb-3">
                             <label class="form-label">Beneficiary</label>
                             <div class="form-check">
@@ -321,42 +327,55 @@
                 const url = isUpdate ? '/data-entry/api/welfare/medical/update' : '/data-entry/api/welfare/medical/add';
                 
                 const beneficiary = document.querySelector('input[name="beneficiary"]:checked').value;
+                const transNo = transNoInput.value;
+                const entryDate = entryDateInput.value;
+                const pfno = empSelect.value;
+                const mCode = transSelect.value;
+                const amount = amountInput.value;
+                const dependant = beneficiary === 'Family' ? dependantSelect.options[dependantSelect.selectedIndex].text : 'Self';
                 
-                const payload = {
-                    transNo: transNoInput.value,
-                    entryDate: entryDateInput.value,
-                    pfno: empSelect.value,
-                    mCode: transSelect.value,
-                    beneficiary: beneficiary,
-                    dependant: beneficiary === 'Family' ? dependantSelect.options[dependantSelect.selectedIndex].text : 'Self',
-                    amount: amountInput.value
-                };
-
-                if (!payload.entryDate || !payload.pfno || !payload.mCode || !payload.amount) {
+                if (!entryDate || !pfno || !mCode || !amount) {
                     alert('Please fill all required fields');
                     return;
                 }
                 
-                if (beneficiary === 'Family' && (!payload.dependant || payload.dependant === 'Select Dependant...')) {
+                if (beneficiary === 'Family' && (!dependant || dependant === 'Select Dependant...')) {
                      alert('Please select a dependant');
                      return;
+                }
+
+                const formData = new FormData();
+                formData.append('transNo', transNo);
+                formData.append('entryDate', entryDate);
+                formData.append('pfno', pfno);
+                formData.append('mCode', mCode);
+                formData.append('amount', amount);
+                formData.append('beneficiary', beneficiary);
+                formData.append('dependant', dependant);
+                
+                const pictureInput = document.getElementById('picture');
+                if (pictureInput.files.length > 0) {
+                    formData.append('picture', pictureInput.files[0]);
                 }
 
                 try {
                     const response = await fetch(url, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
+                        body: formData
                     });
                     
                     const result = await response.json();
                     if (result.success) {
                         alert(result.message);
                         medicalModal.hide();
+                        
                         // Reload data if search field matches
-                        if (empIdSearch.value === payload.pfno) {
+                        if (empIdSearch.value === pfno) {
                             loadDataBtn.click();
                         }
+                        
+                        // Reset form
+                        resetForm();
                     } else {
                         alert(result.error || 'Error saving record');
                     }
@@ -374,6 +393,7 @@
                 transSelect.value = '';
                 transNameInput.value = '';
                 amountInput.value = '';
+                document.getElementById('picture').value = '';
                 document.getElementById('beneficiarySelf').checked = true;
                 dependantDiv.classList.add('d-none');
                 dependantSelect.innerHTML = '<option value="">Select Dependant...</option>';

@@ -128,7 +128,7 @@ const companiesListJson = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT CompanyID, Com_Name, TinNo, Address, Town, City, Country,
-              AccNo, Phone, Bank, PayingBank, Logopath, Email, Manager,
+              AccNo, Phone, Bank, PayingBank, LogoPath, Email, Manager,
               DateCreated, SubscriptionType, SubscriptionPlanType, NoOfStaffLeft, StaffCapacity
        FROM tblcominfo
        ORDER BY CompanyID DESC`

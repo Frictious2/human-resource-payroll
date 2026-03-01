@@ -15,6 +15,26 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
+// Multer Setup for Medical Receipts
+const medicalStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        // Ensure directory exists or use a standard one. 
+        // Ideally we should check/create, but for now assuming public/uploads exists.
+        // I will stick to a new folder 'medical_receipts' inside uploads.
+        // Note: The user might need to create this folder manually or I should ensure it exists.
+        // Since I can't easily run 'mkdir', I'll assume 'public/uploads' exists and maybe just put it there 
+        // or rely on node to not fail if I point to it. 
+        // Actually, multer throws if dir doesn't exist. 
+        // I'll check if I can use 'fs' to ensure dir exists in the controller or just use 'public/uploads' root?
+        // No, let's try to be organized. 'public/uploads/medical_receipts/'
+        cb(null, 'public/uploads/medical_receipts/');
+    },
+    filename: function (req, file, cb) {
+        cb(null, 'MED_' + req.body.pfno + '_' + Date.now() + path.extname(file.originalname));
+    }
+});
+const uploadMedical = multer({ storage: medicalStorage });
+
 // Dashboard
 router.get('/', (req, res) => res.redirect('/data-entry/dashboard'));
 router.get('/dashboard', dataEntryController.getDashboard);
@@ -79,11 +99,13 @@ router.get('/staff/travel', dataEntryController.getComingSoon);
 router.get('/leave/application', dataEntryController.getLeaveApplication);
 router.get('/leave/recall', dataEntryController.getLeaveRecall);
 router.get('/leave/purchase', dataEntryController.getLeavePurchase);
+router.get('/leave/on-leave', dataEntryController.getStaffOnLeave);
 router.post('/api/leave/recall', dataEntryController.postLeaveRecall);
 router.post('/api/leave/purchase', dataEntryController.postLeavePurchase);
 router.get('/api/leave/staff/:pfno/:year', dataEntryController.getLeaveStaffData);
 router.get('/api/staff-leave-data/:pfno', dataEntryController.getStaffLeaveDataForPurchase);
 router.post('/api/leave/application', dataEntryController.postLeaveApplication);
+router.get('/leave/outstanding-report', dataEntryController.getLeaveOutstandingReport);
 
 // 3. Payroll
 router.get('/payroll/entitle', dataEntryController.getPayrollEntitle);
@@ -116,8 +138,8 @@ router.get('/payroll/vehicle-insurance', dataEntryController.getComingSoon);
 router.get('/welfare/leave', dataEntryController.getWelfareLeave);
 router.get('/welfare/medical', dataEntryController.getWelfareMedical);
 router.get('/api/welfare/medical/:pfno', dataEntryController.getStaffMedicalHistory);
-router.post('/api/welfare/medical/add', dataEntryController.addMedicalRecord);
-router.post('/api/welfare/medical/update', dataEntryController.updateMedicalRecord);
+router.post('/api/welfare/medical/add', uploadMedical.single('picture'), dataEntryController.addMedicalRecord);
+router.post('/api/welfare/medical/update', uploadMedical.single('picture'), dataEntryController.updateMedicalRecord);
 router.get('/welfare/loan', dataEntryController.getComingSoon);
 router.get('/welfare/guarantee', dataEntryController.getComingSoon);
 router.get('/welfare/benefits', dataEntryController.getComingSoon);

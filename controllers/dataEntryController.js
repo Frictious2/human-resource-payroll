@@ -588,8 +588,8 @@ const dataEntryController = {
         try {
             const { month, year } = req.body;
 
-            const [comRows] = await pool.query('SELECT Com_Name, Address, Logopath FROM tblcominfo LIMIT 1');
-            const company = comRows[0] || { Com_Name: 'Human Resource Payroll', Address: '', Logopath: '' };
+            const [comRows] = await pool.query('SELECT Com_Name, Address, LogoPath FROM tblcominfo LIMIT 1');
+            const company = comRows[0] || { Com_Name: 'Human Resource Payroll', Address: '', LogoPath: '' };
 
             const m = parseInt(month, 10);
             const y = parseInt(year, 10);
@@ -1095,8 +1095,8 @@ const dataEntryController = {
         try {
             const { month, year, scope, pfno, yearly } = req.query;
 
-            const [comRows] = await pool.query('SELECT Com_Name, Address, Logopath FROM tblcominfo LIMIT 1');
-            const company = comRows[0] || { Com_Name: '', Address: '', Logopath: null };
+            const [comRows] = await pool.query('SELECT Com_Name, Address, LogoPath FROM tblcominfo LIMIT 1');
+            const company = comRows[0] || { Com_Name: '', Address: '', LogoPath: null };
 
             let query = `
                 SELECT 
@@ -1212,7 +1212,7 @@ const dataEntryController = {
                 company: {
                     name: company.Com_Name,
                     address: company.Address,
-                    logo: company.Logopath
+                    logo: company.LogoPath ? `${req.protocol}://${req.get('host')}${company.LogoPath}` : null
                 },
                 period: { month, year },
                 labels: {
@@ -1537,8 +1537,8 @@ const dataEntryController = {
 
     getWelfareRedundancy: async (req, res) => {
         try {
-            const [comRows] = await pool.query('SELECT Com_Name, Address, Logopath FROM tblcominfo LIMIT 1');
-            const company = comRows[0] || { Com_Name: 'Human Resource Payroll', Address: '', Logopath: null };
+            const [comRows] = await pool.query('SELECT Com_Name, Address, LogoPath FROM tblcominfo LIMIT 1');
+            const company = comRows[0] || { Com_Name: 'Human Resource Payroll', Address: '', LogoPath: null };
             res.render('data_entry/welfare/redundancy', {
                 title: 'Redundancy',
                 group: 'Welfare',
@@ -1644,25 +1644,8 @@ const dataEntryController = {
             const { entryDate, pfno, mCode, beneficiary, dependant, amount } = req.body;
             const operator = (req.session && req.session.user && req.session.user.name) ? req.session.user.name : 'Data Entry Officer';
             
-            // Check Medical Limit
-            const [limitRows] = await pool.query(`
-                SELECT g.Medical 
-                FROM tblstaff s 
-                JOIN tblgrade g ON s.CGrade = g.GradeCode 
-                WHERE s.PFNo = ?
-            `, [pfno]);
-            const limit = limitRows[0] ? (parseFloat(limitRows[0].Medical) || 0) : 0;
-
-            const [usageRows] = await pool.query('SELECT SUM(Amount) as usedAmount FROM tblmedical WHERE PFNo = ?', [pfno]);
-            const currentUsed = parseFloat(usageRows[0].usedAmount) || 0;
-            const newAmount = parseFloat(amount) || 0;
-
-            if (currentUsed + newAmount > limit) {
-                return res.status(400).json({ 
-                    success: false, // Ensure frontend handles this
-                    error: `Medical limit exceeded. Limit: ${limit}, Used: ${currentUsed}, Available: ${limit - currentUsed}` 
-                });
-            }
+            // Get Picture Path
+            const picturePath = req.file ? '/uploads/medical_receipts/' + req.file.filename : null;
 
             // Generate TransNo
             const [maxRows] = await pool.query('SELECT MAX(TransNo) as maxId FROM tblmedical');
@@ -1671,8 +1654,8 @@ const dataEntryController = {
             const depName = (beneficiary === 'Family') ? dependant : 'Self';
             
             await pool.query(
-                'INSERT INTO tblmedical (TransNo, EntryDate, PFNo, Dependant, MCode, Amount, TimeKeyed, CompanyID) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)',
-                [transNo, entryDate, pfno, depName, mCode, newAmount, 1] // Assuming CompanyID 1
+                'INSERT INTO tblmedical (TransNo, EntryDate, PFNo, Dependant, MCode, Amount, PicturePath, TimeKeyed, CompanyID) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?)',
+                [transNo, entryDate, pfno, depName, mCode, parseFloat(amount) || 0, picturePath, 1] // Assuming CompanyID 1
             );
 
             res.json({ success: true, message: 'Medical record added successfully' });
@@ -1686,32 +1669,22 @@ const dataEntryController = {
         try {
             const { transNo, entryDate, pfno, mCode, beneficiary, dependant, amount } = req.body;
             
-            // Check Medical Limit
-            const [limitRows] = await pool.query(`
-                SELECT g.Medical 
-                FROM tblstaff s 
-                JOIN tblgrade g ON s.CGrade = g.GradeCode 
-                WHERE s.PFNo = ?
-            `, [pfno]);
-            const limit = limitRows[0] ? (parseFloat(limitRows[0].Medical) || 0) : 0;
-
-            const [usageRows] = await pool.query('SELECT SUM(Amount) as usedAmount FROM tblmedical WHERE PFNo = ? AND TransNo != ?', [pfno, transNo]);
-            const currentUsed = parseFloat(usageRows[0].usedAmount) || 0;
-            const newAmount = parseFloat(amount) || 0;
-
-            if (currentUsed + newAmount > limit) {
-                return res.status(400).json({ 
-                     success: false,
-                     error: `Medical limit exceeded. Limit: ${limit}, Used (others): ${currentUsed}, Available: ${limit - currentUsed}` 
-                });
-            }
+            // Note: Removed Medical Limit Check as per request
 
             const depName = (beneficiary === 'Family') ? dependant : 'Self';
 
-            await pool.query(
-                'UPDATE tblmedical SET EntryDate = ?, PFNo = ?, Dependant = ?, MCode = ?, Amount = ? WHERE TransNo = ?',
-                [entryDate, pfno, depName, mCode, newAmount, transNo]
-            );
+            let query = 'UPDATE tblmedical SET EntryDate = ?, PFNo = ?, Dependant = ?, MCode = ?, Amount = ?';
+            const params = [entryDate, pfno, depName, mCode, parseFloat(amount) || 0];
+
+            if (req.file) {
+                query += ', PicturePath = ?';
+                params.push('/uploads/medical_receipts/' + req.file.filename);
+            }
+
+            query += ' WHERE TransNo = ?';
+            params.push(transNo);
+
+            await pool.query(query, params);
 
             res.json({ success: true, message: 'Medical record updated successfully' });
         } catch (error) {
@@ -2340,11 +2313,12 @@ const dataEntryController = {
                 return res.status(400).json({ error: 'No applicants provided' });
             }
 
-            const [comRows] = await pool.query('SELECT Com_Name, Logopath FROM tblcominfo LIMIT 1');
+            const [comRows] = await pool.query('SELECT Com_Name, LogoPath FROM tblcominfo LIMIT 1');
             const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
-            const logoPath = comRows[0] ? comRows[0].Logopath : null; // In real app, might need full URL
+            const logoPath = comRows[0] ? comRows[0].LogoPath : null;
 
             const nodemailer = require('nodemailer');
+            const path = require('path');
             const transporter = nodemailer.createTransport({
                 host: process.env.SMTP_HOST,
                 port: process.env.SMTP_PORT,
@@ -2381,8 +2355,8 @@ const dataEntryController = {
                     subject: 'Interview Invitation',
                     html: html,
                     attachments: logoPath ? [{
-                        filename: 'logo.png', // Adjust extension based on actual file
-                        path: logoPath, // Ensure this is a valid filesystem path or URL
+                        filename: 'logo.png',
+                        path: path.join(process.cwd(), 'public', logoPath),
                         cid: 'companyLogo'
                     }] : []
                 };
@@ -3494,6 +3468,146 @@ const dataEntryController = {
         }
     },
 
+    // Leave Outstanding Report
+    getLeaveOutstandingReport: async (req, res) => {
+        try {
+            const { year, type, filter, staffId } = req.query;
+            
+            // Get Company Info for Header
+            const [companyRows] = await pool.query("SELECT * FROM tblcominfo LIMIT 1");
+            const company = companyRows[0];
+            
+            let query = "";
+            let params = [];
+            
+            // Base parts for queries
+            const selectStaff = `
+                s.PFNo, s.SName, j.JobTitle, d.Dept,
+                COALESCE(g.LDays, 0) as LeaveDays,
+                (COALESCE(g.LDays, 0) - COALESCE((SELECT SUM(l2.Part) FROM tblleave l2 WHERE l2.PFNO = s.PFNo AND l2.LYear = ?), 0)) as OutstandingDays
+            `;
+            
+            const fromJoins = `
+                FROM tblstaff s
+                LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code
+                LEFT JOIN tblgrade g ON s.CGrade = g.GradeCode
+                LEFT JOIN tbldept d ON s.CDept = d.Code
+            `;
+
+            if (type === 'Outstanding') {
+                // Outstanding Leave Report
+                // Logic: Staff with balance > 0 for the given year
+                // Note: If no leave taken, balance = entitlement.
+                // We need to fetch ALL active staff and calculate balance.
+                
+                query = `
+                    SELECT ${selectStaff}
+                    ${fromJoins}
+                    WHERE s.EmpStatus = '01'
+                `;
+                
+                params.push(year); // For subquery
+
+                if (filter === 'Staff' && staffId) {
+                    query += " AND s.PFNo = ?";
+                    params.push(staffId);
+                }
+                
+                query += " GROUP BY s.PFNo HAVING OutstandingDays > 0 ORDER BY d.Dept, s.SName";
+                
+            } else if (type === 'Recalled') {
+                // Recalled Leave Report
+                // Logic: Staff with Recalled=1 in tblleave for the given year
+                
+                query = `
+                    SELECT 
+                        ${selectStaff},
+                        MAX(l.DateRecalled) as DateRecalled,
+                        SUM(l.Part) as DaysRecalledPart -- Summing parts if multiple recalled
+                    ${fromJoins}
+                    JOIN tblleave l ON s.PFNo = l.PFNO
+                    WHERE l.Recalled = 1 AND l.LYear = ?
+                `;
+                
+                params.push(year); // For subquery
+                params.push(year); // For main query
+
+                if (filter === 'Staff' && staffId) {
+                    query += " AND s.PFNo = ?";
+                    params.push(staffId);
+                }
+                
+                query += " GROUP BY s.PFNo ORDER BY d.Dept, s.SName";
+                
+            } else if (type === 'Purchased') {
+                // Purchased Leave Report
+                // Logic: Staff with DaysPurchased > 0 for the given year
+                
+                query = `
+                    SELECT 
+                        ${selectStaff},
+                        SUM(l.DaysPurchased) as DaysPurchased,
+                        SUM(l.Allowance) as Allowance
+                    ${fromJoins}
+                    JOIN tblleave l ON s.PFNo = l.PFNO
+                    WHERE l.DaysPurchased > 0 AND l.LYear = ?
+                `;
+                
+                params.push(year); // For subquery
+                params.push(year); // For main query
+
+                if (filter === 'Staff' && staffId) {
+                    query += " AND s.PFNo = ?";
+                    params.push(staffId);
+                }
+                
+                query += " GROUP BY s.PFNo ORDER BY d.Dept, s.SName";
+            }
+
+            const [reportData] = await pool.query(query, params);
+            
+            // Format dates if needed
+            if (type === 'Recalled') {
+                reportData.forEach(row => {
+                    if (row.DateRecalled) {
+                        row.DateRecalled = new Date(row.DateRecalled).toLocaleDateString();
+                    }
+                });
+            }
+
+            // Render the preview page
+            // We use a new view for the report
+            
+            // Fix LogoPath URL
+            let logoUrl = null;
+            if (company && company.LogoPath) {
+                // Normalize slashes
+                let cleanPath = company.LogoPath.replace(/\\/g, '/');
+                // Ensure it starts with /
+                if (!cleanPath.startsWith('/')) {
+                    cleanPath = '/' + cleanPath;
+                }
+                // Construct full URL
+                logoUrl = `${req.protocol}://${req.get('host')}${cleanPath}`;
+            }
+
+            res.render('data_entry/leave/report_preview', {
+                title: `${type} Leave Report - ${year}`,
+                reportData,
+                type,
+                year,
+                company: {
+                    ...company,
+                    LogoPath: logoUrl
+                }
+            });
+
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error: ' + error.message);
+        }
+    },
+
     getLeaveRecall: async (req, res) => {
         try {
             const query = `
@@ -3576,6 +3690,44 @@ const dataEntryController = {
         }
     },
 
+    getStaffOnLeave: async (req, res) => {
+        try {
+            // Get Company Info for Letterhead
+            const [comInfo] = await pool.query('SELECT Com_Name, Address, LogoPath FROM tblcominfo LIMIT 1');
+            
+            // Get Staff On Leave
+            const query = `
+                SELECT 
+                    l.PFNO,
+                    s.SName,
+                    t.LeaveType,
+                    l.StartDate,
+                    l.ResumptionDate
+                FROM tblleave l
+                JOIN tblstaff s ON l.PFNO = s.PFNo
+                LEFT JOIN tblleavetype t ON l.LType = t.Code
+                WHERE l.Approved = 1 
+                AND l.Recalled = 0
+                AND l.Resumed = 0
+                AND l.StartDate <= CURDATE()
+                AND l.ResumptionDate >= CURDATE()
+                ORDER BY l.StartDate DESC
+            `;
+            const [staffOnLeave] = await pool.query(query);
+
+            res.render('data_entry/leave/on_leave', {
+                title: 'Staff On Leave',
+                path: '/data-entry/leave/on-leave',
+                user: req.session.user || { name: 'Data Entry' },
+                staffOnLeave,
+                comInfo: comInfo[0] || {}
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
     getLeavePurchase: async (req, res) => {
         try {
             // Fetch Staff List
@@ -3628,9 +3780,9 @@ const dataEntryController = {
             const [gradeRows] = await pool.query("SELECT LDays FROM tblgrade WHERE GradeCode = ?", [gradeCode]);
             const entitledDays = gradeRows.length > 0 ? (gradeRows[0].LDays || 0) : 0;
             
-            // Calculate Used Days (including pending approvals if needed, but usually approved ones)
-            // Assuming Part holds the days taken.
-            const [leaveRows] = await pool.query("SELECT Part FROM tblleave WHERE PFNO = ? AND LYear = ? AND Approved = 1", [pfno, year]);
+            // Calculate Used Days (Approved or Pending)
+            // Including pending to prevent double-spending
+            const [leaveRows] = await pool.query("SELECT Part FROM tblleave WHERE PFNO = ? AND LYear = ? AND (Approved = 1 OR Approved = 0)", [pfno, year]);
             let usedDays = 0;
             leaveRows.forEach(r => {
                 usedDays += (r.Part || 0);
@@ -3656,10 +3808,28 @@ const dataEntryController = {
                 amount, datePurchased, purchased, method, bank, bban
             } = req.body;
             
-            // Validation
-            // We should re-verify availability here, but trusting the client for now + basic check
-            // Ideally re-run getStaffLeaveDataForPurchase logic
+            // Validation: Ensure purchased days do not exceed available days
+            const [staffRows] = await pool.query("SELECT CGrade FROM tblstaff WHERE PFNo = ?", [pfno]);
+            if (staffRows.length === 0) return res.status(404).json({ error: 'Staff not found' });
             
+            const gradeCode = staffRows[0].CGrade;
+            const [gradeRows] = await pool.query("SELECT LDays FROM tblgrade WHERE GradeCode = ?", [gradeCode]);
+            const entitledDays = gradeRows.length > 0 ? (gradeRows[0].LDays || 0) : 0;
+            
+            // Check used days (including pending requests)
+            const [leaveRows] = await pool.query("SELECT Part FROM tblleave WHERE PFNO = ? AND LYear = ? AND (Approved = 1 OR Approved = 0)", [pfno, lyear]);
+            let usedDays = 0;
+            leaveRows.forEach(r => {
+                usedDays += (r.Part || 0);
+            });
+            
+            const availableDays = entitledDays - usedDays;
+            const daysPurchasedNum = parseInt(daysPurchased, 10);
+            
+            if (daysPurchasedNum > availableDays) {
+                return res.status(400).json({ error: `Cannot purchase ${daysPurchasedNum} days. Only ${availableDays} days available.` });
+            }
+
             // Get Max LCount
             const [maxRows] = await pool.query("SELECT MAX(LCount) as maxCount FROM tblleave");
             const nextCount = (maxRows[0].maxCount || 0) + 1;
@@ -3670,8 +3840,8 @@ const dataEntryController = {
                     DaysPurchased, DatePurchased, Purchased, 
                     Allowance, Method, Bank, BBAN, 
                     StartDate, Approved, CompanyID,
-                    Part
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1, ?)
+                    Part, Deduct, Holidays, WithPay, Resumed, Recalled, EntryPassed
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1, ?, ?, ?, ?, ?, ?, ?)
             `;
             
             // Note: StartDate is used for "Date" as per user request.
@@ -3679,13 +3849,25 @@ const dataEntryController = {
             // Part: Should purchase reduce available days? Usually yes.
             // "Number of days that will be purchased must not exceed the outstanding days value"
             // This implies it consumes the leave days. So Part = DaysPurchased.
+            // Deduct: Set to -1 as per user request for purchases
+            // Holidays: Set to 0 as per user request
+            // WithPay: Set to -1 as per user request
+            // Resumed: Set to 1 as per user request
+            // Recalled: Set to 0 as per user request
+            // EntryPassed: Set to 0 as per user request
             
             const params = [
                 nextCount, pfno, ltypeCode || '08', lyear,
                 daysPurchased, datePurchased, purchased || 0,
                 amount, method, bank || null, bban || null,
                 datePurchased, // StartDate
-                daysPurchased // Part
+                daysPurchased, // Part
+                -1, // Deduct
+                0, // Holidays
+                -1, // WithPay
+                1, // Resumed
+                0, // Recalled
+                0 // EntryPassed
             ];
             
             await pool.query(query, params);

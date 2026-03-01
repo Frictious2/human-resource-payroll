@@ -3072,6 +3072,7 @@ CREATE TABLE `tblentert` (
   `AccountNo` varchar(16) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
   `TCode` varchar(2) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
   `Amount` double DEFAULT NULL,
+  `PicturePath` varchar(255) DEFAULT NULL,
   `TimeKeyed` datetime(3) DEFAULT NULL,
   `CompanyID` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;

@@ -68,7 +68,7 @@ async function updateCompanyInfo(req, res) {
             AccNo, Phone, Bank, PayingBank, Email, Manager
         } = req.body;
 
-        const Logopath = req.file ? '/uploads/' + req.file.filename : req.body.currentLogo;
+        const LogoPath = req.file ? '/uploads/' + req.file.filename : req.body.currentLogo;
 
         // Check if company record exists
         const [rows] = await pool.query('SELECT CompanyID FROM tblcominfo LIMIT 1');
@@ -78,18 +78,18 @@ async function updateCompanyInfo(req, res) {
             await pool.query(
                 `UPDATE tblcominfo SET 
                     Com_Name=?, TinNo=?, Address=?, Town=?, City=?, Country=?, 
-                    AccNo=?, Phone=?, Bank=?, PayingBank=?, Email=?, Manager=?, Logopath=? 
+                    AccNo=?, Phone=?, Bank=?, PayingBank=?, Email=?, Manager=?, LogoPath=? 
                  WHERE CompanyID=?`,
-                [Com_Name, TinNo, Address, Town, City, Country, AccNo, Phone, Bank, PayingBank, Email, Manager, Logopath, rows[0].CompanyID]
+                [Com_Name, TinNo, Address, Town, City, Country, AccNo, Phone, Bank, PayingBank, Email, Manager, LogoPath, rows[0].CompanyID]
             );
         } else {
             // Insert
             await pool.query(
                 `INSERT INTO tblcominfo (
                     Com_Name, TinNo, Address, Town, City, Country, 
-                    AccNo, Phone, Bank, PayingBank, Email, Manager, Logopath, DateCreated
+                    AccNo, Phone, Bank, PayingBank, Email, Manager, LogoPath, DateCreated
                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-                [Com_Name, TinNo, Address, Town, City, Country, AccNo, Phone, Bank, PayingBank, Email, Manager, Logopath]
+                [Com_Name, TinNo, Address, Town, City, Country, AccNo, Phone, Bank, PayingBank, Email, Manager, LogoPath]
             );
         }
 

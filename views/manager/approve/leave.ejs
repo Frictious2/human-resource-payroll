@@ -62,7 +62,7 @@
                             <i class="bi bi-calendar2-check fs-1 text-info mb-3"></i>
                             <h5 class="card-title">On Leave</h5>
                             <p class="card-text text-muted">View staff currently on leave</p>
-                            <a href="#" class="btn btn-outline-info stretched-link">View On Leave</a>
+                            <a href="/manager/approve/on-leave" class="btn btn-outline-info stretched-link">View On Leave</a>
                         </div>
                     </div>
                 </div>
@@ -74,7 +74,7 @@
                             <i class="bi bi-hourglass-bottom fs-1 text-danger mb-3"></i>
                             <h5 class="card-title">Outstanding Leave</h5>
                             <p class="card-text text-muted">View outstanding balances</p>
-                            <a href="#" class="btn btn-outline-danger stretched-link">View Outstanding</a>
+                            <button type="button" class="btn btn-outline-danger stretched-link" data-bs-toggle="modal" data-bs-target="#outstandingModal">View Outstanding</button>
                         </div>
                     </div>
                 </div>
@@ -85,6 +85,68 @@
             </footer>
         </div>
     </main>
+
+    <!-- Outstanding Report Modal -->
+    <div class="modal fade" id="outstandingModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">View Outstanding Leave</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="outstandingForm" action="/manager/leave/outstanding-report" method="GET" target="_blank">
+                        <div class="mb-3">
+                            <label class="form-label">Filter By</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="filter" id="filterAll" value="All" checked onchange="toggleStaffInput()">
+                                <label class="form-check-label" for="filterAll">All Staff</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="filter" id="filterStaff" value="Staff" onchange="toggleStaffInput()">
+                                <label class="form-check-label" for="filterStaff">Specific Staff</label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3" id="staffInputContainer" style="display: none;">
+                            <label class="form-label">Staff ID / PF No</label>
+                            <input type="text" class="form-control" name="staffId" placeholder="Enter Staff ID">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Leave Type</label>
+                            <select class="form-select" name="type" required>
+                                <option value="Outstanding">Outstanding (Balance > 0)</option>
+                                <option value="Recalled">Recalled</option>
+                                <option value="Purchased">Purchased</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Year</label>
+                            <input type="number" class="form-control" name="year" value="<%= new Date().getFullYear() %>" required>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100">Generate Report</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleStaffInput() {
+            const isStaff = document.getElementById('filterStaff').checked;
+            document.getElementById('staffInputContainer').style.display = isStaff ? 'block' : 'none';
+            const staffInput = document.querySelector('input[name="staffId"]');
+            if (isStaff) staffInput.setAttribute('required', 'required');
+            else {
+                staffInput.removeAttribute('required');
+                staffInput.value = '';
+            }
+        }
+    </script>
+
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/js/scripts.js"></script>

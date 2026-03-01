@@ -48,8 +48,8 @@
                             <!-- Logo Section -->
                             <div class="col-md-12 text-center mb-3">
                                 <div class="mb-2">
-                                    <% if (company.Logopath) { %>
-                                        <img src="<%= company.Logopath %>" alt="Company Logo" class="img-thumbnail" style="max-height: 150px;">
+                                    <% if (company.LogoPath) { %>
+                                        <img src="<%= company.LogoPath %>" alt="Company Logo" class="img-thumbnail" style="max-height: 150px;">
                                     <% } else { %>
                                         <div class="text-muted p-4 border rounded bg-light d-inline-block">
                                             <i class="bi bi-image fs-1"></i>
@@ -60,7 +60,7 @@
                                 <div class="col-md-4 mx-auto">
                                     <label for="logo" class="form-label">Update Logo</label>
                                     <input class="form-control" type="file" id="logo" name="logo" accept="image/*">
-                                    <input type="hidden" name="currentLogo" value="<%= company.Logopath || '' %>">
+                                    <input type="hidden" name="currentLogo" value="<%= company.LogoPath || '' %>">
                                 </div>
                             </div>
 

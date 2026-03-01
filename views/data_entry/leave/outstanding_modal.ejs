@@ -1,0 +1,65 @@
+<!-- Outstanding Report Modal -->
+<div class="modal fade" id="outstandingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">View Outstanding Leave</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="outstandingForm" action="/data-entry/leave/outstanding-report" method="GET" target="_blank">
+                    <div class="mb-3">
+                        <label class="form-label">Filter By</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="filter" id="filterAll" value="All" checked onchange="toggleStaffInput()">
+                            <label class="form-check-label" for="filterAll">All Staff</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="filter" id="filterStaff" value="Staff" onchange="toggleStaffInput()">
+                            <label class="form-check-label" for="filterStaff">Specific Staff</label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3" id="staffInputContainer" style="display: none;">
+                        <label class="form-label">Staff ID / PF No</label>
+                        <input type="text" class="form-control" name="staffId" placeholder="Enter Staff ID">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Leave Type</label>
+                        <select class="form-select" name="type" required>
+                            <option value="Outstanding">Outstanding (Balance > 0)</option>
+                            <option value="Recalled">Recalled</option>
+                            <option value="Purchased">Purchased</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Year</label>
+                        <input type="number" class="form-control" name="year" value="<%= new Date().getFullYear() %>" required>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">Generate Report</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleStaffInput() {
+        const isStaff = document.getElementById('filterStaff').checked;
+        const container = document.getElementById('staffInputContainer');
+        const staffInput = document.querySelector('#outstandingModal input[name="staffId"]');
+        
+        if (container && staffInput) {
+            container.style.display = isStaff ? 'block' : 'none';
+            if (isStaff) {
+                staffInput.setAttribute('required', 'required');
+            } else {
+                staffInput.removeAttribute('required');
+                staffInput.value = '';
+            }
+        }
+    }
+</script>

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const managerController = require('../controllers/managerController');
+const dataEntryController = require('../controllers/dataEntryController');
 
 // Dashboard
 router.get('/', (req, res) => res.redirect('/manager/dashboard'));
@@ -42,6 +43,8 @@ router.get('/approve/leave-recall', managerController.getLeaveRecallApproval);
 router.post('/api/approve/leave-recall', managerController.postLeaveRecallApproval);
 router.get('/approve/leave-purchase', managerController.getApproveLeavePurchase);
 router.post('/api/approve/leave-purchase', managerController.postApproveLeavePurchase);
+router.get('/approve/on-leave', managerController.getStaffOnLeave);
+router.get('/leave/outstanding-report', dataEntryController.getLeaveOutstandingReport);
 router.get('/approve/interview', managerController.getComingSoon);
 router.get('/approve/promotion-demotion', managerController.getApprovePromotionDemotion);
 router.post('/approve/promotion-demotion', managerController.postApprovePromotion);

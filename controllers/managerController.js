@@ -64,6 +64,44 @@ const managerController = {
         }
     },
 
+    getStaffOnLeave: async (req, res) => {
+        try {
+            // Get Company Info for Letterhead
+            const [comInfo] = await pool.query('SELECT Com_Name, Address, LogoPath FROM tblcominfo LIMIT 1');
+            
+            // Get Staff On Leave
+            const query = `
+                SELECT 
+                    l.PFNO,
+                    s.SName,
+                    t.LeaveType,
+                    l.StartDate,
+                    l.ResumptionDate
+                FROM tblleave l
+                JOIN tblstaff s ON l.PFNO = s.PFNo
+                LEFT JOIN tblleavetype t ON l.LType = t.Code
+                WHERE l.Approved = 1 
+                AND l.Recalled = 0
+                AND l.Resumed = 0
+                AND l.StartDate <= CURDATE()
+                AND l.ResumptionDate >= CURDATE()
+                ORDER BY l.StartDate DESC
+            `;
+            const [staffOnLeave] = await pool.query(query);
+
+            res.render('manager/approve/on_leave', {
+                title: 'Staff On Leave',
+                path: '/manager/approve/on-leave',
+                user: req.session.user || { name: 'Manager' },
+                staffOnLeave,
+                comInfo: comInfo[0] || {}
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
     getApproveIncomeSetup: async (req, res) => {
       try {
           const [rows] = await pool.query(`
@@ -1108,7 +1146,7 @@ const managerController = {
                 const staff = staffRows[0];
 
                 // Fetch Company Info
-                const [comRows] = await pool.query('SELECT Com_Name, Address, Logopath FROM tblcominfo LIMIT 1');
+                const [comRows] = await pool.query('SELECT Com_Name, Address, LogoPath FROM tblcominfo LIMIT 1');
                 const company = comRows[0];
 
                 // Fetch HOD from Parameters
@@ -1449,7 +1487,6 @@ const managerController = {
         }
     },
 
-    // Leave Purchase Approval
     getApproveLeavePurchase: async (req, res) => {
         try {
             const query = `
@@ -1463,22 +1500,22 @@ const managerController = {
                     l.DatePurchased,
                     l.Method,
                     l.Bank,
-                    l.BBAN
+                    l.BBAN,
+                    p.PayThrough
                 FROM tblleave l
                 JOIN tblstaff s ON l.PFNO = s.PFNo
-                WHERE l.Approved = 0 AND l.LType = '08'
+                LEFT JOIN tblpaythrough p ON l.Method = p.Code
+                WHERE l.Approved = 0 AND (l.LType = '08' OR l.LType = 'PURCHASE')
                 ORDER BY l.DatePurchased DESC
             `;
-            
-            const [pendingPurchases] = await pool.query(query);
+            const [rows] = await pool.query(query);
 
             res.render('manager/approve/leave_purchase', {
                 title: 'Approve Leave Purchase',
                 path: '/manager/approve/leave-purchase',
                 user: req.session.user || { name: 'Manager' },
-                pendingPurchases
+                pendingPurchases: rows
             });
-
         } catch (error) {
             console.error(error);
             res.status(500).send('Server Error');
@@ -1487,21 +1524,21 @@ const managerController = {
 
     postApproveLeavePurchase: async (req, res) => {
         try {
-            const { id, status } = req.body;
-            const operator = req.session.user ? req.session.user.name : 'Manager';
+            const { lCount, action } = req.body;
+            // action: 'approve' or 'reject'
+            const status = action === 'approve' ? 1 : 2;
+            const user = req.session.user ? req.session.user.name : 'Manager';
             const now = new Date();
-            
-            // 1 = Approved, 2 = Rejected
-            
+
             await pool.query(
                 'UPDATE tblleave SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE LCount = ?',
-                [status, operator, now, now, id]
+                [status, user, now, now, lCount]
             );
 
-            res.json({ success: true });
+            res.redirect('/manager/approve/leave-purchase');
         } catch (error) {
             console.error(error);
-            res.status(500).json({ error: 'Server Error' });
+            res.status(500).send('Server Error');
         }
     }
 };
