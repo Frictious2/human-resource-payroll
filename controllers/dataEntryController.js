@@ -1614,7 +1614,8 @@ const dataEntryController = {
                     m.Dependant,
                     m.MCode,
                     mc.TransName,
-                    m.Amount
+                    m.Amount,
+                    m.PicturePath
                 FROM tblmedical m
                 LEFT JOIN tblMCode mc ON m.MCode = mc.TCode
                 WHERE m.PFNo = ?
@@ -1659,6 +1660,163 @@ const dataEntryController = {
             );
 
             res.json({ success: true, message: 'Medical record added successfully' });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    getWelfareLoan: async (req, res) => {
+        try {
+            // Fetch Staff for dropdown
+            const [staffList] = await pool.query('SELECT PFNo, SName, AccountNo FROM tblstaff ORDER BY SName');
+            
+            // Fetch Loan Transaction Types
+            const [loanCodes] = await pool.query('SELECT TCode, TransName FROM tblloancode ORDER BY TransName');
+
+            // Fetch Existing Loans for Application Table
+            const [applications] = await pool.query(`
+                SELECT 
+                    l.TransNo,
+                    l.EntryDate,
+                    l.PFNo,
+                    s.SName,
+                    l.Amount,
+                    l.Interest
+                FROM tblloan l
+                LEFT JOIN tblstaff s ON l.PFNo = s.PFNo
+                ORDER BY l.EntryDate DESC
+            `);
+
+            // Fetch Repayment Data (Loans with balance > 0 or recently active)
+            const [repayments] = await pool.query(`
+                SELECT 
+                    l.TransNo,
+                    l.PFNo,
+                    s.SName,
+                    l.Amount,
+                    l.EntryDate as LoanDate,
+                    l.Duration,
+                    l.RepaidAmount,
+                    l.LoanBal,
+                    l.StartDate,
+                    l.ExpDate,
+                    l.Repayment
+                FROM tblloan l
+                LEFT JOIN tblstaff s ON l.PFNo = s.PFNo
+                WHERE l.LoanBal > 0 OR l.RepaidAmount > 0
+                ORDER BY l.EntryDate DESC
+            `);
+
+            res.render('data_entry/welfare/loan', {
+                title: 'Staff Loan',
+                group: 'Welfare',
+                path: '/data-entry/welfare/loan',
+                user: { name: 'Data Entry Clerk' },
+                staffList,
+                loanCodes,
+                applications,
+                repayments
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getStaffLoanHistory: async (req, res) => {
+        try {
+            const { pfno } = req.params;
+            
+            // Get last loan details
+            const [loans] = await pool.query(`
+                SELECT * FROM tblloan 
+                WHERE PFNo = ? 
+                ORDER BY EntryDate DESC 
+                LIMIT 1
+            `, [pfno]);
+
+            let lastLoan = null;
+            if (loans.length > 0) {
+                const l = loans[0];
+                lastLoan = {
+                    EntryDate: l.EntryDate,
+                    Amount: l.Amount,
+                    Completed: (l.LoanBal <= 0) ? 'Yes' : 'No'
+                };
+            }
+
+            res.json({ lastLoan });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    postWelfareLoanAdd: async (req, res) => {
+        try {
+            const {
+                entryDate, pfno, lTrans, amount, duration,
+                monthlyRepayment, interest, monthlyInt, startDate, surcharge
+            } = req.body;
+
+            // Calculate Balance (Amount + Interest)
+            const loanBal = parseFloat(amount) + parseFloat(interest || 0);
+            
+            // Calculate Expiry Date based on StartDate + Duration (months)
+            const start = new Date(startDate);
+            const expDate = new Date(start.setMonth(start.getMonth() + parseInt(duration)));
+
+            // Get Max TransNo
+            const [maxRows] = await pool.query("SELECT MAX(TransNo) as maxNo FROM tblloan");
+            const nextTransNo = (maxRows[0].maxNo || 0) + 1;
+
+            const query = `
+                INSERT INTO tblloan (
+                    TransNo, EntryDate, PFNo, LTypeCode, LTrans, 
+                    Amount, Duration, DurationBal, Rate, 
+                    Repayment, Interest, MonthlyInt, MonthlyRepayment, 
+                    StartDate, ExpDate, LoanBal, RepaidAmount, 
+                    Approved, Expired, Reschedule, Repaid, CompanyID,
+                    Surcharge
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            
+            // Rate is 4% if duration > 5, else 0
+            const rate = parseInt(duration) > 5 ? 4 : 0;
+            const surchargeVal = surcharge === 'Yes' ? 'Yes' : 'No';
+
+            await pool.query(query, [
+                nextTransNo, entryDate, pfno, '01', lTrans,
+                amount, duration, duration, rate,
+                0, interest || 0, monthlyInt || 0, monthlyRepayment,
+                startDate, expDate, loanBal, 0,
+                0, 0, 0, 0, 1,
+                surchargeVal
+            ]);
+
+            res.json({ success: true, message: 'Loan application added successfully' });
+
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    postWelfareLoanRepayment: async (req, res) => {
+        try {
+            const {
+                transNo, repaymentDate, repaymentAmount, pfno
+            } = req.body;
+
+            // Insert into tblloanrepayment for Manager Approval
+            await pool.query(`
+                INSERT INTO tblloanrepayment (LoanTransNo, PFNo, Amount, DatePaid, Approved)
+                VALUES (?, ?, ?, ?, 0)
+            `, [transNo, pfno, parseFloat(repaymentAmount), repaymentDate]);
+
+            res.json({ success: true, message: 'Repayment submitted for approval' });
+
         } catch (error) {
             console.error(error);
             res.status(500).json({ error: 'Server Error' });
@@ -3877,6 +4035,69 @@ const dataEntryController = {
         } catch (error) {
             console.error(error);
             res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    getMedicalReports: async (req, res) => {
+        try {
+            const { type, pfno, dateFrom, dateTo } = req.query;
+            let records = [];
+            let companyInfo = {};
+            const searchParams = { type, pfno, dateFrom, dateTo };
+
+            // Fetch Company Info
+            const [companyRows] = await pool.query('SELECT * FROM tblcominfo LIMIT 1');
+            companyInfo = companyRows[0] || {};
+
+            if (type) {
+                let query = `
+                    SELECT 
+                        m.TransNo,
+                        m.EntryDate,
+                        m.PFNo,
+                        s.SName,
+                        m.Dependant,
+                        mc.TransName as Description,
+                        m.Amount,
+                        m.PicturePath
+                    FROM tblmedical m
+                    LEFT JOIN tblstaff s ON m.PFNo = s.PFNo
+                    LEFT JOIN tblMCode mc ON m.MCode = mc.TCode
+                    WHERE 1=1
+                `;
+                const params = [];
+
+                if (type === 'specific' && pfno) {
+                    query += ' AND m.PFNo = ?';
+                    params.push(pfno);
+                }
+
+                if (dateFrom) {
+                    query += ' AND m.EntryDate >= ?';
+                    params.push(dateFrom);
+                }
+                if (dateTo) {
+                    query += ' AND m.EntryDate <= ?';
+                    params.push(dateTo);
+                }
+
+                query += ' ORDER BY m.EntryDate DESC';
+
+                const [rows] = await pool.query(query, params);
+                records = rows;
+            }
+
+            res.render('reports/medical', {
+                records,
+                companyInfo,
+                searchParams,
+                user: req.session.user || { name: 'User', role: 'data_entry' },
+                role: (req.session.user && req.session.user.role) ? req.session.user.role : 'data_entry',
+                path: req.path
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
         }
     }
 };

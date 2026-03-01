@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="/css/styles.css" rel="stylesheet">
+</head>
+<body>
+    <%- include('../partials/topbar') %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <h2 class="mb-4">Approve Loans</h2>
+
+            <!-- Tabs -->
+            <ul class="nav nav-tabs mb-4" id="loanTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab" aria-selected="true">Pending Loans</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="repayment-tab" data-bs-toggle="tab" data-bs-target="#repayment" type="button" role="tab" aria-selected="false">Pending Repayments</button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="loanTabsContent">
+                <!-- Pending Loans Tab -->
+                <div class="tab-pane fade show active" id="pending" role="tabpanel" aria-labelledby="pending-tab">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white py-3">
+                            <h5 class="mb-0 text-primary">Pending Loan Applications</h5>
+                        </div>
+                        <div class="card-body">
+                            <% if (loans && loans.length > 0) { %>
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>PFNo</th>
+                                                <th>Name</th>
+                                                <th>Type</th>
+                                                <th>Amount</th>
+                                                <th>Duration</th>
+                                                <th>Interest</th>
+                                                <th>Start Date</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <% loans.forEach(loan => { %>
+                                                <tr>
+                                                    <td><%= new Date(loan.EntryDate).toLocaleDateString() %></td>
+                                                    <td><%= loan.PFNo %></td>
+                                                    <td><%= loan.Name %></td>
+                                                    <td><%= loan.Type %></td>
+                                                    <td><%= parseFloat(loan.Amount).toFixed(2) %></td>
+                                                    <td><%= loan.Duration %> M</td>
+                                                    <td><%= parseFloat(loan.Interest || 0).toFixed(2) %></td>
+                                                    <td><%= new Date(loan.StartDate).toLocaleDateString() %></td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-primary" 
+                                                            onclick="viewLoan({
+                                                                transNo: '<%= loan.TransNo %>',
+                                                                entryDate: '<%= loan.EntryDate %>',
+                                                                pfno: '<%= loan.PFNo %>',
+                                                                name: '<%= loan.Name %>',
+                                                                account: '<%= loan.AccountNo %>',
+                                                                type: '<%= loan.Type %>',
+                                                                amount: '<%= loan.Amount %>',
+                                                                duration: '<%= loan.Duration %>',
+                                                                interest: '<%= loan.Interest %>',
+                                                                rate: '<%= loan.Rate %>',
+                                                                monthlyRepayment: '<%= loan.MonthlyRepayment %>',
+                                                                monthlyInt: '<%= loan.MonthlyInt %>',
+                                                                startDate: '<%= loan.StartDate %>',
+                                                                expDate: '<%= loan.ExpDate %>',
+                                                                balance: '<%= loan.LoanBal %>',
+                                                                surcharge: '<%= loan.Surcharge %>'
+                                                            })">
+                                                            View
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            <% }); %>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <% } else { %>
+                                <div class="alert alert-info">No pending loan applications.</div>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pending Repayments Tab -->
+                <div class="tab-pane fade" id="repayment" role="tabpanel" aria-labelledby="repayment-tab">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white py-3">
+                            <h5 class="mb-0 text-primary">Pending Repayment Approvals</h5>
+                        </div>
+                        <div class="card-body">
+                            <% if (repayments && repayments.length > 0) { %>
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Date Paid</th>
+                                                <th>PFNo</th>
+                                                <th>Name</th>
+                                                <th>Loan Amount</th>
+                                                <th>Current Balance</th>
+                                                <th>Repayment Amount</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <% repayments.forEach(rep => { %>
+                                                <tr>
+                                                    <td><%= new Date(rep.DatePaid).toLocaleDateString() %></td>
+                                                    <td><%= rep.PFNo %></td>
+                                                    <td><%= rep.Name %></td>
+                                                    <td><%= parseFloat(rep.LoanAmount).toFixed(2) %></td>
+                                                    <td><%= parseFloat(rep.CurrentBalance).toFixed(2) %></td>
+                                                    <td class="fw-bold text-success"><%= parseFloat(rep.Amount).toFixed(2) %></td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-success me-1" onclick="approveRepayment('<%= rep.RepayID %>', 'approve')">Approve</button>
+                                                        <button class="btn btn-sm btn-danger" onclick="approveRepayment('<%= rep.RepayID %>', 'reject')">Reject</button>
+                                                    </td>
+                                                </tr>
+                                            <% }); %>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <% } else { %>
+                                <div class="alert alert-info">No pending repayments.</div>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- View Loan Modal -->
+    <div class="modal fade" id="viewLoanModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Loan Application Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="fw-bold">Entry Date:</label>
+                            <p id="viewEntryDate"></p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="fw-bold">Applicant:</label>
+                            <p id="viewApplicant"></p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="fw-bold">Account No:</label>
+                            <p id="viewAccount"></p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="fw-bold">Loan Type:</label>
+                            <p id="viewType"></p>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="fw-bold">Amount:</label>
+                            <p id="viewAmount"></p>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="fw-bold">Duration:</label>
+                            <p id="viewDuration"></p>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="fw-bold">Interest Rate:</label>
+                            <p id="viewRate"></p>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="fw-bold">Monthly Repayment:</label>
+                            <p id="viewMonthlyRepayment"></p>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="fw-bold">Interest:</label>
+                            <p id="viewInterest"></p>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="fw-bold">Monthly Interest:</label>
+                            <p id="viewMonthlyInt"></p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="fw-bold">Start Date:</label>
+                            <p id="viewStartDate"></p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="fw-bold">End Date:</label>
+                            <p id="viewExpDate"></p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="fw-bold">Total Balance:</label>
+                            <p id="viewBalance"></p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="fw-bold text-danger">Surcharge Apply?</label>
+                            <p id="viewSurcharge" class="fw-bold"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-success" id="btnApprove">Approve</button>
+                    <button type="button" class="btn btn-danger" id="btnReject">Reject</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentTransNo = null;
+        let viewModal;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            viewModal = new bootstrap.Modal(document.getElementById('viewLoanModal'));
+            
+            document.getElementById('btnApprove').onclick = () => approveLoan(currentTransNo, 'approve');
+            document.getElementById('btnReject').onclick = () => approveLoan(currentTransNo, 'reject');
+        });
+
+        function viewLoan(data) {
+            currentTransNo = data.transNo;
+            
+            document.getElementById('viewEntryDate').textContent = new Date(data.entryDate).toLocaleString();
+            document.getElementById('viewApplicant').textContent = data.pfno + ' - ' + data.name;
+            document.getElementById('viewAccount').textContent = data.account || 'N/A';
+            document.getElementById('viewType').textContent = data.type;
+            document.getElementById('viewAmount').textContent = parseFloat(data.amount).toFixed(2);
+            document.getElementById('viewDuration').textContent = data.duration + ' Months';
+            document.getElementById('viewRate').textContent = data.rate + '%';
+            document.getElementById('viewMonthlyRepayment').textContent = parseFloat(data.monthlyRepayment).toFixed(2);
+            document.getElementById('viewInterest').textContent = parseFloat(data.interest || 0).toFixed(2);
+            document.getElementById('viewMonthlyInt').textContent = parseFloat(data.monthlyInt || 0).toFixed(2);
+            document.getElementById('viewStartDate').textContent = new Date(data.startDate).toLocaleDateString();
+            document.getElementById('viewExpDate').textContent = data.expDate ? new Date(data.expDate).toLocaleDateString() : 'N/A';
+            document.getElementById('viewBalance').textContent = parseFloat(data.balance).toFixed(2);
+            document.getElementById('viewSurcharge').textContent = data.surcharge || 'No';
+
+            viewModal.show();
+        }
+
+        async function approveLoan(transNo, action) {
+            if (!confirm(`Are you sure you want to ${action} this loan application?`)) return;
+
+            try {
+                const res = await fetch('/manager/approve/loan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ transNo, action })
+                });
+                const result = await res.json();
+                
+                if (result.success) {
+                    alert('Loan ' + action + 'd successfully');
+                    location.reload();
+                } else {
+                    alert('Error processing request');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Server Error');
+            }
+        }
+        function approveRepayment(repayId, action) {
+            const confirmMsg = action === 'approve' ? 'Approve this repayment?' : 'Reject this repayment?';
+            if (confirm(confirmMsg)) {
+                fetch('/manager/api/approve/loan-repayment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ repayId, action })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + (data.error || 'Operation failed'));
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            }
+        }
+    </script>
+</body>
+</html>

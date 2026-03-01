@@ -138,9 +138,15 @@
 
                         <!-- Picture Field -->
                         <div class="mb-3">
-                            <label for="picture" class="form-label">Receipt Picture (Proof)</label>
-                            <input type="file" class="form-control" id="picture" name="picture" accept="image/*">
-                        </div>
+                <label for="picture" class="form-label">Receipt Picture (Proof)</label>
+                <input type="file" class="form-control" id="picture" name="picture" accept="image/*">
+                <div id="preview-container" class="mt-2 d-none">
+                    <label class="form-label text-muted">Current Proof:</label>
+                    <div class="border p-2 rounded text-center">
+                        <img id="preview-image" src="" class="img-fluid" style="max-height: 200px;" alt="Medical Receipt Proof">
+                    </div>
+                </div>
+            </div>
 
                         <div class="mb-3">
                             <label class="form-label">Beneficiary</label>
@@ -234,6 +240,7 @@
                                 <td>${record.Dependant}</td>
                                 <td>${parseFloat(record.Amount).toFixed(2)}</td>
                                 <td>
+                                    ${record.PicturePath ? `<a href="${record.PicturePath}" target="_blank" class="btn btn-sm btn-info me-1" title="View Proof"><i class="bi bi-file-earmark-image"></i></a>` : ''}
                                     <button class="btn btn-sm btn-primary edit-btn" 
                                         data-record='${JSON.stringify(record)}'
                                         data-staff-name="${data.staff.SName}">
@@ -394,6 +401,8 @@
                 transNameInput.value = '';
                 amountInput.value = '';
                 document.getElementById('picture').value = '';
+                document.getElementById('preview-container').classList.add('d-none');
+                document.getElementById('preview-image').src = '';
                 document.getElementById('beneficiarySelf').checked = true;
                 dependantDiv.classList.add('d-none');
                 dependantSelect.innerHTML = '<option value="">Select Dependant...</option>';
@@ -418,6 +427,16 @@
                 // Select Staff
                 empSelect.value = record.PFNo;
                 empNameInput.value = staffName;
+                
+                // Show Picture if exists
+                if (record.PicturePath) {
+                    const previewContainer = document.getElementById('preview-container');
+                    const previewImage = document.getElementById('preview-image');
+                    previewImage.src = record.PicturePath;
+                    previewContainer.classList.remove('d-none');
+                } else {
+                    document.getElementById('preview-container').classList.add('d-none');
+                }
                 
                 // Select MCode
                 transSelect.value = record.MCode;

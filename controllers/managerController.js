@@ -51,6 +51,89 @@ const managerController = {
     }
   },
 
+    getApproveLoan: async (req, res) => {
+        try {
+            // Fetch Pending Loan Applications
+            const [pendingLoans] = await pool.query(`
+                SELECT 
+                    l.TransNo,
+                    l.EntryDate,
+                    l.PFNo,
+                    s.SName,
+                    s.AccountNo,
+                    l.Amount,
+                    l.Interest,
+                    l.Duration,
+                    l.StartDate,
+                    l.ExpDate,
+                    l.Rate,
+                    l.MonthlyRepayment,
+                    l.MonthlyInt,
+                    l.LoanBal,
+                    l.Surcharge,
+                    lc.TransName as LoanType
+                FROM tblloan l
+                LEFT JOIN tblstaff s ON l.PFNo = s.PFNo
+                LEFT JOIN tblloancode lc ON l.LTrans = lc.TCode
+                WHERE l.Approved = 0
+                ORDER BY l.EntryDate DESC
+            `);
+
+            // Fetch Repayment View (All Active Loans for context)
+            const [activeRepayments] = await pool.query(`
+                SELECT 
+                    l.TransNo,
+                    l.PFNo,
+                    s.SName,
+                    l.Amount,
+                    l.EntryDate as LoanDate,
+                    l.Duration,
+                    l.RepaidAmount,
+                    l.LoanBal,
+                    l.StartDate,
+                    l.ExpDate
+                FROM tblloan l
+                LEFT JOIN tblstaff s ON l.PFNo = s.PFNo
+                WHERE l.Approved = 1 AND (l.LoanBal > 0 OR l.RepaidAmount > 0)
+                ORDER BY l.EntryDate DESC
+            `);
+
+            res.render('manager/approve/loan', {
+                title: 'Approve Loans',
+                path: '/manager/approve/loan',
+                user: req.session.user || { name: 'Manager' },
+                pendingLoans,
+                activeRepayments
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    postApproveLoan: async (req, res) => {
+        try {
+            const { transNo, action } = req.body;
+            const approvedBy = (req.session.user && req.session.user.name) ? req.session.user.name : 'Manager';
+            const now = new Date();
+
+            let status = 0;
+            if (action === 'approve') status = 1;
+            else if (action === 'reject') status = 2; // Assuming 2 is Rejected
+
+            await pool.query(`
+                UPDATE tblloan 
+                SET Approved = ?, ApprovedBy = ?, DateApproved = ?
+                WHERE TransNo = ?
+            `, [status, approvedBy, now, transNo]);
+
+            res.json({ success: true });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
     getApproveLeave: async (req, res) => {
         try {
             res.render('manager/approve/leave', {
@@ -1539,6 +1622,128 @@ const managerController = {
         } catch (error) {
             console.error(error);
             res.status(500).send('Server Error');
+        }
+    },
+
+    getApproveLoan: async (req, res) => {
+        try {
+            // Fetch Pending Loans
+            const loanQuery = `
+                SELECT 
+                    l.TransNo, l.PFNo, s.SName as Name, l.EntryDate, 
+                    l.Amount, l.Duration, l.Rate, l.MonthlyRepayment, 
+                    l.Interest, l.MonthlyInt, l.StartDate, l.ExpDate, 
+                    l.LoanBal, lc.TransName as Type, l.Surcharge
+                FROM tblloan l
+                JOIN tblstaff s ON l.PFNo = s.PFNo
+                LEFT JOIN tblloancode lc ON l.LTrans = lc.TCode
+                WHERE l.Approved = 0
+                ORDER BY l.EntryDate DESC
+            `;
+            const [loans] = await pool.query(loanQuery);
+
+            // Fetch Pending Repayments
+            const repaymentQuery = `
+                SELECT 
+                    r.RepayID, r.LoanTransNo, r.PFNo, s.SName as Name, 
+                    r.Amount, r.DatePaid, l.Amount as LoanAmount, 
+                    l.LoanBal as CurrentBalance
+                FROM tblloanrepayment r
+                JOIN tblstaff s ON r.PFNo = s.PFNo
+                JOIN tblloan l ON r.LoanTransNo = l.TransNo
+                WHERE r.Approved = 0
+                ORDER BY r.DatePaid DESC
+            `;
+            const [repayments] = await pool.query(repaymentQuery);
+
+            res.render('manager/approve/loan', {
+                title: 'Approve Loans & Repayments',
+                path: '/manager/approve/loan',
+                user: req.session.user || { name: 'Manager' },
+                loans,
+                repayments
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    postApproveLoan: async (req, res) => {
+        try {
+            const { transNo, action } = req.body;
+            const status = action === 'approve' ? 1 : 2; // 1=Approved, 2=Rejected
+            const user = req.session.user ? req.session.user.name : 'Manager';
+            const now = new Date();
+
+            await pool.query(
+                'UPDATE tblloan SET Approved = ?, ApprovedBy = ?, DateApproved = ? WHERE TransNo = ?',
+                [status, user, now, transNo]
+            );
+
+            res.json({ success: true });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    postApproveLoanRepayment: async (req, res) => {
+        try {
+            const { repayId, action } = req.body;
+            const user = req.session.user ? req.session.user.name : 'Manager';
+            const now = new Date();
+
+            const connection = await pool.getConnection();
+            try {
+                await connection.beginTransaction();
+
+                if (action === 'approve') {
+                    // 1. Get Repayment Details
+                    const [repayRows] = await connection.query('SELECT * FROM tblloanrepayment WHERE RepayID = ?', [repayId]);
+                    if (repayRows.length === 0) throw new Error('Repayment not found');
+                    const repay = repayRows[0];
+
+                    // 2. Get Loan Details
+                    const [loanRows] = await connection.query('SELECT * FROM tblloan WHERE TransNo = ?', [repay.LoanTransNo]);
+                    if (loanRows.length === 0) throw new Error('Loan not found');
+                    const loan = loanRows[0];
+
+                    // 3. Update Loan Balance
+                    const newRepaid = parseFloat(loan.RepaidAmount || 0) + parseFloat(repay.Amount);
+                    const newBal = parseFloat(loan.LoanBal || 0) - parseFloat(repay.Amount);
+                    const isRepaid = newBal <= 0 ? 1 : 0;
+
+                    await connection.query(
+                        'UPDATE tblloan SET RepaidAmount = ?, LoanBal = ?, Repaid = ? WHERE TransNo = ?',
+                        [newRepaid, newBal, isRepaid, repay.LoanTransNo]
+                    );
+
+                    // 4. Mark Repayment as Approved
+                    await connection.query(
+                        'UPDATE tblloanrepayment SET Approved = 1, ApprovedBy = ?, DateApproved = ? WHERE RepayID = ?',
+                        [user, now, repayId]
+                    );
+                } else {
+                    // Reject: Just mark as Rejected (2)
+                    await connection.query(
+                        'UPDATE tblloanrepayment SET Approved = 2, ApprovedBy = ?, DateApproved = ? WHERE RepayID = ?',
+                        [user, now, repayId]
+                    );
+                }
+
+                await connection.commit();
+                res.json({ success: true });
+
+            } catch (err) {
+                await connection.rollback();
+                throw err;
+            } finally {
+                connection.release();
+            }
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
         }
     }
 };

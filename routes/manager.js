@@ -66,7 +66,9 @@ router.get('/approve/entitlement/view', managerController.getApproveEntitlementV
 router.post('/approve/entitlement', managerController.postApproveEntitlement);
 
 router.get('/approve/attendance', managerController.getComingSoon);
-router.get('/approve/loan', managerController.getComingSoon);
+router.get('/approve/loan', managerController.getApproveLoan);
+router.post('/approve/loan', managerController.postApproveLoan);
+router.post('/api/approve/loan-repayment', managerController.postApproveLoanRepayment);
 router.get('/approve/guarantee', managerController.getComingSoon);
 router.get('/approve/salary-review', managerController.getComingSoon);
 router.get('/approve/increment', managerController.getComingSoon);
@@ -80,7 +82,7 @@ router.get('/approve/entitlement', managerController.getComingSoon);
 router.get('/reports/payroll', managerController.getPayrollReports);
 router.get('/reports/journal', managerController.getComingSoon);
 router.get('/reports/vehicle-insurance', managerController.getComingSoon);
-router.get('/reports/medical', managerController.getComingSoon);
+router.get('/reports/medical', dataEntryController.getMedicalReports);
 router.get('/reports/bio-data', managerController.getComingSoon);
 router.get('/reports/loan', managerController.getComingSoon);
 router.get('/reports/long-service', managerController.getComingSoon);
