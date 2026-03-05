@@ -46,12 +46,9 @@
                                             <td><%= new Date(t.StartDate).toLocaleDateString() %></td>
                                             <td><%= t.SponsorName %></td>
                                             <td>
-                                                <button class="btn btn-sm btn-success me-1" onclick="approve('<%= t.PFNo %>', '<%= t.Course %>', '<%= t.StartDate %>')">
-                                                    <i class="bi bi-check-lg"></i> Approve
-                                                </button>
-                                                <button class="btn btn-sm btn-danger" onclick="reject('<%= t.PFNo %>', '<%= t.Course %>', '<%= t.StartDate %>')">
-                                                    <i class="bi bi-x-lg"></i> Reject
-                                                </button>
+                                                <a href="/manager/approve/training/view?pfno=<%= t.PFNo %>&course=<%= encodeURIComponent(t.Course) %>&startDate=<%= new Date(t.StartDate).toISOString() %>" class="btn btn-sm btn-primary">
+                                                    <i class="bi bi-eye"></i> View
+                                                </a>
                                             </td>
                                         </tr>
                                     <% }); %>
@@ -69,52 +66,5 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        async function approve(pfno, course, startDate) {
-            if (!confirm('Are you sure you want to approve this training?')) return;
-            
-            try {
-                const res = await fetch('/manager/api/approve/training', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ pfno, course, startDate, action: 'approve' })
-                });
-                
-                const data = await res.json();
-                if (data.success) {
-                    alert('Training approved successfully.');
-                    location.reload();
-                } else {
-                    alert('Error: ' + data.message);
-                }
-            } catch (err) {
-                console.error(err);
-                alert('Failed to approve training.');
-            }
-        }
-
-        async function reject(pfno, course, startDate) {
-            if (!confirm('Are you sure you want to reject this training?')) return;
-            
-            try {
-                const res = await fetch('/manager/api/approve/training', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ pfno, course, startDate, action: 'reject' })
-                });
-                
-                const data = await res.json();
-                if (data.success) {
-                    alert('Training rejected successfully.');
-                    location.reload();
-                } else {
-                    alert('Error: ' + data.message);
-                }
-            } catch (err) {
-                console.error(err);
-                alert('Failed to reject training.');
-            }
-        }
-    </script>
 </body>
 </html>

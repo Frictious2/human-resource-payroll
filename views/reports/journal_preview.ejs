@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { font-size: 12px; }
+        .report-header { text-align: center; margin-bottom: 20px; }
+        .company-logo { max-height: 80px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #dee2e6; padding: 6px; }
+        th { background-color: #f8f9fa; }
+        @media print {
+            .no-print { display: none !important; }
+            @page { size: landscape; margin: 1cm; }
+        }
+    </style>
+</head>
+<body class="p-4">
+    <div class="container-fluid">
+        <div class="no-print mb-3">
+            <button onclick="window.print()" class="btn btn-primary btn-sm">Print</button>
+            <button onclick="window.close()" class="btn btn-secondary btn-sm">Close</button>
+        </div>
+
+        <div class="report-header">
+            <% if (companyInfo.LogoPath) { %>
+                <img src="/uploads/<%= companyInfo.LogoPath.replace(/^.*[\\\/]/, '') %>" class="company-logo" alt="Logo">
+            <% } %>
+            <h3><%= companyInfo.Com_Name || 'Company Name' %></h3>
+            <p><%= companyInfo.Address || '' %></p>
+            <h4>General Ledger Journal Report</h4>
+            <p><strong>Date:</strong> <%= new Date(glDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) %></p>
+        </div>
+
+        <% if (journalEntries.length > 0) { %>
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped table-sm">
+                    <thead>
+                        <tr>
+                            <th>GL Date</th>
+                            <th>Month</th>
+                            <th>Year</th>
+                            <th class="text-end">Basic Salary</th>
+                            <th class="text-end">Transport</th>
+                            <th class="text-end">Housing</th>
+                            <th class="text-end">Medical</th>
+                            <th class="text-end">Lunch</th>
+                            <th class="text-end">Gross Pay</th>
+                            <th class="text-end">NASSIT (Emp)</th>
+                            <th class="text-end">PAYE</th>
+                            <th class="text-end">Net Pay</th>
+                            <!-- Add other columns as needed based on tblgltrans schema -->
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% 
+                            let totalBasic = 0;
+                            let totalTransport = 0;
+                            let totalHousing = 0;
+                            let totalMedical = 0;
+                            let totalLunch = 0;
+                            let totalGross = 0;
+                            let totalNassit = 0;
+                            let totalPAYE = 0;
+                            let totalNet = 0;
+                        %>
+                        <% journalEntries.forEach(entry => { 
+                            // Map fields based on tblgltrans schema provided earlier
+                            // Note: tblgltrans has fields like BasicSalary, Transport, Rent (Housing?), StaffWelfare, etc.
+                            // I'll map some common ones. 
+                            
+                            const basic = entry.BasicSalary || 0;
+                            const transport = entry.Transport || 0;
+                            const housing = entry.Rent || 0; // Assuming Rent is Housing
+                            const medical = entry.StaffWelfare || 0; // Assuming StaffWelfare is Medical? Or specific field? Schema showed StaffWelfare.
+                            const lunch = entry.JSA || 0; // Assuming JSA is Lunch? Or specific. Schema showed JSA, SSA.
+                            // Schema had: BasicSalary, Headquarters, Responsibility, MaidAllowance, StaffWelfare, Transport, COLA, Risk, Acting, Professional, Academic, IncomeTax, NassitEmp, ProvidentEmp, Rent, SSA, JSA, SalAdvance, IntOnAdv, SalaryWages
+                            
+                            // Let's just list the ones from schema that seem relevant for a journal
+                            
+                            const gross = entry.SalaryWages || 0; // Usually Gross or Total Cost
+                            const nassit = entry.NassitEmp || 0;
+                            const paye = entry.IncomeTax || 0;
+                            const net = gross - paye - nassit; // Rough calculation if Net isn't explicit
+                            
+                            totalBasic += parseFloat(basic);
+                            totalTransport += parseFloat(transport);
+                            totalHousing += parseFloat(housing);
+                            totalMedical += parseFloat(medical);
+                            totalLunch += parseFloat(lunch);
+                            totalGross += parseFloat(gross);
+                            totalNassit += parseFloat(nassit);
+                            totalPAYE += parseFloat(paye);
+                            totalNet += net;
+                        %>
+                        <tr>
+                            <td><%= new Date(entry.GLDate).toLocaleDateString('en-GB') %></td>
+                            <td><%= entry.GLMonth %></td>
+                            <td><%= entry.GLYear %></td>
+                            <td class="text-end"><%= parseFloat(basic).toFixed(2) %></td>
+                            <td class="text-end"><%= parseFloat(transport).toFixed(2) %></td>
+                            <td class="text-end"><%= parseFloat(housing).toFixed(2) %></td>
+                            <td class="text-end"><%= parseFloat(medical).toFixed(2) %></td>
+                            <td class="text-end"><%= parseFloat(lunch).toFixed(2) %></td>
+                            <td class="text-end"><%= parseFloat(gross).toFixed(2) %></td>
+                            <td class="text-end"><%= parseFloat(nassit).toFixed(2) %></td>
+                            <td class="text-end"><%= parseFloat(paye).toFixed(2) %></td>
+                            <td class="text-end"><%= net.toFixed(2) %></td>
+                        </tr>
+                        <% }); %>
+                        <tr class="fw-bold">
+                            <td colspan="3" class="text-end">Totals</td>
+                            <td class="text-end"><%= totalBasic.toFixed(2) %></td>
+                            <td class="text-end"><%= totalTransport.toFixed(2) %></td>
+                            <td class="text-end"><%= totalHousing.toFixed(2) %></td>
+                            <td class="text-end"><%= totalMedical.toFixed(2) %></td>
+                            <td class="text-end"><%= totalLunch.toFixed(2) %></td>
+                            <td class="text-end"><%= totalGross.toFixed(2) %></td>
+                            <td class="text-end"><%= totalNassit.toFixed(2) %></td>
+                            <td class="text-end"><%= totalPAYE.toFixed(2) %></td>
+                            <td class="text-end"><%= totalNet.toFixed(2) %></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        <% } else { %>
+            <div class="alert alert-warning text-center">
+                No journal entries found for this date.
+            </div>
+        <% } %>
+    </div>
+</body>
+</html>

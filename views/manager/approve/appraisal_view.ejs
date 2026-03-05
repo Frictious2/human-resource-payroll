@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · HR & Payroll</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <div>
+                    <h2 class="mb-0">View Appraisal</h2>
+                    <div class="text-muted">Read-only review. Approve or Reject below.</div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <!-- Header Info -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Staff Name</label>
+                            <input type="text" class="form-control" value="<%= appraisal.SName %>" disabled>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold">Staff ID</label>
+                            <input type="text" class="form-control" value="<%= appraisal.PFNo %>" disabled>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Department</label>
+                            <input type="text" class="form-control" value="<%= appraisal.DeptName %>" disabled>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Job Title</label>
+                            <input type="text" class="form-control" value="<%= appraisal.JobTitleName %>" disabled>
+                        </div>
+
+                        <!-- Dates -->
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Start Date</label>
+                            <input type="text" class="form-control" value="<%= appraisal.StartDate ? new Date(appraisal.StartDate).toLocaleDateString() : '' %>" disabled>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">End Date</label>
+                            <input type="text" class="form-control" value="<%= appraisal.EndDate ? new Date(appraisal.EndDate).toLocaleDateString() : '' %>" disabled>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Last Review</label>
+                            <input type="text" class="form-control" value="<%= appraisal['Last Review'] ? new Date(appraisal['Last Review']).toLocaleDateString() : '' %>" disabled>
+                        </div>
+                         <div class="col-md-3">
+                            <label class="form-label fw-bold">Hire Date</label>
+                            <input type="text" class="form-control" value="<%= appraisal.HireDate ? new Date(appraisal.HireDate).toLocaleDateString() : '' %>" disabled>
+                        </div>
+
+                        <div class="col-12"><hr></div>
+
+                        <!-- Scores -->
+                        <div class="col-md-3">
+                            <label class="form-label">Punctuality</label>
+                            <input type="text" class="form-control bg-light" value="<%= appraisal.Punctuality %>" disabled>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Performance</label>
+                            <input type="text" class="form-control bg-light" value="<%= appraisal.Performance %>" disabled>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Communication</label>
+                            <input type="text" class="form-control bg-light" value="<%= appraisal.Communication_Skills %>" disabled>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Leadership</label>
+                            <input type="text" class="form-control bg-light" value="<%= appraisal.Leadership %>" disabled>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Team Work</label>
+                            <input type="text" class="form-control bg-light" value="<%= appraisal.TeamWork %>" disabled>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Relationship</label>
+                            <input type="text" class="form-control bg-light" value="<%= appraisal.Relationship %>" disabled>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Attitude</label>
+                            <input type="text" class="form-control bg-light" value="<%= appraisal.Attitude %>" disabled>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Output</label>
+                            <input type="text" class="form-control bg-light" value="<%= appraisal.Output %>" disabled>
+                        </div>
+
+                         <div class="col-12"><hr></div>
+
+                        <!-- Comments -->
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Manager Comments</label>
+                            <textarea class="form-control" rows="3" disabled><%= appraisal.Manager_Comments %></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Staff Comments</label>
+                            <textarea class="form-control" rows="3" disabled><%= appraisal.Staff_Comments %></textarea>
+                        </div>
+                         <div class="col-12">
+                            <label class="form-label fw-bold">Committee Comments</label>
+                            <textarea class="form-control" rows="3" disabled><%= appraisal.Committee_Comments %></textarea>
+                        </div>
+                    </div>
+
+                    <div class="mt-5 d-flex justify-content-between">
+                        <a href="/manager/approve/appraisals" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Back
+                        </a>
+                        <div id="action-buttons">
+                            <button type="button" class="btn btn-success me-2" onclick="submitAction('approve')">
+                                <i class="bi bi-check-circle"></i> Approve
+                            </button>
+                            <button type="button" class="btn btn-danger" onclick="submitAction('reject')">
+                                <i class="bi bi-x-circle"></i> Reject
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function submitAction(action) {
+            const appraisalNo = '<%= appraisal.AppraisalNo %>';
+            if (!confirm(`Are you sure you want to ${action} this appraisal?`)) return;
+
+            fetch('/manager/approve/appraisals', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ appraisalNo, action })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.href = '/manager/approve/appraisals';
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Server error occurred.');
+            });
+        }
+    </script>
+</body>
+</html>

@@ -57,10 +57,10 @@
                                             <td><%= a.Attd %></td>
                                             <td><%= a.Output %></td>
                                             <td>
-                                                <button class="btn btn-sm btn-success btn-approve" 
-                                                        data-id="<%= a.AppraisalNo %>">
-                                                    <i class="bi bi-check-lg"></i> Approve
-                                                </button>
+                                                <a href="/manager/approve/appraisals/view?appraisalNo=<%= a.AppraisalNo %>" 
+                                                   class="btn btn-sm btn-primary">
+                                                    <i class="bi bi-eye"></i> View
+                                                </a>
                                             </td>
                                         </tr>
                                     <% }) %>
@@ -75,40 +75,5 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script>
-        $(document).ready(function() {
-            $('.btn-approve').click(function() {
-                const btn = $(this);
-                const appraisalNo = btn.data('id');
-                
-                if (!confirm('Are you sure you want to approve this appraisal?')) {
-                    return;
-                }
-
-                $.ajax({
-                    url: '/manager/approve/appraisals',
-                    type: 'POST',
-                    contentType: 'application/json',
-                    data: JSON.stringify({ appraisalNo: appraisalNo }),
-                    success: function(response) {
-                        if (response.success) {
-                            $('#row-' + appraisalNo).fadeOut(function() {
-                                $(this).remove();
-                                if ($('tbody tr').length === 0) {
-                                    $('tbody').append('<tr><td colspan="11" class="text-center">No pending appraisals to approve.</td></tr>');
-                                }
-                            });
-                        } else {
-                            alert('Error: ' + response.message);
-                        }
-                    },
-                    error: function(err) {
-                        console.error(err);
-                        alert('Server error occurred.');
-                    }
-                });
-            });
-        });
-    </script>
 </body>
 </html>

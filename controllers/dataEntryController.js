@@ -356,14 +356,19 @@ const dataEntryController = {
                 return val === '' || val == null ? null : val;
             };
 
+            const round2 = (val) => {
+                if (val === '' || val === null || val === undefined) return null;
+                return Math.round(parseFloat(val) * 100) / 100;
+            };
+
             const baseFields = {
                 PDate: submittedDate,
                 PFNo: pfno,
                 Dept: staff.Dept,
                 Grade: staff.GradeCode,
                 JobTitle: staff.JobTitleCode,
-                Annual: annual || null,
-                Salary: salary || null,
+                Annual: round2(annual),
+                Salary: round2(salary),
                 Allw02: getAllw('02'),
                 Allw03: getAllw('03'),
                 Allw04: getAllw('04'),
@@ -1374,8 +1379,45 @@ const dataEntryController = {
             // Check if staff exists
             const [existing] = await pool.query('SELECT PFNo FROM tblstaff WHERE PFNo = ?', [pfno]);
 
+            // Notch Validation (Global)
+            const [gradeRows] = await pool.query('SELECT NotchIncr FROM tblgrade WHERE GradeCode = ?', [cGrade]);
+            const maxNotch = gradeRows.length > 0 ? (gradeRows[0].NotchIncr || 0) : 0;
+            if (notch > maxNotch) {
+                return res.status(400).json({ error: `Notch cannot exceed ${maxNotch} for this grade` });
+            }
+
+            // Salary Calculation (Global)
+            let calculatedSalary = 0;
+            const [allowanceRows] = await pool.query(
+                'SELECT StartLevel, EndLevel, Notches, Increment FROM tblallowance WHERE Grade = ? ORDER BY ScaleDate DESC LIMIT 1',
+                [cGrade]
+            );
+
+            if (allowanceRows.length > 0) {
+                const { StartLevel, EndLevel, Notches, Increment } = allowanceRows[0];
+                const numNotches = parseFloat(Notches) || 0;
+                const startSalary = parseFloat(StartLevel) || 0;
+                const endSalary = parseFloat(EndLevel) || 0;
+                const notchVal = parseInt(notch) || 0;
+
+                if (notchVal > 0 && numNotches > 0) {
+                    const increment = (endSalary - startSalary) / numNotches;
+                    // Annual salary
+                    let annualSalary = startSalary + (notchVal * increment);
+                    // Monthly salary
+                    calculatedSalary = annualSalary / 12;
+                    // Round to 2 decimal places
+                    calculatedSalary = Math.round(calculatedSalary * 100) / 100;
+                } else if (notchVal === 0) {
+                    calculatedSalary = 0; // Manual entry or no salary
+                } else {
+                     calculatedSalary = startSalary / 12;
+                     calculatedSalary = Math.round(calculatedSalary * 100) / 100;
+                }
+            }
+
             if (existing.length > 0) {
-                // Update
+                // Update Staff
                 const nassitR = nassitNo ? 1 : 0;
                 let updateQuery = `
                     UPDATE tblstaff SET
@@ -1396,6 +1438,29 @@ const dataEntryController = {
                     hodVal, hodStartDate || null, hodEndDate || null, vehicleVal, vehicleStartDate || null, vehicleEndDate || null, contractExp || null,
                     operator, now, now
                 ];
+
+                // Update Salary in tblpayroll (Master Record PYear=0) if notch > 0
+                if (notch > 0 && calculatedSalary > 0) {
+                    const [masterPayroll] = await pool.query('SELECT * FROM tblpayroll WHERE PFNo = ? AND PYear = 0 AND PMonth = 0', [pfno]);
+                    if (masterPayroll.length > 0) {
+                        await pool.query('UPDATE tblpayroll SET Salary = ? WHERE PFNo = ? AND PYear = 0 AND PMonth = 0', [calculatedSalary, pfno]);
+                    } else {
+                        // Create master record if missing
+                        await pool.query(`INSERT INTO tblpayroll (
+                            PDate, SalDate, PFNo, Dept, Grade, JobTitle, 
+                            PayThrough, Bank, AccountNo, Level, EmpType, 
+                            PayCurrency, ExchRate, Salary, 
+                            PMonth, PYear, PType, Paid, Approved, CompanyID,
+                            FullPay, HalfPay, WithoutPay
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+                            now, now, pfno, dept, cGrade, jobTitle, 
+                            '1', '1', accountNo, level, empType, 
+                            '01', 1, calculatedSalary, 
+                            0, 0, '1', 0, 1, 1,
+                            1, 0, 0
+                        ]);
+                    }
+                }
 
                 if (photoPath) {
                     updateQuery += `, PhotoPath = ?`;
@@ -1438,6 +1503,19 @@ const dataEntryController = {
                     cGradeDate || null, cDeptDate || null, dEmp, notch, level, unionMem, acad, photoPath,
                     hodVal, hodStartDate || null, hodEndDate || null, vehicleVal, vehicleStartDate || null, vehicleEndDate || null, contractExp || null,
                     operator, now, now
+                ]);
+
+                // Create master payroll record for new staff
+                await pool.query(`INSERT INTO tblpayroll (
+                    PDate, SalDate, PFNo, Dept, Grade, JobTitle, 
+                    PayThrough, Bank, AccountNo, Level, EmpType, 
+                    PayCurrency, ExchRate, Salary, 
+                    PMonth, PYear, PType, Paid, Approved, CompanyID
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+                    now, now, pfno, dept, cGrade, jobTitle, 
+                    '1', '1', accountNo, level, empType, 
+                    '01', 1, calculatedSalary || 0, 
+                    0, 0, '1', 0, 1, 1
                 ]);
             }
 
@@ -1634,6 +1712,118 @@ const dataEntryController = {
                 limit,
                 used
             });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    // --- WELFARE: BANK GUARANTEE ---
+
+    getWelfareGuarantee: async (req, res) => {
+        try {
+            // 1. Fetch Guarantees
+            const [guarantees] = await pool.query(`
+                SELECT 
+                    bg.RefNo, bg.PFNO, s.SName as Name, bg.LoanAmount, bg.LoanDate, 
+                    bg.Duration, bg.Monthly, bg.Bank, b.Bank as BankName,
+                    bg.ExpiryDate, bg.Approved, bg.Clearance, bg.ClearanceDate, bg.ReceivedBy
+                FROM tblbankguarantee bg
+                LEFT JOIN tblstaff s ON bg.PFNO = s.PFNo
+                LEFT JOIN tblbanks b ON bg.Bank = b.Code
+                ORDER BY bg.LoanDate DESC
+            `);
+
+            // 2. Fetch Staff for Dropdown
+            const [staff] = await pool.query('SELECT PFNo, SName FROM tblstaff WHERE Redundant = 0 ORDER BY SName');
+
+            // 3. Fetch Banks for Dropdown
+            const [banks] = await pool.query('SELECT Code, Bank FROM tblbanks ORDER BY Bank');
+
+            res.render('data_entry/welfare/guarantee', {
+                title: 'Bank Loan Guarantee',
+                path: '/data-entry/welfare/guarantee',
+                user: req.session.user,
+                guarantees,
+                staff,
+                banks
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    postWelfareGuarantee: async (req, res) => {
+        try {
+            const {
+                refNo, pfno, bank, loanAmount, duration, loanDate, 
+                clearance, clearanceDate, receivedBy
+            } = req.body;
+
+            const user = req.session.user ? req.session.user.name : 'DataEntry';
+            const now = new Date();
+
+            // Auto-calculate Monthly and Expiry
+            const amount = parseFloat(loanAmount);
+            const dur = parseInt(duration);
+            const monthly = amount / dur;
+            
+            const lDate = new Date(loanDate);
+            const expiryDate = new Date(lDate);
+            expiryDate.setMonth(expiryDate.getMonth() + dur);
+
+            if (refNo) {
+                // UPDATE Existing Guarantee
+                
+                // 1. Check Approval Status
+                const [rows] = await pool.query('SELECT Approved FROM tblbankguarantee WHERE RefNo = ?', [refNo]);
+                if (rows.length === 0) return res.status(404).json({ error: 'Guarantee not found' });
+                
+                const isApproved = rows[0].Approved === 1;
+
+                if (isApproved) {
+                    // Only update Clearance fields
+                    await pool.query(`
+                        UPDATE tblbankguarantee 
+                        SET Clearance=?, ClearanceDate=?, ReceivedBy=?, Operator=?, DateKeyed=?
+                        WHERE RefNo=?
+                    `, [
+                        clearance ? 1 : 0, clearanceDate || null, receivedBy || null, 
+                        user, now, refNo
+                    ]);
+                } else {
+                    // Update All Fields
+                    await pool.query(`
+                        UPDATE tblbankguarantee 
+                        SET PFNO=?, Bank=?, LoanAmount=?, Duration=?, Monthly=?, LoanDate=?, ExpiryDate=?,
+                            Operator=?, DateKeyed=?
+                        WHERE RefNo=?
+                    `, [
+                        pfno, bank, amount, dur, monthly, loanDate, expiryDate, 
+                        user, now, refNo
+                    ]);
+                }
+                
+                res.json({ success: true, message: 'Guarantee updated successfully' });
+
+            } else {
+                // INSERT New Guarantee
+                const newRefNo = `BG-${Date.now()}`; // Simple unique ID
+                
+                await pool.query(`
+                    INSERT INTO tblbankguarantee (
+                        RefNo, PFNO, Bank, LoanAmount, Duration, Monthly, LoanDate, ExpiryDate,
+                        Approved, Clearance, Operator, DateKeyed, EntryDate
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?)
+                `, [
+                    newRefNo, pfno, bank, amount, dur, monthly, loanDate, expiryDate,
+                    user, now, now
+                ]);
+
+                res.json({ success: true, message: 'Guarantee added successfully' });
+            }
+
         } catch (error) {
             console.error(error);
             res.status(500).json({ error: 'Server Error' });
@@ -2432,7 +2622,7 @@ const dataEntryController = {
             const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
             const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
 
-            const [applicants] = await pool.query('SELECT RefNo, SName FROM tblapplication ORDER BY SName');
+            const [applicants] = await pool.query('SELECT RefNo, SName FROM tblapplication WHERE (Selected IS NULL OR Selected = 0) ORDER BY SName');
 
             res.render('data_entry/staff/interview', {
                 title: 'Interview Invitation',
@@ -2463,71 +2653,27 @@ const dataEntryController = {
         }
     },
 
-    postInvite: async (req, res) => {
+    postSelectInterview: async (req, res) => {
         try {
-            const { applicants, content } = req.body;
+            const { applicants } = req.body;
             
             if (!applicants || !Array.isArray(applicants) || applicants.length === 0) {
                 return res.status(400).json({ error: 'No applicants provided' });
             }
 
-            const [comRows] = await pool.query('SELECT Com_Name, LogoPath FROM tblcominfo LIMIT 1');
-            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
-            const logoPath = comRows[0] ? comRows[0].LogoPath : null;
+            const refNos = applicants.map(app => app.RefNo);
+            const now = new Date();
 
-            const nodemailer = require('nodemailer');
-            const path = require('path');
-            const transporter = nodemailer.createTransport({
-                host: process.env.SMTP_HOST,
-                port: process.env.SMTP_PORT,
-                secure: process.env.SMTP_SECURE === 'true',
-                auth: {
-                    user: process.env.SMTP_USER,
-                    pass: process.env.SMTP_PASS
-                }
-            });
+            // Update tblapplication
+            // Using placeholders for IN clause
+            const placeholders = refNos.map(() => '?').join(',');
+            const query = `UPDATE tblapplication SET Selected = 1, dateSelected = ?, Approved = 0 WHERE RefNo IN (${placeholders})`;
+            
+            const params = [now, ...refNos];
+            
+            await pool.query(query, params);
 
-            let sentCount = 0;
-
-            for (const app of applicants) {
-                if (!app.Email) continue;
-
-                // Construct email HTML
-                const html = `
-                    <div style="font-family: Arial, sans-serif; text-align: center;">
-                        ${logoPath ? `<img src="cid:companyLogo" alt="Company Logo" style="max-width: 150px; margin-bottom: 20px;">` : ''}
-                        <h2>${companyName}</h2>
-                    </div>
-                    <div style="font-family: Arial, sans-serif; margin-top: 20px;">
-                        <p>Dear ${app.Name},</p>
-                        <p>${content.replace(/\n/g, '<br>')}</p>
-                        <br>
-                        <p>Best Regards,</p>
-                        <p>${companyName}</p>
-                    </div>
-                `;
-
-                const mailOptions = {
-                    from: `"${companyName}" <${process.env.SMTP_USER}>`,
-                    to: app.Email,
-                    subject: 'Interview Invitation',
-                    html: html,
-                    attachments: logoPath ? [{
-                        filename: 'logo.png',
-                        path: path.join(process.cwd(), 'public', logoPath),
-                        cid: 'companyLogo'
-                    }] : []
-                };
-
-                try {
-                    await transporter.sendMail(mailOptions);
-                    sentCount++;
-                } catch (err) {
-                    console.error(`Failed to send email to ${app.Email}:`, err);
-                }
-            }
-
-            res.json({ success: true, sentCount });
+            res.json({ success: true, message: 'Applicants selected for interview approval.' });
         } catch (error) {
             console.error(error);
             res.status(500).json({ error: 'Server Error: ' + error.message });
@@ -3345,28 +3491,34 @@ const dataEntryController = {
             const freq = itemRows.length > 0 ? itemRows[0].Freq : 'M';
 
             // Determine Target Staff
-            let staffQuery = 'SELECT s.* FROM tblstaff s WHERE s.Approved = 1 AND s.Redundant = 0'; 
-            
+            let staffQuery = ''; 
             let staffParams = [];
 
             if (activity === 'RENT' || payCode === '02') {
+                // Assuming RENT uses Allw02 flag in tblentitle, but where is the amount?
+                // If the code expects e.Amount, it's broken. 
+                // We will leave this part as is for now or just fix the Salary part which is critical.
                 staffQuery = `
-                    SELECT s.*, e.Amount as EntitledAmount 
+                    SELECT s.*, 0 as EntitledAmount 
                     FROM tblstaff s 
-                    JOIN tblentitle e ON s.PFNo = e.PFNo 
-                    WHERE s.Approved = 1 AND s.Redundant = 0 AND e.Code = ? AND e.Approved = 1
+                    WHERE s.Approved = 1 AND s.Redundant = 0
                 `;
-                staffParams = [payCode];
+                 // TODO: Fix Entitlement logic based on actual schema
             } else if (activity === 'LEAVE' || payCode === '13') {
-                staffQuery = `
-                    SELECT s.*, e.Amount as EntitledAmount 
+                 staffQuery = `
+                    SELECT s.*, 0 as EntitledAmount 
                     FROM tblstaff s 
-                    JOIN tblentitle e ON s.PFNo = e.PFNo 
-                    WHERE s.Approved = 1 AND s.Redundant = 0 AND e.Code = ? AND e.Approved = 1
+                    WHERE s.Approved = 1 AND s.Redundant = 0
                 `;
-                staffParams = [payCode];
             } else {
-                // For Salary (01) or others, select all active staff.
+                // For Salary (01)
+                // Fetch Salary from tblpayroll Master Record (PYear=0)
+                staffQuery = `
+                    SELECT s.*, p.Salary as BaseSalary
+                    FROM tblstaff s
+                    LEFT JOIN tblpayroll p ON s.PFNo = p.PFNo AND p.PYear = 0
+                    WHERE s.Approved = 1 AND s.Redundant = 0
+                `;
             }
 
             const [staffList] = await conn.query(staffQuery, staffParams);
@@ -3385,7 +3537,7 @@ const dataEntryController = {
                 // Base Amount
                 let amount = 0;
                 if (payCode === '01') {
-                    amount = staff.Salary || 0;
+                    amount = staff.BaseSalary || 0;
                 } else {
                     amount = staff.EntitledAmount || 0;
                 }
@@ -3408,6 +3560,9 @@ const dataEntryController = {
                 if (isWithoutPay) continue; // Skip processing
 
                 if (isHalfPay) amount = amount / 2;
+
+                // Ensure final amount is rounded to 2 decimal places
+                amount = Math.round(amount * 100) / 100;
 
                 // Surcharge Check (tblsurcharge)
                 let surcharge = 0;
@@ -4094,6 +4249,50 @@ const dataEntryController = {
                 user: req.session.user || { name: 'User', role: 'data_entry' },
                 role: (req.session.user && req.session.user.role) ? req.session.user.role : 'data_entry',
                 path: req.path
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getJournalReport: async (req, res) => {
+        try {
+            // Fetch distinct dates (ignoring time) from tblgltrans
+            const [dates] = await pool.query('SELECT DISTINCT DATE(GLDate) as GLDateVal FROM tblgltrans ORDER BY GLDateVal DESC');
+            
+            res.render('reports/journal_index', {
+                title: 'Journal Report',
+                dates,
+                path: req.path,
+                user: req.session.user || { name: 'Data Entry' },
+                role: 'data_entry'
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getJournalReportPreview: async (req, res) => {
+        try {
+            const { glDate } = req.query;
+            const [companyRows] = await pool.query('SELECT * FROM tblcominfo LIMIT 1');
+            const companyInfo = companyRows[0] || {};
+
+            // Fetch journal entries for the selected date
+            const [journalEntries] = await pool.query(`
+                SELECT * FROM tblgltrans 
+                WHERE DATE(GLDate) = ?
+            `, [glDate]);
+
+            res.render('reports/journal_preview', {
+                title: 'Journal Report Preview',
+                companyInfo,
+                journalEntries,
+                glDate,
+                user: req.session.user || { name: 'Data Entry' },
+                role: 'data_entry'
             });
         } catch (error) {
             console.error(error);

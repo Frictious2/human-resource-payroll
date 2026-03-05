@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Benefit Status Report</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 1cm;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+        }
+        .report-header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+        }
+        .company-logo {
+            max-height: 80px;
+            margin-bottom: 10px;
+        }
+        .company-name {
+            font-size: 24px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin: 0;
+        }
+        .company-address {
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        .report-title {
+            font-size: 18px;
+            font-weight: bold;
+            text-decoration: underline;
+            margin-top: 10px;
+        }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .table th, .table td {
+            border: 1px solid #000;
+            padding: 5px;
+            vertical-align: middle;
+        }
+        .table thead th {
+            background-color: #f0f0f0;
+            text-align: center;
+            font-weight: bold;
+        }
+        .text-end {
+            text-align: right;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .no-print {
+            margin-bottom: 20px;
+        }
+        @media print {
+            .no-print {
+                display: none;
+            }
+            .table th, .table td {
+                font-size: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Print Button -->
+        <div class="d-flex justify-content-end no-print mt-3">
+            <button onclick="window.print()" class="btn btn-primary me-2">Print Report</button>
+            <button onclick="window.history.back()" class="btn btn-secondary">Back</button>
+        </div>
+
+        <!-- Report Header -->
+        <div class="report-header">
+            <% if (company.Logopath) { %>
+                <img src="<%= company.Logopath %>" alt="Company Logo" class="company-logo">
+            <% } else if (company.LogoPath) { %>
+                <img src="<%= company.LogoPath %>" alt="Company Logo" class="company-logo">
+            <% } %>
+            <h1 class="company-name"><%= company.Com_Name %></h1>
+            <div class="company-address">
+                <%= company.Address %><br>
+                <%= company.City %>, <%= company.Country %>
+            </div>
+            <div class="report-title">
+                <%= searchType === 'ex-gracia' ? 'EX-GRACIA BENEFIT REPORT' : 'END OF SERVICE BENEFIT REPORT' %>
+            </div>
+            <div class="mt-2">
+                <strong>Reference Date:</strong> <%= new Date(endDate).toLocaleDateString() %>
+            </div>
+        </div>
+
+        <!-- Report Content -->
+        <% if (results && Object.keys(results).length > 0) { %>
+            <% Object.keys(results).forEach(dept => { %>
+                <h5 class="mt-4 mb-2">Department: <%= dept %></h5>
+                <table class="table table-bordered table-sm">
+                    <thead>
+                        <tr>
+                            <th>PF No</th>
+                            <th>Name</th>
+                            <th>Grade</th>
+                            <th>Date Emp</th>
+                            <th>Age</th>
+                            <th>Yrs</th>
+                            <th class="text-end">Salary</th>
+                            <th class="text-center">Days</th>
+                            <th class="text-end">Benefit</th>
+                            <th class="text-end">Taxable</th>
+                            <th class="text-end">Tax</th>
+                            <th class="text-end">Net Pay</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% let deptTotal = 0; %>
+                        <% results[dept].forEach(row => { %>
+                            <% const netPay = row.Benefit - row.Tax; %>
+                            <% deptTotal += netPay; %>
+                            <tr>
+                                <td class="text-center"><%= row.PFNo %></td>
+                                <td><%= row.SName %></td>
+                                <td class="text-center"><%= row.Grade %></td>
+                                <td class="text-center"><%= new Date(row.DateEmp).toLocaleDateString() %></td>
+                                <td class="text-center"><%= row.Age %></td>
+                                <td class="text-center"><%= row.Years %></td>
+                                <td class="text-end"><%= parseFloat(row.Salary).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                                <td class="text-center"><%= row.Days %></td>
+                                <td class="text-end"><%= parseFloat(row.Benefit).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                                <td class="text-end"><%= parseFloat(row.Taxable).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                                <td class="text-end"><%= parseFloat(row.Tax).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                                <td class="text-end fw-bold"><%= netPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                            </tr>
+                        <% }); %>
+                        <tr class="table-light fw-bold">
+                            <td colspan="11" class="text-end">Total for <%= dept %>:</td>
+                            <td class="text-end"><%= deptTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                        </tr>
+                    </tbody>
+                </table>
+            <% }); %>
+        <% } else { %>
+            <div class="alert alert-warning text-center">
+                No records found for the selected criteria.
+            </div>
+        <% } %>
+    </div>
+</body>
+</html>
