@@ -7,6 +7,7 @@ const benefitController = require('../controllers/benefitController');
 // Dashboard
 router.get('/', (req, res) => res.redirect('/manager/dashboard'));
 router.get('/dashboard', managerController.getDashboard);
+router.get('/pending-approvals', managerController.getPendingApprovals);
 
 // Enquiry
 router.get('/enquiry/staff', managerController.getStaffEnquiry);

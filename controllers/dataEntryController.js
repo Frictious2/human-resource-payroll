@@ -1,12 +1,82 @@
 const pool = require('../config/db');
 
 const dataEntryController = {
-    getDashboard: (req, res) => {
-        res.render('data_entry/dashboard', {
-            title: 'Data Entry Dashboard',
-            path: '/data-entry/dashboard',
-            user: { name: 'Data Entry Clerk' }
-        });
+    getDashboard: async (req, res) => {
+        try {
+            // 1. Staff Records Count (Active & Not Redundant)
+            const [staffRows] = await pool.query('SELECT COUNT(*) as count FROM tblstaff WHERE EmpStatus = 1 AND Redundant = 0');
+            const staffCount = staffRows[0].count;
+
+            // 2. Pending Approvals Count
+            const tables = [
+                'tblstaff', 'tbldependant', 'tblallowance', 'tblleave', 'tblapplication',
+                'tblpromotions', 'tbltransfer', 'tblcourse', 'tblquery', 'tblformer',
+                'tblappraisal', 'tblentitle', 'tblloan', 'tblbankguarantee'
+            ];
+            
+            let pendingApprovals = 0;
+            const approvalPromises = tables.map(table => 
+                pool.query(`SELECT COUNT(*) as count FROM ${table} WHERE Approved = 0`)
+            );
+            const results = await Promise.all(approvalPromises);
+            results.forEach(([rows]) => pendingApprovals += rows[0].count);
+
+            res.render('data_entry/dashboard', {
+                title: 'Data Entry Dashboard',
+                path: '/data-entry/dashboard',
+                user: req.session.user || { name: 'Data Entry Clerk' },
+                staffCount,
+                pendingApprovals
+            });
+        } catch (error) {
+            console.error('Dashboard Error:', error);
+            res.render('data_entry/dashboard', {
+                title: 'Data Entry Dashboard',
+                path: '/data-entry/dashboard',
+                user: req.session.user || { name: 'Data Entry Clerk' },
+                staffCount: 0,
+                pendingApprovals: 0
+            });
+        }
+    },
+
+    getPendingApprovals: async (req, res) => {
+        try {
+            const approvalConfig = [
+                { table: 'tblstaff', label: 'New Staff / Edits', route: '/manager/approve/new-staff' },
+                { table: 'tbldependant', label: 'Dependant Changes', route: '/manager/approve/dependants' },
+                { table: 'tblallowance', label: 'Income Setup', route: '/manager/approve/income-setup' },
+                { table: 'tblleave', label: 'Leave Applications', route: '/manager/approve/leave-application' },
+                { table: 'tblapplication', label: 'Interview Approvals', route: '/manager/approve/interview' },
+                { table: 'tblpromotions', label: 'Promotions / Demotions', route: '/manager/approve/promotion-demotion' },
+                { table: 'tbltransfer', label: 'Transfers', route: '/manager/approve/transfer' },
+                { table: 'tblcourse', label: 'Training', route: '/manager/approve/training' },
+                { table: 'tblquery', label: 'Queries', route: '/manager/approve/query' },
+                { table: 'tblformer', label: 'Staff Exits', route: '/manager/approve/exit' },
+                { table: 'tblappraisal', label: 'Appraisals', route: '/manager/approve/appraisals' },
+                { table: 'tblentitle', label: 'Entitlements', route: '/manager/approve/entitlement' },
+                { table: 'tblloan', label: 'Loans', route: '/manager/approve/loan' },
+                { table: 'tblbankguarantee', label: 'Bank Guarantees', route: '/manager/approve/guarantee' }
+            ];
+
+            const promises = approvalConfig.map(async (item) => {
+                const [rows] = await pool.query(`SELECT COUNT(*) as count FROM ${item.table} WHERE Approved = 0`);
+                return { ...item, count: rows[0].count };
+            });
+
+            const pendingItems = await Promise.all(promises);
+
+            res.render('shared/pending_approvals', {
+                title: 'Pending Approvals',
+                path: '/data-entry/pending-approvals',
+                user: req.session.user || { name: 'Data Entry Clerk' },
+                role: 'data_entry',
+                pendingItems
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
     },
 
     getPayrollIncomeSetup: async (req, res) => {

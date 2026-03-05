@@ -39,6 +39,7 @@ const uploadMedical = multer({ storage: medicalStorage });
 // Dashboard
 router.get('/', (req, res) => res.redirect('/data-entry/dashboard'));
 router.get('/dashboard', dataEntryController.getDashboard);
+router.get('/pending-approvals', dataEntryController.getPendingApprovals);
 
 // 1. Enquiry
 router.get('/enquiry/staff', dataEntryController.getStaffEnquiry);

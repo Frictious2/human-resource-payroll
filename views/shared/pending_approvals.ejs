@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <% if (role === 'manager') { %>
+        <%- include('../manager/partials/topbar', { user }) %>
+        <%- include('../manager/partials/sidebar') %>
+    <% } else { %>
+        <%- include('../data_entry/partials/topbar', { user }) %>
+        <%- include('../data_entry/partials/sidebar') %>
+    <% } %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <h2 class="mb-0">Pending Approvals</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item"><a href="/<%= role === 'manager' ? 'manager' : 'data-entry' %>/dashboard">Dashboard</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">Pending Approvals</li>
+                    </ol>
+                </nav>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Record Type</th>
+                                    <th class="text-center">Pending Count</th>
+                                    <th class="text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% pendingItems.forEach(item => { %>
+                                    <% if (item.count > 0) { %>
+                                        <tr>
+                                            <td>
+                                                <div class="fw-semibold"><%= item.label %></div>
+                                                <div class="small text-muted"><%= item.table %></div>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-warning text-dark rounded-pill"><%= item.count %></span>
+                                            </td>
+                                            <td class="text-end">
+                                                <% if (role === 'manager') { %>
+                                                    <a href="<%= item.route %>" class="btn btn-sm btn-primary">
+                                                        Review <i class="bi bi-arrow-right ms-1"></i>
+                                                    </a>
+                                                <% } else { %>
+                                                    <span class="text-muted small">Manager Review Required</span>
+                                                <% } %>
+                                            </td>
+                                        </tr>
+                                    <% } %>
+                                <% }); %>
+                                <% if (pendingItems.every(item => item.count === 0)) { %>
+                                    <tr>
+                                        <td colspan="3" class="text-center py-4 text-muted">
+                                            <i class="bi bi-check-circle fs-2 d-block mb-2"></i>
+                                            No pending approvals found.
+                                        </td>
+                                    </tr>
+                                <% } %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

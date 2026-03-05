@@ -4,18 +4,18 @@ const ejs = require('ejs');
 const path = require('path');
 
 const managerController = {
-  getDashboard: async (req, res) => {
+    getDashboard: async (req, res) => {
     try {
-        // 1. My Staff count
-        const [staffRows] = await pool.query('SELECT COUNT(*) as count FROM tblstaff');
+        // 1. My Staff count (Active & Not Redundant)
+        const [staffRows] = await pool.query('SELECT COUNT(*) as count FROM tblstaff WHERE EmpStatus = 1 AND Redundant = 0');
         const staffCount = staffRows[0].count;
 
         // 2. Pending Approvals
         // List of tables to check
         const tables = [
-            'tblacting', 'tblapplication', 'tblappraisal', 'tblattendance', 
-            'tblbankguarantee', 'tblbonus', 'tblbonusawards', 'tbldependant', 
-            'tbldependanthistory', 'tblentitle'
+            'tblstaff', 'tbldependant', 'tblallowance', 'tblleave', 'tblapplication',
+            'tblpromotions', 'tbltransfer', 'tblcourse', 'tblquery', 'tblformer',
+            'tblappraisal', 'tblentitle', 'tblloan', 'tblbankguarantee'
         ];
         
         let pendingApprovals = 0;
@@ -34,7 +34,7 @@ const managerController = {
         res.render('manager/dashboard', { 
             title: 'Manager Dashboard',
             path: '/manager/dashboard',
-            user: { name: 'Manager' },
+            user: req.session.user || { name: 'Manager' },
             staffCount,
             pendingApprovals
         });
@@ -43,11 +43,50 @@ const managerController = {
         res.render('manager/dashboard', { 
             title: 'Manager Dashboard',
             path: '/manager/dashboard',
-            user: { name: 'Manager' },
+            user: req.session.user || { name: 'Manager' },
             staffCount: 0,
             pendingApprovals: 0,
             error: 'Failed to load dashboard data'
         });
+    }
+  },
+
+  getPendingApprovals: async (req, res) => {
+    try {
+        const approvalConfig = [
+            { table: 'tblstaff', label: 'New Staff / Edits', route: '/manager/approve/new-staff' },
+            { table: 'tbldependant', label: 'Dependant Changes', route: '/manager/approve/dependants' },
+            { table: 'tblallowance', label: 'Income Setup', route: '/manager/approve/income-setup' },
+            { table: 'tblleave', label: 'Leave Applications', route: '/manager/approve/leave-application' },
+            { table: 'tblapplication', label: 'Interview Approvals', route: '/manager/approve/interview' },
+            { table: 'tblpromotions', label: 'Promotions / Demotions', route: '/manager/approve/promotion-demotion' },
+            { table: 'tbltransfer', label: 'Transfers', route: '/manager/approve/transfer' },
+            { table: 'tblcourse', label: 'Training', route: '/manager/approve/training' },
+            { table: 'tblquery', label: 'Queries', route: '/manager/approve/query' },
+            { table: 'tblformer', label: 'Staff Exits', route: '/manager/approve/exit' },
+            { table: 'tblappraisal', label: 'Appraisals', route: '/manager/approve/appraisals' },
+            { table: 'tblentitle', label: 'Entitlements', route: '/manager/approve/entitlement' },
+            { table: 'tblloan', label: 'Loans', route: '/manager/approve/loan' },
+            { table: 'tblbankguarantee', label: 'Bank Guarantees', route: '/manager/approve/guarantee' }
+        ];
+
+        const promises = approvalConfig.map(async (item) => {
+            const [rows] = await pool.query(`SELECT COUNT(*) as count FROM ${item.table} WHERE Approved = 0`);
+            return { ...item, count: rows[0].count };
+        });
+
+        const pendingItems = await Promise.all(promises);
+
+        res.render('shared/pending_approvals', {
+            title: 'Pending Approvals',
+            path: '/manager/pending-approvals',
+            user: req.session.user || { name: 'Manager' },
+            role: 'manager',
+            pendingItems
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Server Error');
     }
   },
 

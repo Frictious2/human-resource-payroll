@@ -35,49 +35,63 @@
     padding-top: 56px; /* navbar height */
     overflow-y: auto;
     z-index: 1020;
+    background-color: #fff; /* Ensure background is white */
 }
 
 .sidebar .nav-link {
     color: var(--bs-body-color);
     border-radius: 8px;
     margin-bottom: 6px;
+    font-weight: 500;
 }
+
+.sidebar .nav-link:hover {
+    color: var(--bs-primary);
+    background-color: rgba(13, 110, 253, 0.04);
+}
+
 .sidebar .nav-link.active {
     background-color: rgba(13, 110, 253, 0.12);
     color: var(--bs-primary);
     font-weight: 600;
 }
 
+/* Sub-navigation indentation */
+.sub-nav .nav-link {
+    padding-left: 2.5rem;
+    font-size: 0.95em;
+}
+
+/* Main content offset */
 .main {
     margin-left: 260px;
-    padding-top: 72px; /* navbar height + spacing */
-    padding-bottom: 24px;
+    padding: 2rem;
+    min-height: 100vh;
 }
 
-/* Collapsible sub navigation styling */
-.sidebar .sub-nav {
-    padding-left: 1rem;
-    border-left: 1px dashed var(--bs-border-color);
-    margin: 6px 0 10px;
-}
-.sidebar .sub-nav .nav-link {
-    margin-bottom: 4px;
-    border-radius: 6px;
-    font-size: 0.95rem;
-    /* Make collapsible headers clearly clickable */
-    cursor: pointer;
-    font-weight: 600;
-}
-
+/* Responsive adjustments */
 @media (max-width: 991.98px) {
     .sidebar {
         position: static;
         width: 100%;
+        height: auto;
         padding-top: 0;
-        border-bottom: 1px solid var(--bs-border-color);
+        border-right: none !important;
+        border-bottom: 1px solid #dee2e6;
     }
+    
     .main {
         margin-left: 0;
-        padding-top: 88px;
+        padding: 1rem;
     }
+}
+
+/* Clickable cards */
+.hover-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+}
+.hover-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
 }
