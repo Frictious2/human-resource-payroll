@@ -280,6 +280,11 @@
                                             <input type="text" class="form-control" id="signature3Name" readonly>
                                         </div>
                                     </div>
+                                    <div class="d-flex gap-2 justify-content-end mt-4">
+                                        <button type="button" class="btn btn-info text-white" id="btnVoucherPreview"><i class="bi bi-eye"></i> Preview</button>
+                                        <button type="button" class="btn btn-secondary" id="btnVoucherPrint"><i class="bi bi-printer"></i> Print</button>
+                                        <button type="button" class="btn btn-danger" id="btnVoucherPdf"><i class="bi bi-file-pdf"></i> PDF</button>
+                                    </div>
                                 </div>
                             </form>
                         </div>
@@ -356,6 +361,8 @@
         let yearlyEnabled = false;
         let yearlyMap = {};
         let currentScope = 'all';
+
+        let isVoucherMode = false;
 
         document.addEventListener('DOMContentLoaded', () => {
             const scopeAll = document.getElementById('scopeAll');
@@ -462,6 +469,7 @@
         });
 
         async function loadPayslip(action) {
+            isVoucherMode = false;
             const period = document.getElementById('period').value;
             if (!period) {
                 alert('Please select a period');
@@ -506,6 +514,13 @@
                 inputModal.hide();
                 
                 const previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
+                
+                // Show UI elements for Payslip
+                document.getElementById('prevBtn').style.display = 'inline-block';
+                document.getElementById('nextBtn').style.display = 'inline-block';
+                document.getElementById('recordCounter').style.display = 'inline-block';
+                document.querySelector('#previewModal .modal-title').textContent = 'Payslip Preview';
+                
                 renderPayslip(0);
                 previewModal.show();
 
@@ -879,9 +894,15 @@
 
         function downloadPdf() {
             const element = document.getElementById('payslipContainer');
+            
+            // Customize options based on mode
+            const filename = isVoucherMode 
+                ? `Voucher_${new Date().toISOString().slice(0,10)}.pdf`
+                : `payslip_${currentData[currentIndex]?.PFNo || 'all'}.pdf`;
+
             const opt = {
                 margin:       0,
-                filename:     `payslip_${currentData[currentIndex]?.PFNo}.pdf`,
+                filename:     filename,
                 image:        { type: 'jpeg', quality: 0.98 },
                 html2canvas:  { scale: 2 },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
@@ -889,6 +910,7 @@
             };
             html2pdf().set(opt).from(element).save();
         }
+
         function triggerPrint() {
             document.body.classList.add('print-payslip');
             window.print();
@@ -897,12 +919,198 @@
             }, 500);
         }
         function downloadPdfWithScope() {
-            if (currentScope === 'all') {
+            if (currentScope === 'all' && !isVoucherMode) {
                 renderAllPayslips();
                 setTimeout(() => downloadPdf(), 200);
             } else {
                 downloadPdf();
             }
+        }
+
+        // Voucher Logic
+        document.getElementById('btnVoucherPreview').addEventListener('click', () => loadVoucher('preview'));
+        document.getElementById('btnVoucherPrint').addEventListener('click', () => loadVoucher('print'));
+        document.getElementById('btnVoucherPdf').addEventListener('click', () => loadVoucher('pdf'));
+
+        async function loadVoucher(action) {
+            isVoucherMode = true;
+            const periodInput = document.getElementById('voucherPeriod');
+            const period = periodInput ? periodInput.value : '';
+            
+            if (!period) {
+                alert('Please select a period');
+                return;
+            }
+            const [year, month] = period.split('-');
+            
+            const groupEl = document.querySelector('input[name="voucherGroup"]:checked');
+            if (!groupEl) {
+                alert('Please select a group');
+                return;
+            }
+            const group = groupEl.value;
+            
+            const scopes = [];
+            document.querySelectorAll('.voucher-scope:checked').forEach(cb => scopes.push(cb.value));
+            
+            if (scopes.length === 0) {
+                alert('Please select at least one payment scope (Salary, Yearly, EOS)');
+                return;
+            }
+            
+            const signatures = [];
+            if (document.getElementById('signature1Toggle').checked) signatures.push({ name: document.getElementById('signature1Name').value, title: 'Prepared By' });
+            if (document.getElementById('signature2Toggle').checked) signatures.push({ name: document.getElementById('signature2Name').value, title: 'Checked By' });
+            if (document.getElementById('signature3Toggle').checked) signatures.push({ name: document.getElementById('signature3Name').value, title: 'Approved By' });
+
+            try {
+                const voucherModal = bootstrap.Modal.getInstance(document.getElementById('voucherModal'));
+                voucherModal.hide();
+
+                const response = await fetch('/data-entry/api/reports/voucher/preview', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ month, year, group, scope: scopes })
+                });
+                
+                const result = await response.json();
+                if (!result.success || !result.data || result.data.length === 0) {
+                    alert('No data found');
+                    return;
+                }
+                
+                renderVoucherPreview(result, signatures);
+                
+                const previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
+                // Reset UI elements for Voucher
+                document.getElementById('prevBtn').style.display = 'none';
+                document.getElementById('nextBtn').style.display = 'none';
+                document.getElementById('recordCounter').style.display = 'none';
+                document.querySelector('#previewModal .modal-title').textContent = 'Voucher Preview';
+
+                previewModal.show();
+
+                if (action === 'print') {
+                   setTimeout(() => {
+                        triggerPrint();
+                   }, 500);
+                } else if (action === 'pdf') {
+                   setTimeout(() => {
+                        downloadPdf();
+                   }, 500);
+                }
+                
+            } catch (e) {
+                console.error(e);
+                alert('Error generating voucher');
+            }
+        }
+
+        function renderVoucherPreview(result, signatures) {
+             const { company, data, meta } = result;
+             const container = document.getElementById('payslipContainer');
+             container.innerHTML = ''; // Clear container
+
+             const ROWS_PER_PAGE = 20;
+             const totalPages = Math.ceil(data.length / ROWS_PER_PAGE);
+             let totalNet = 0;
+             let overallTotalNet = 0; // To track total across all pages if needed, but usually total is at bottom
+
+             // Calculate overall total first
+             data.forEach(row => {
+                 overallTotalNet += parseFloat(row.NetIncome || 0);
+             });
+
+             let html = '';
+
+             for (let page = 0; page < totalPages; page++) {
+                 const start = page * ROWS_PER_PAGE;
+                 const end = start + ROWS_PER_PAGE;
+                 const chunk = data.slice(start, end);
+                 
+                 let chunkHtml = '';
+                 chunk.forEach((row, i) => {
+                     const net = parseFloat(row.NetIncome || 0);
+                     chunkHtml += `
+                        <tr>
+                            <td>${start + i + 1}</td>
+                            <td>${row.PFNo}</td>
+                            <td>${row.SName}</td>
+                            <td>${row.BankName || ''}</td>
+                            <td>${row.StaffAccount || ''}</td>
+                            <td class="text-end">${formatCurrency(net)}</td>
+                            <td style="width: 100px;"></td>
+                        </tr>
+                     `;
+                 });
+
+                 // Fill empty rows if needed to maintain height? No, flexible is better.
+                 
+                 const isLastPage = page === totalPages - 1;
+                 
+                 const sigHtml = signatures.map(sig => `
+                    <div class="text-center" style="min-width: 150px;">
+                        <div class="border-bottom border-dark mb-2" style="height: 40px;"></div>
+                        <p class="fw-bold mb-0">${sig.name}</p>
+                        <small>${sig.title}</small>
+                    </div>
+                 `).join('');
+
+                 const headerHtml = `
+                    <div class="text-center mb-4">
+                        ${company.LogoPath ? `<img src="${company.LogoPath}" style="height: 60px;" class="mb-2">` : ''}
+                        <h3 class="fw-bold mb-0 text-uppercase">${company.Com_Name || 'Company Name'}</h3>
+                        <p class="mb-2">${company.Address || ''}</p>
+                        <h4 class="text-uppercase text-decoration-underline mt-3">PAYMENT VOUCHER - ${meta.group.toUpperCase()}</h4>
+                        <p class="fw-bold">PERIOD: ${meta.year}-${meta.month}</p>
+                    </div>
+                 `;
+
+                 const footerHtml = isLastPage ? `
+                    <tfoot class="fw-bold">
+                        <tr>
+                            <td colspan="5" class="text-end">TOTAL</td>
+                            <td class="text-end">${formatCurrency(overallTotalNet)}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                 ` : '';
+
+                 const signatureSection = isLastPage ? `
+                    <div class="d-flex justify-content-around mt-5 pt-5">
+                        ${sigHtml}
+                    </div>
+                 ` : '';
+
+                 const pageContent = `
+                    <div class="payslip-page p-5 position-relative bg-white" style="min-height: 297mm; width: 210mm; margin: 0 auto;">
+                        ${headerHtml}
+                        <table class="table table-bordered table-sm" style="font-size: 0.8rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>PF No</th>
+                                    <th>Name</th>
+                                    <th>Bank</th>
+                                    <th>Account No</th>
+                                    <th class="text-end">Net Pay</th>
+                                    <th>Signature</th>
+                                </tr>
+                            </thead>
+                            <tbody>${chunkHtml}</tbody>
+                            ${footerHtml}
+                        </table>
+                        ${signatureSection}
+                        <div class="mt-4 text-center text-muted small">
+                            Page ${page + 1} of ${totalPages} - Generated on ${new Date().toLocaleDateString()}
+                        </div>
+                    </div>
+                 `;
+                 
+                 html += pageContent;
+             }
+
+             container.innerHTML = html;
         }
     </script>
 </body>

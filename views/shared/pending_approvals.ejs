@@ -76,6 +76,13 @@
                     </div>
                 </div>
             </div>
+            <footer class="mt-4 py-3 text-center text-muted border-top">
+                <% if (role === 'manager') { %>
+                    <%- include('../manager/partials/footer') %>
+                <% } else { %>
+                    <%- include('../data_entry/partials/footer') %>
+                <% } %>
+            </footer>
         </div>
     </main>
 

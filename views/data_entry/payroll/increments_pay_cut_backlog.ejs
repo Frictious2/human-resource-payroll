@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Increments / Pay Cut / Backlog · HR & Payroll</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <div>
+                    <h2 class="mb-0">Increments / Pay Cut / Backlog</h2>
+                    <div class="text-muted">Manage staff increments and salary adjustments</div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <% if (typeof req !== 'undefined' && req.query.success) { %>
+                         <div class="alert alert-success"><%= req.query.success %></div>
+                    <% } %>
+                    <% if (typeof req !== 'undefined' && req.query.error) { %>
+                         <div class="alert alert-danger"><%= req.query.error %></div>
+                    <% } %>
+
+                    <form action="/data-entry/payroll/increments-pay-cut-backlog" method="POST">
+                        <div class="row g-3">
+                            <!-- Target Selection -->
+                            <div class="col-12">
+                                <label class="form-label d-block fw-bold">Target Group</label>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="target" id="targetAll" value="All" onchange="toggleStaffSelection()">
+                                    <label class="form-check-label" for="targetAll">All Staff</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="target" id="targetStaff" value="Staff" checked onchange="toggleStaffSelection()">
+                                    <label class="form-check-label" for="targetStaff">Specific Staff</label>
+                                </div>
+                            </div>
+
+                            <!-- Staff Selection -->
+                            <div class="col-md-4 staff-field">
+                                <label for="pfno" class="form-label">Staff PFNo</label>
+                                <input type="text" class="form-control" id="pfno" name="pfno" list="staffList" onchange="fillStaffDetails()">
+                                <datalist id="staffList">
+                                    <% staffList.forEach(s => { %>
+                                        <option value="<%= s.PFNo %>" data-name="<%= s.SName %>" data-grade="<%= s.CGrade %>"><%= s.SName %></option>
+                                    <% }) %>
+                                </datalist>
+                            </div>
+                            <div class="col-md-4 staff-field">
+                                <label for="staffName" class="form-label">Staff Name</label>
+                                <input type="text" class="form-control" id="staffName" readonly>
+                            </div>
+                            <div class="col-md-4 staff-field">
+                                <label for="grade" class="form-label">Grade</label>
+                                <input type="text" class="form-control" id="grade" name="grade" readonly>
+                            </div>
+
+                            <!-- Increment Details -->
+                            <div class="col-md-4">
+                                <label for="incDate" class="form-label">Increment Date</label>
+                                <input type="date" class="form-control" id="incDate" name="incDate" value="<%= new Date().toISOString().split('T')[0] %>" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="type" class="form-label">Type</label>
+                                <select class="form-select" id="type" name="type" required onchange="togglePayOptions()">
+                                    <option value="">Select Type</option>
+                                    <% types.forEach(t => { %>
+                                        <option value="<%= t.InsCode %>"><%= t.InsType %></option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="incNo" class="form-label">Increment No</label>
+                                <input type="number" class="form-control" id="incNo" name="incNo" value="0">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="days" class="form-label">Days</label>
+                                <input type="number" class="form-control" id="days" name="days" value="0">
+                            </div>
+
+                            <!-- Pay Options -->
+                            <div class="col-12">
+                                <label class="form-label d-block fw-bold">Pay Options</label>
+                                <div class="form-check form-check-inline" id="fullPayContainer">
+                                    <input class="form-check-input" type="checkbox" name="payType" id="fullPay" value="full" onclick="handleCheckbox(this)">
+                                    <label class="form-check-label" for="fullPay">Full Pay</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="payType" id="partPay" value="part" onclick="handleCheckbox(this)">
+                                    <label class="form-check-label" for="partPay">Part Pay</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="payType" id="withoutPay" value="without" onclick="handleCheckbox(this)">
+                                    <label class="form-check-label" for="withoutPay">Without Pay</label>
+                                </div>
+                            </div>
+
+                            <div class="col-12 mt-4">
+                                <button type="submit" class="btn btn-primary">Submit for Approval</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function toggleStaffSelection() {
+            const isAll = document.getElementById('targetAll').checked;
+            const staffFields = document.querySelectorAll('.staff-field');
+            const pfnoInput = document.getElementById('pfno');
+            
+            staffFields.forEach(field => {
+                if (isAll) {
+                    field.style.display = 'none';
+                    pfnoInput.removeAttribute('required');
+                    pfnoInput.value = ''; // Clear value
+                } else {
+                    field.style.display = 'block';
+                    pfnoInput.setAttribute('required', 'required');
+                }
+            });
+        }
+
+        function fillStaffDetails() {
+            const pfno = document.getElementById('pfno').value;
+            const options = document.querySelectorAll('#staffList option');
+            let found = false;
+            
+            options.forEach(opt => {
+                if (opt.value === pfno) {
+                    document.getElementById('staffName').value = opt.getAttribute('data-name');
+                    document.getElementById('grade').value = opt.getAttribute('data-grade');
+                    found = true;
+                }
+            });
+            
+            if (!found) {
+                document.getElementById('staffName').value = '';
+                document.getElementById('grade').value = '';
+            }
+        }
+
+        function togglePayOptions() {
+            const type = document.getElementById('type').value;
+            const fullPayContainer = document.getElementById('fullPayContainer');
+            
+            // 07 is BACKLOG, 05 is PART PAY (from schema dump)
+            // User said: Hide Full Pay if BACKLOG (Code 6) or PART PAY (Code 5)
+            // Assuming BACKLOG is 07 as per DB. Also hiding for 06 just in case.
+            if (type === '07' || type === '05' || type === '06') {
+                fullPayContainer.style.display = 'none';
+                document.getElementById('fullPay').checked = false;
+            } else {
+                fullPayContainer.style.display = 'inline-block';
+            }
+        }
+
+        function handleCheckbox(checkbox) {
+            if (checkbox.checked) {
+                const checkboxes = document.getElementsByName('payType');
+                checkboxes.forEach(cb => {
+                    if (cb !== checkbox) cb.checked = false;
+                });
+            }
+        }
+
+        // Initialize
+        toggleStaffSelection();
+        togglePayOptions();
+    </script>
+</body>
+</html>

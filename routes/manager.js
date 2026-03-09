@@ -59,7 +59,8 @@ router.get('/approve/training/view', managerController.getApproveTrainingView);
 router.post('/api/approve/training', managerController.postApproveTraining);
 router.get('/approve/query', managerController.getApproveQuery);
 router.post('/approve/query', managerController.postApproveQuery);
-router.get('/approve/acting-allowance', managerController.getComingSoon);
+router.get('/approve/acting-allowance', managerController.getApproveActingAllowance);
+router.post('/api/approve/acting-allowance', managerController.postApproveActingAllowance);
 router.get('/approve/yearly', managerController.getComingSoon);
 // Staff Exit Approval
 router.get('/approve/exit', managerController.getApproveExit);
@@ -78,8 +79,11 @@ router.post('/api/approve/loan-repayment', managerController.postApproveLoanRepa
 router.get('/approve/guarantee', managerController.getApproveGuarantee);
 router.post('/api/approve/guarantee', managerController.postApproveGuarantee);
 router.get('/approve/salary-review', managerController.getComingSoon);
-router.get('/approve/increment', managerController.getComingSoon);
-router.get('/approve/bonus', managerController.getComingSoon);
+router.get('/approve/increment', managerController.getApproveIncrement);
+router.post('/approve/increment', managerController.postApproveIncrement);
+router.get('/approve/bonus', managerController.getApproveBonus);
+router.get('/api/bonus-awards/:id', managerController.getBonusAwardById);
+router.post('/api/approve/bonus', managerController.postApproveBonus);
 router.get('/approve/end-of-service', managerController.getComingSoon);
 router.get('/approve/redundancy', managerController.getApproveRedundancy);
 router.post('/approve/redundancy', managerController.approveRedundancy);

@@ -290,6 +290,88 @@ const managerController = {
           res.status(500).send('Server Error');
       }
   },
+
+  // Bonus Awards Approval
+  getApproveBonus: async (req, res) => {
+    try {
+      const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+      const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+      const [rows] = await pool.query(`
+        SELECT 
+          ba.*, 
+          IFNULL(ba.Fixed, 0) as Fixed,
+          IFNULL(ba.Percent, 0) as Percent,
+          IFNULL(ba.BTaxable, 0) as BTaxable
+        FROM tblbonusawards ba
+        WHERE IFNULL(ba.Approved, 0) = 0
+        ORDER BY ba.EntryDate DESC
+      `);
+
+      res.render('manager/approve/bonus', {
+        title: 'Approve Bonus Awards',
+        path: '/manager/approve/bonus',
+        user: req.session.user || { name: 'Manager' },
+        companyName,
+        bonuses: rows
+      });
+    } catch (error) {
+      console.error('Approve Bonus Error:', error);
+      res.status(500).send('Server Error');
+    }
+  },
+
+  getBonusAwardById: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const candidates = ['RefNo', 'Id', 'BonusID'];
+      for (const key of candidates) {
+        const [rows] = await pool.query(`SELECT * FROM tblbonusawards WHERE ${key} = ? LIMIT 1`, [id]);
+        if (rows.length > 0) return res.json(rows[0]);
+      }
+      res.json(null);
+    } catch (error) {
+      console.error('Get Bonus Award Manager Error:', error);
+      res.status(500).json({ error: 'Server Error' });
+    }
+  },
+
+  postApproveBonus: async (req, res) => {
+    try {
+      const { id, action } = req.body; // action: 'approve' | 'reject'
+      const approvedBy = (req.session.user && req.session.user.name) ? req.session.user.name : 'Manager';
+      const now = new Date();
+
+      // Determine primary key column
+      const [colsRows] = await pool.query(`
+        SELECT COLUMN_NAME 
+        FROM information_schema.COLUMNS 
+        WHERE TABLE_NAME = 'tblbonusawards'
+      `);
+      const colSet = new Set(colsRows.map(r => r.COLUMN_NAME));
+      const keyCol = colSet.has('RefNo') ? 'RefNo' : (colSet.has('Id') ? 'Id' : (colSet.has('BonusID') ? 'BonusID' : null));
+      if (!keyCol) return res.status(400).json({ error: 'Missing key column' });
+
+      const status = action === 'approve' ? 1 : 2;
+
+      // Build dynamic update with available columns
+      const updates = [];
+      const params = [];
+      if (colSet.has('Approved')) { updates.push('Approved = ?'); params.push(status); }
+      if (colSet.has('ApprovedBy')) { updates.push('ApprovedBy = ?'); params.push(approvedBy); }
+      if (colSet.has('DateApproved')) { updates.push('DateApproved = ?'); params.push(now); }
+      if (colSet.has('TimeApproved')) { updates.push('TimeApproved = ?'); params.push(now); }
+
+      if (updates.length === 0) return res.status(400).json({ error: 'No approvable columns' });
+
+      params.push(id);
+      await pool.query(`UPDATE tblbonusawards SET ${updates.join(', ')} WHERE ${keyCol} = ?`, params);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Post Approve Bonus Error:', error);
+      res.status(500).json({ error: 'Server Error' });
+    }
+  },
  
      getApproveIncomeSetupView: async (req, res) => {
       try {
@@ -2217,6 +2299,115 @@ const managerController = {
         } catch (error) {
             console.error(error);
             res.status(500).send('Server Error');
+        }
+    },
+
+    getApproveIncrement: async (req, res) => {
+        try {
+            const [increments] = await pool.query(`
+                SELECT 
+                    i.*,
+                    s.SName,
+                    t.InsType,
+                    DATE_FORMAT(i.IncDate, '%Y-%m-%d %H:%i:%s.%f') as IncDateStr
+                FROM tblincrement i
+                LEFT JOIN tblstaff s ON i.PFNo = s.PFNo
+                LEFT JOIN tblinstype t ON i.Type = t.InsCode
+                WHERE i.Approved = 0
+                ORDER BY i.DateKeyed DESC
+            `);
+
+            res.render('manager/approve/increment', {
+                title: 'Approve Increments',
+                path: '/manager/approve/increment',
+                user: req.session.user || { name: 'Manager' },
+                increments
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    postApproveIncrement: async (req, res) => {
+        try {
+            const { pfno, incDate, type, action } = req.body;
+            
+            const status = action === 'approve' ? 1 : 2;
+            const user = req.session.user ? req.session.user.name : 'Manager';
+            
+            // Note: tblincrement doesn't have a unique ID, so we use composite keys
+            // But incDate coming from client might be formatted string.
+            // It's safer if we can pass a unique identifier, but we don't have one.
+            // We'll rely on PFNo, IncDate, and Type.
+
+            await pool.query(
+                `UPDATE tblincrement 
+                 SET Approved = ?, ApprovedBy = ?, DateApproved = CURDATE(), TimeApproved = CURTIME() 
+                 WHERE PFNo = ? AND Type = ? AND IncDate = ? AND Approved = 0`,
+                [status, user, pfno, type, incDate]
+            );
+
+            res.json({ success: true });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    // Acting Allowance Approval
+    getApproveActingAllowance: async (req, res) => {
+        try {
+            const [actingRecords] = await pool.query(`
+                SELECT 
+                    a.*,
+                    s.SName,
+                    cg.Grade as CurrentGradeName,
+                    cj.JobTitle as CurrentJobTitleName,
+                    ag.Grade as ActingGradeName,
+                    aj.JobTitle as ActingJobTitleName,
+                    d.DeptName as ActingDeptName
+                FROM tblacting a
+                LEFT JOIN tblstaff s ON a.PFNo = s.PFNo
+                LEFT JOIN tblgrade cg ON a.C_Grade = cg.GradeCode
+                LEFT JOIN tbljobtitle cj ON a.JobTitle = cj.Code
+                LEFT JOIN tblgrade ag ON a.A_Grade = ag.GradeCode
+                LEFT JOIN tbljobtitle aj ON a.A_JobTitle = aj.Code
+                LEFT JOIN tbldept d ON a.A_dept = d.DeptCode
+                WHERE a.Approved = 0
+                ORDER BY a.DateKeyed DESC
+            `);
+
+            res.render('manager/approve/acting_allowance', {
+                title: 'Approve Acting Allowance',
+                path: '/manager/approve/acting-allowance',
+                user: req.session.user || { name: 'Manager' },
+                actingRecords
+            });
+        } catch (error) {
+            console.error('Acting Allowance Approval Error:', error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    postApproveActingAllowance: async (req, res) => {
+        try {
+            const { refNo, action } = req.body;
+            
+            const status = action === 'approve' ? 1 : 2;
+            const user = req.session.user ? req.session.user.name : 'Manager';
+            
+            await pool.query(
+                `UPDATE tblacting 
+                 SET Approved = ?, ApprovedBy = ?, DateApproved = CURDATE(), TimeApproved = CURTIME() 
+                 WHERE RefNo = ? AND Approved = 0`,
+                [status, user, refNo]
+            );
+
+            res.json({ success: true });
+        } catch (error) {
+            console.error('Approve Acting Allowance Error:', error);
+            res.status(500).json({ error: 'Server Error' });
         }
     }
 };

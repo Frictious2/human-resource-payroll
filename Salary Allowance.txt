@@ -1,0 +1,213 @@
+If Salary / Code 01 is selected, then run the below queries one after the other
+
+INSERT INTO tblPayroll ( SalDate, PDate, PFNo, Dept, Grade, JobTitle, PayThrough, Bank, PayingBBAN, PayingBank, AccountNo, [Level], Salary, Allw02, Allw03, Allw04, Allw05, Allw06, Allw07, Allw08, Allw09, Allw10, Allw11, Allw12, Allw13, Allw14, Allw15, Allw16, Allw17, Allw18, Allw19, Allw20, TotalIncome, Taxable, Tax, NassitEmp, NassitInst, GratEmp, GratInst, NetIncome, Ded1, Ded2, Ded3, Ded4, Ded5, PMonth, PYear, PType, FullPay, HalfPay, WithoutPay, Operator, DateKeyed, TimeKeyed, Approved, ApprovedBy, DateApproved, TimeApproved, EmpType, PayCurrency, ExchRate )
+SELECT Forms!frmPay!ActivityDate AS SalDate, Date() AS PDate, tblSalary.PFNo, tblSalary.Dept, tblSalary.Grade, tblSalary.JobTitle, tblSalary.PayThrough, tblSalary.Bank, DLookUp("AccNo","tblComInfo") AS PayingBBAN, DLookUp("PayingBank","tblComInfo") AS PayingBank, tblSalary.AccountNo, tblSalary.Level, tblSalary.Salary, tblSalary.Allw02, tblSalary.Allw03, tblSalary.Allw04, tblSalary.Allw05, tblSalary.Allw06, tblSalary.Allw07, tblSalary.Allw08, tblSalary.Allw09, tblSalary.Allw10, tblSalary.Allw11, tblSalary.Allw12, tblSalary.Allw13, tblSalary.Allw14, tblSalary.Allw15, tblSalary.Allw16, tblSalary.Allw17, tblSalary.Allw18, tblSalary.Allw19, tblSalary.Allw20, tblSalary.TotalIncome, tblSalary.Taxable, tblSalary.Tax, tblSalary.NassitEmp, tblSalary.NassitInst, tblSalary.GratEmp, tblSalary.GratInst, tblSalary.NetIncome, tblSalary.Ded1, tblSalary.UnionDues, tblSalary.Ded3, tblSalary.Ded4, tblSalary.Ded5, Month(Forms!frmPay!ActivityDate) AS Pmonth, Year(Forms!frmPay!ActivityDate) AS PYear, "01" AS PType, tblSalary.FullPay, tblSalary.HalfPay, tblSalary.WithoutPay, Forms!frmLogin!txtUser AS Operator, Date() AS DateKeyed, Time() AS TimeKeyed, tblSalary.Approved, tblSalary.ApprovedBy, tblSalary.DateApproved, tblSalary.TimeApproved, tblSalary.EmpType, tblSalary.PayCurrency, tblSalary.ExchRate
+FROM tblStaff INNER JOIN tblSalary ON tblStaff.PFNo = tblSalary.PFNo
+GROUP BY Forms!frmPay!ActivityDate, tblSalary.PFNo, tblSalary.Dept, tblSalary.Grade, tblSalary.JobTitle, tblSalary.PayThrough, tblSalary.Bank, DLookUp("AccNo","tblComInfo"), DLookUp("PayingBank","tblComInfo"), tblSalary.AccountNo, tblSalary.Level, tblSalary.Salary, tblSalary.Allw02, tblSalary.Allw03, tblSalary.Allw04, tblSalary.Allw05, tblSalary.Allw06, tblSalary.Allw07, tblSalary.Allw08, tblSalary.Allw09, tblSalary.Allw10, tblSalary.Allw11, tblSalary.Allw12, tblSalary.Allw13, tblSalary.Allw14, tblSalary.Allw15, tblSalary.Allw16, tblSalary.Allw17, tblSalary.Allw18, tblSalary.Allw19, tblSalary.Allw20, tblSalary.TotalIncome, tblSalary.Taxable, tblSalary.Tax, tblSalary.NassitEmp, tblSalary.NassitInst, tblSalary.GratEmp, tblSalary.GratInst, tblSalary.NetIncome, tblSalary.Ded1, tblSalary.UnionDues, tblSalary.Ded3, tblSalary.Ded4, tblSalary.Ded5, Month(Forms!frmPay!ActivityDate), Year(Forms!frmPay!ActivityDate), "01", tblSalary.FullPay, tblSalary.HalfPay, tblSalary.WithoutPay, Forms!frmLogin!txtUser, Date(), Time(), tblSalary.Approved, tblSalary.ApprovedBy, tblSalary.DateApproved, tblSalary.TimeApproved, tblSalary.EmpType, tblSalary.PayCurrency, tblSalary.ExchRate, Date(), tblStaff.approved, tblStaff.EmpStatus, tblSalary.Posted, tblStaff.DOE, tblStaff.ReasonDate
+HAVING (((tblSalary.TotalIncome)>0) AND ((tblSalary.FullPay)=Yes) AND ((tblSalary.HalfPay)=No) AND ((tblSalary.WithoutPay)=No) AND ((tblSalary.Approved)=Yes) AND ((tblStaff.approved)=Yes) AND ((tblStaff.EmpStatus)<>"04") AND ((tblSalary.Posted)=No) AND ((tblStaff.DOE)<[Forms]![frmPay]![ActivityDate])) OR (((tblStaff.ReasonDate)>[Forms]![frmPay]![ActivityDate]));
+
+Then
+INSERT INTO tblpayroll ( PDate, SalDate, Grade, PFNo, [Level], Dept, JobTitle, Salary, Allw02, Allw03, Allw04, Allw05, Allw06, Allw07, Allw08, Allw09, Allw10, Allw11, Allw12, Allw13, Allw14, Allw15, Allw16, Allw17, Allw18, Allw19, Allw20, TotalIncome, Taxable, Tax, NassitEmp, NassitInst, GratEmp, GratInst, UnionDues, NetIncome, PayThrough, Bank, PayingBBAN, PayingBank, AccountNo, PType, Operator, DateKeyed, TimeKeyed, PayCurrency, EmpType, HalfPay, FullPay, PMonth, PYear )
+SELECT [Forms]![frmPay]![ActivityDate] AS Pdate, [Forms]![frmPay]![ActivityDate] AS saldate, tblStaff.CGrade, tblStaff.PFNo, tblStaff.Level, tblStaff.CDept, tblStaff.JobTitle, (([StartLevel]+([Notch]*[Increment]))/12)/2 AS Salary, (IIf([Allw02]<>-1,0,IIf([Freq02]="Y" Or [Freq02]=Null,0,IIf([Rate02]>0,[Salary]*([Rate02]/100),[Amount02]/12)))) AS Allw2, (IIf([Allw03]<>-1,0,IIf([Freq03]="Y" Or [Freq03]=Null,0,IIf([Rate03]>0,[Salary]*([Rate03]/100),[Amount03]/12))))/2 AS Allw3, (IIf([Allw04]<>-1,0,IIf([Freq04]="Y" Or [Freq04]=Null,0,IIf([Rate04]>0,[Salary]*([Rate04]/100),[Amount04]/12))))/2 AS Allw4, (IIf([Allw05]<>-1,0,IIf([Freq05]="Y" Or [Freq05]=Null,0,IIf([Rate05]>0,[Salary]*([Rate05]/100),[Amount05]/12))))/2 AS Allw5, (IIf([Allw06]<>-1,0,IIf([Freq06]="Y" Or [Freq06]=Null,0,IIf([Rate06]>0,[Salary]*([Rate06]/100),[Amount06]/12))))/2 AS Allw6, IIf([Allw07]<>-1,0,IIf([Freq07]="Y" Or [Freq07]=Null,0,IIf([Rate07]>0,([Salary]*[Rate07])/12,IIf([Rate07]=0 And [Vehicle]="MB",[amount07]/12))))/2 AS Allw7, (IIf([Allw08]<>-1,0,IIf([Freq08]="Y" Or [Freq08]=Null,0,IIf([Rate08]>0,[Salary]*([Rate08]/100),[Amount08]/12))))/2 AS Allw8, (IIf([Allw09]<>-1,0,IIf([Freq09]="Y" Or [Freq09]=Null,0,IIf([Rate09]>0,[Salary]*([Rate09]/100),[Amount09]/12))))/2 AS Allw9, IIf([Allw10]<>-1,0,IIf([Freq10]="Y" Or [Freq10]=Null,0,IIf([Rate10]>0,([Salary]*[Rate10])/12,IIf([Rate10]=Null Or [Rate10]=0 And [Percent10]=-1 And [Vehicle]="CR",[Amount10]/12,[TAmount10]/12))))/2 AS Allw010, (IIf([Allw11]<>-1,0,IIf([Freq11]="Y" Or [Freq11]=Null,0,IIf([Rate11]>0,[Salary]*([Rate11]/100),[Amount11]/12))))/2 AS Allw011, (IIf([Allw12]<>-1,0,IIf([Freq12]="Y" Or [Freq12]=Null,0,IIf([Rate12]>0,[Salary]*([Rate12]/100),[Amount12]/12))))/2 AS Allw012, (IIf([Allw13]<>-1,0,IIf([Freq13]="Y" Or [Freq13]=Null,0,IIf([Rate13]>0,([Salary]*([Rate13]/100)),[Amount13]/12)))) AS Allw013, 0 AS Allw014, (IIf([Allw15]<>-1,0,IIf([Freq15]="Y" Or [Freq15]=Null,0,IIf([Rate15]>0,([Salary]*([Rate15]/100)),[Amount15]/12))))/2 AS Allw015, (IIf([Allw16]<>-1,0,IIf([Freq16]="Y" Or [Freq16]=Null,0,IIf([Rate16]>0 And [Professional]='02',([Salary]*([Rate16]/100)),[Amount16]/12))))/2 AS Allw016, (IIf([Allw17]<>-1,0,IIf([Freq17]="Y" Or [Freq17]=Null,0,IIf([Rate17]>0,[Salary]*([Rate17]/100),[Amount17]/12)))) AS Allw017, (IIf([Allw18]<>-1,0,IIf([Freq18]="Y" Or [Freq18]=Null,0,IIf([Rate18]>0,([Salary]*([Rate18]/100)),[Amount18]/12))))/2 AS Allw018, (IIf([Allw19]<>-1,0,IIf([Freq19]="Y" Or [Freq19]=Null,0,IIf([Rate19]>0,([Salary]*([Rate19]/100)),[Amount19]/12))))/2 AS Allw019, (IIf([Allw20]<>-1,0,IIf([Freq20]="Y" Or [Freq20]=Null,0,IIf([Rate20]>0,([Salary]*([Rate20]/100)),[Amount20]/12))))/2 AS Allw020, ([Salary]+[Allw2]+[Allw3]+[Allw4]+[Allw5]+[Allw6]+[Allw7]+[Allw8]+[Allw9]+[Allw010]+[Allw011]+[Allw012]+[Allw013]+[Allw14]+[Allw015]+[Allw016]+[Allw017]+[Allw018]+[Allw019]+[Allw020]) AS TotalIncome, ([TotalIncome]-[NassitEmp]-[AllwThreshold]) AS Taxable, (IIf([Taxable]<=[R1],[R1]*([R1Tax]/100),IIf([Taxable]>[R1] And [Taxable]<=[R2],([Taxable]-[R1])*([R2Tax]/100),IIf([Taxable]>[R2] And [Taxable]<=[R3],([Taxable]-[R2])*([R3Tax]/100)+(([R2]-[R1])*([R2Tax]/100)),IIf([Taxable]>[R3] And [Taxable]<=[R4],([Taxable]-[R3])*([R4Tax]/100)+(([R3]-[R2])*([R3Tax]/100))+(([R2]-[R1])*([R2Tax]/100)),IIf([Taxable]>[R4],([Taxable]-[R4])*([R5Tax]/100)+(([R4]-[R3])*([R4Tax]/100))+(([R3]-[R2])*([R3Tax]/100))+(([R2]-[R1])*([R2Tax]/100)))))))) AS IncTax, (IIf([NASSITR]=0,0,[Salary]*([NRate]/100))) AS NassitEmp, (IIf([NASSITR]=0,0,[Salary]*([NORate]/100))) AS NassitInst, ([Salary]*([GRate]/100)) AS GE, ([Salary]*([GORate]/100)) AS [GO], IIf([Level]="01" And [UnionMember]="Y",[Management],IIf([Level]="02" And [UnionMember]="Y",[UnionDues],0)) AS Dues, Round([TotalIncome]-([NassitEmp]+[GE]+[IncTax]+[Ded1]+[Dues]+[Ded3]+[Ded4]+[Ded5])) AS NetSalary, tblEntitle.PayThrough, tblEntitle.Bank, tblEntitle.PayingBBAN, tblEntitle.PayingBank, tblEntitle.AccountNo, "01" AS PType, [Forms]![frmLogin]![txtUser] AS [User], Date() AS Keyed, Time() AS TimeK, tblStaff.PayCurrency, tblStaff.EmpType, qrySalSet_HP.HalfPay, No AS fullPay, Month([Forms]![frmPay]![ActivityDate]) AS PMonth, Year([Forms]![frmPay]![ActivityDate]) AS PYear
+FROM tblTax, tblParams1, ((tblStaff INNER JOIN (tblAllowance INNER JOIN tblGrade ON tblAllowance.Grade = tblGrade.GradeCode) ON tblStaff.JobTitle = tblGrade.JobTitle) INNER JOIN qrySalSet_HP ON tblStaff.PFNo = qrySalSet_HP.PFNo) INNER JOIN tblEntitle ON tblStaff.PFNo = tblEntitle.PFNo
+WHERE (((qrySalSet_HP.HalfPay)=Yes) AND ((tblStaff.EmpStatus)<>"04" Or (tblStaff.EmpStatus)<>"05"))
+ORDER BY tblStaff.PFNo;
+
+Then
+INSERT INTO tblLoanRepyt ( PFNo, DeductionDate, LoanType, DAmount, DCode, ExpDate, TransRef, PYear, PMonth )
+SELECT tblLoan.PFNo, [Forms]![frmPay]![ActivityDate] AS PDate, tblLoan.LTypeCode, IIf([Ded1]=0,[Ded4],[Ded1]) AS DAmount, tblLoan.LTrans, tblLoan.ExpDate, tblLoan.TransNo, Year([Forms]![frmPay]![ActivityDate]) AS PYear, Month([Forms]![frmPay]![ActivityDate]) AS PMonth
+FROM tblPayroll INNER JOIN tblLoan ON tblPayroll.PFNo = tblLoan.PFNo
+WHERE (((IIf([Ded1]=0,[Ded4],[Ded1]))>0) AND ((tblLoan.Expired)=No));
+
+Then
+INSERT INTO tblLoan ( PFNo, LTypeCode, LTrans, Amount, EntryDate, TransNo )
+SELECT tblLoanRepyt.PFNO, tblLoanRepyt.LoanType, "03" AS DCode, tblLoanRepyt.DAmount, [Forms]![frmPay]![AcivityDate] AS PDate, tblLoanRepyt.TransRef
+FROM tblLoanRepyt;
+
+Then
+UPDATE tblLoan INNER JOIN tblSalary ON tblLoan.PFNo = tblSalary.PFNo SET tblSalary.LoanCounter = [DurationBal]
+WHERE (((tblSalary.LoanCounter)>0) AND ((tblLoan.LTrans)<>"03" Or (tblLoan.LTrans)<>"04"));
+
+Then
+UPDATE tblLoan SET tblLoan.LoanBal = [LoanBal]-[MonthlyRepayment], tblLoan.DurationBal = [DurationBal]-1, tblLoan.expired = IIf([LoanBal]<=0,-1,0)
+WHERE (((tblLoan.LoanBal)>0) AND ((tblLoan.DurationBal)>0) AND ((tblLoan.LTrans)<>"03" Or (tblLoan.LTrans)<>"04") AND ((tblLoan.LTypeCode)<>"03" Or (tblLoan.LTypeCode)<>"04"));
+
+Then
+UPDATE tblLoan INNER JOIN tblSalary ON tblLoan.PFNo = tblSalary.PFNo SET tblSalary.Ded1 = 0, tblSalary.LoanCounter = [tblLoan]![DurationBal], tblLoan.Expired = Yes, tblSalary.Ded3 = 0, tblSalary.Ded4 = 0
+WHERE (((tblSalary.LoanCounter)<=0) AND ((tblLoan.Expired)=No) AND ((tblLoan.LoanBal)<=0) AND ((tblLoan.LTrans)<>"03" Or (tblLoan.LTrans)<>"04"));
+
+Then
+DELETE tblLeaveAllowance.EntryDate, tblLeaveAllowance.TCode, tblLeaveAllowance.PMonth, tblLeaveAllowance.PYear
+FROM tblLeaveAllowance
+WHERE (((tblLeaveAllowance.EntryDate)=[Forms]![frmPay]![ActivityDate]) AND ((tblLeaveAllowance.TCode)="01") AND ((tblLeaveAllowance.PMonth)=Month([Forms]![frmPay]![ActivityDate])) AND ((tblLeaveAllowance.PYear)=Year([Forms]![frmPay]![ActivityDate])));
+
+Then
+INSERT INTO tblLeaveAllowance ( EntryDate, PFNo, SName, L_Allowance, TCode, Pmonth, PYear )
+SELECT [Forms]![frmPay]![ActivityDate] AS LM, tblStaff.PFNo, tblStaff.SName, tblYearlyPayments.TotalIncome, "01" AS TCode, Month([Forms]![frmPay]![ActivityDate]) AS Pmonth, Year([Forms]![frmPay]![ActivityDate]) AS PYear
+FROM tblStaff INNER JOIN tblYearlyPayments ON tblStaff.PFNo = tblYearlyPayments.PFNo
+WHERE (((tblStaff.empstatus)<>"04") AND ((tblYearlyPayments.ptype)="13"));
+
+Then
+INSERT INTO tblPayDay ( PayDate )
+SELECT tblPayroll.SalDate
+FROM tblPayroll;
+
+Then
+UPDATE tblSalary INNER JOIN tblLoan ON tblSalary.PFNo = tblLoan.PFNo SET tblSalary.Ded1 = 0, tblSalary.netincome = [TotalIncome]-([Tax]+[NassitEmp]+[GratEmp]+[UnionDues]+[Ded3]+[ded4]+[ded5])
+WHERE (((tblLoan.expired)=No) AND ((tblLoan.ltrans)="01") AND ((tblLoan.LoanBal)>0) AND ((tblLoan.RescheduleDate)>[Forms]![frmPay]![Activitydate]) AND ((tblLoan.Approved)=Yes) AND ((tblLoan.Reschedule)=Yes) AND ((tblLoan.Repaid)=No));
+
+Then
+UPDATE tblActing INNER JOIN tblSalary ON tblActing.PFNO = tblSalary.PFNo SET tblSalary.allw14 = 0, tblSalary.Paid = 0
+WHERE (((tblActing.Closed)=True) AND ((tblActing.Approved)=Yes) AND ((tblActing.EDate)<Date())) OR (((tblActing.EDate) Is Not Null And (tblActing.EDate)<Date()));
+
+Then
+INSERT INTO tblGLTrans ( GLDate, BasicSalary, Headquarters, Transport, COLA, Responsibility, MaidAllowance, Acting, Risk, Professional, StaffWelfare, Academic, IncomeTax, NassitEmp, ProvidentEmp, SSA, JSA, GLMonth, GLYear, SalAdvance, IntOnAdv, SalaryWages, Rent )
+SELECT DISTINCT Last(tblPayroll.PDate) AS LastOfPDate, Sum(IIf([Dept]="06" Or [Dept]="12",0,[Salary])) AS Basic, Sum(IIf([Dept]="06" Or [Dept]="12",[Salary]+[Allw03]+[Allw04]+[Allw05]+[Allw06]+[Allw10]+[Allw11]+[Allw12]+[Allw14]+[Allw16]+[Allw17]+[Allw19]+[Allw20])) AS HQ, Sum(IIf([Dept]="06" Or [Dept]="12",0,[Allw03]+[Allw10])) AS TRCM, Sum(IIf([Dept]="06" Or [Dept]="12",0,[Allw06])) AS Cola, Sum(IIf([Dept]="06" Or [Dept]="12",0,[Allw11])) AS Resp, Sum(IIf([Dept]="06" Or [Dept]="12",0,[Allw12])) AS Maid, Sum(IIf([Dept]="06" Or [Dept]="12",0,[Allw14])) AS Act, Sum(IIf([Dept]="06" Or [Dept]="12",0,[Allw17])) AS Risk, Sum(IIf([Dept]="06" Or [Dept]="12",0,[Allw16])) AS Prof, Sum(tblPayroll.Allw04) AS Welf, Sum(IIf([Dept]="06" Or [Dept]="12",0,[Allw19])) AS Acad, Sum(tblPayroll.Tax) AS SumOfTax, Sum(tblPayroll.NassitEmp) AS SumOfNassitEmp, Sum(tblPayroll.GratEmp) AS SumOfGratEmp, Sum((IIf([Level]="01",[Ded2],0))) AS SSA, Sum(IIf([Level]="02",[Ded2],0)) AS JSA, tblPayroll.PMonth, Last(tblPayroll.PYear) AS LastOfPYear, Sum(tblPayroll.Ded1) AS SumOfDed1, Sum(tblPayroll.Ded3) AS SumOfDed3, Sum(tblPayroll.Netincome) AS SumOfNetincome, Sum(tblPayroll.Ded4) AS SumOfDed4
+FROM tblPayroll
+GROUP BY tblPayroll.PMonth
+HAVING (((Last(tblPayroll.PDate))=[Forms]![frmPay]![ActivityDate]));
+
+If Rent / Code 02 is selected, then run the below queries
+INSERT INTO tblPayroll ( PDate, SalDate, PFNo, Grade, AccountNo, JobTitle, Salary, TotalIncome, Taxable, Tax, PMonth, PYear, PType, Operator, Paid, NetIncome, Approved, PayThrough, PayingBBAN, Allw13, Allw02, Allw05, Allw15, Bank, Dept, PayingBank, EmpType, PayCurrency )
+SELECT tblYearlyPayments.PDate, Forms!frmPay!ActivityDate AS SalDate, tblStaff.PFNo, tblStaff.CGrade, tblStaff.AccountNo, tblStaff.JobTitle, tblYearlyPayments.Monthly, tblYearlyPayments.TotalIncome, tblYearlyPayments.Taxable, tblYearlyPayments.Tax, tblYearlyPayments.PMonth, tblYearlyPayments.PYear, [Forms]![frmPay]![Activity] AS PType, DLookUp("FullName","tblPassword","Application.menubar=tblPassword!Level") AS Operator, Yes AS Paid, tblYearlyPayments.NetIncome, tblYearlyPayments.Approved, tblEntitle.PayThrough, tblEntitle.PayingBBAN, IIf([PType]="13",[TotalIncome],0) AS Total13, IIf([PType]="02",[TotalIncome],0) AS Total02, IIf([PType]="05",[TotalIncome],0) AS Total05, IIf([PType]="15",[TotalIncome],0) AS Total15, tblEntitle.Bank, tblStaff.CDept, tblEntitle.PayingBank, tblStaff.EmpType, tblStaff.PayCurrency
+FROM (tblStaff INNER JOIN tblEntitle ON tblStaff.PFNo = tblEntitle.PFNo) INNER JOIN tblYearlyPayments ON tblStaff.PFNo = tblYearlyPayments.PFNo
+GROUP BY tblYearlyPayments.PDate, Forms!frmPay!ActivityDate, tblStaff.PFNo, tblStaff.CGrade, tblStaff.AccountNo, tblStaff.JobTitle, tblYearlyPayments.Monthly, tblYearlyPayments.TotalIncome, tblYearlyPayments.Taxable, tblYearlyPayments.Tax, tblYearlyPayments.PMonth, tblYearlyPayments.PYear, [Forms]![frmPay]![Activity], Yes, tblYearlyPayments.NetIncome, tblYearlyPayments.Approved, tblEntitle.PayThrough, tblEntitle.PayingBBAN, IIf([PType]="13",[TotalIncome],0), IIf([PType]="02",[TotalIncome],0), IIf([PType]="05",[TotalIncome],0), IIf([PType]="15",[TotalIncome],0), tblEntitle.Bank, tblStaff.CDept, tblEntitle.PayingBank, tblStaff.EmpType, tblStaff.PayCurrency, tblStaff.CDept, tblStaff.EmpStatus
+HAVING (((tblYearlyPayments.Approved)=Yes) AND ((tblStaff.EmpStatus)<>"04"));
+
+Then
+UPDATE tblYearlyPayments SET tblYearlyPayments.Paid = Yes
+WHERE (((tblYearlyPayments.Paid)=No) AND ((tblYearlyPayments.PType)=[Forms]![frmPay]![Activity]) AND ((tblYearlyPayments.Approved)=Yes) AND ((tblYearlyPayments.Selected)=Yes));
+
+
+If Leave / Code 13 is selected, then run the below queries one after the other
+INSERT INTO tblPayroll ( PDate, SalDate, PFNo, Grade, AccountNo, JobTitle, Salary, TotalIncome, Taxable, Tax, PMonth, PYear, PType, Operator, Paid, NetIncome, Approved, PayThrough, PayingBBAN, Allw13, Allw02, Allw05, Allw15, Bank, Dept, PayingBank, EmpType, PayCurrency )
+SELECT tblYearlyPayments.PDate, Forms!frmPay!ActivityDate AS SalDate, tblStaff.PFNo, tblStaff.CGrade, tblStaff.AccountNo, tblStaff.JobTitle, tblYearlyPayments.Monthly, tblYearlyPayments.TotalIncome, tblYearlyPayments.Taxable, tblYearlyPayments.Tax, tblYearlyPayments.PMonth, tblYearlyPayments.PYear, [Forms]![frmPay]![Activity] AS PType, DLookUp("FullName","tblPassword","Application.menubar=tblPassword!Level") AS Operator, Yes AS Paid, tblYearlyPayments.NetIncome, tblYearlyPayments.Approved, tblEntitle.PayThrough, tblEntitle.PayingBBAN, IIf([PType]="13",[TotalIncome],0) AS Total13, IIf([PType]="02",[TotalIncome],0) AS Total02, IIf([PType]="05",[TotalIncome],0) AS Total05, IIf([PType]="15",[TotalIncome],0) AS Total15, tblEntitle.Bank, tblStaff.CDept, tblEntitle.PayingBank, tblStaff.EmpType, tblStaff.PayCurrency
+FROM (tblStaff INNER JOIN tblEntitle ON tblStaff.PFNo = tblEntitle.PFNo) INNER JOIN tblYearlyPayments ON tblStaff.PFNo = tblYearlyPayments.PFNo
+GROUP BY tblYearlyPayments.PDate, Forms!frmPay!ActivityDate, tblStaff.PFNo, tblStaff.CGrade, tblStaff.AccountNo, tblStaff.JobTitle, tblYearlyPayments.Monthly, tblYearlyPayments.TotalIncome, tblYearlyPayments.Taxable, tblYearlyPayments.Tax, tblYearlyPayments.PMonth, tblYearlyPayments.PYear, [Forms]![frmPay]![Activity], Yes, tblYearlyPayments.NetIncome, tblYearlyPayments.Approved, tblEntitle.PayThrough, tblEntitle.PayingBBAN, IIf([PType]="13",[TotalIncome],0), IIf([PType]="02",[TotalIncome],0), IIf([PType]="05",[TotalIncome],0), IIf([PType]="15",[TotalIncome],0), tblEntitle.Bank, tblStaff.CDept, tblEntitle.PayingBank, tblStaff.EmpType, tblStaff.PayCurrency, tblStaff.CDept, tblStaff.EmpStatus
+HAVING (((tblYearlyPayments.Approved)=Yes) AND ((tblStaff.EmpStatus)<>"04"));
+
+Then
+UPDATE tblYearlyPayments SET tblYearlyPayments.Paid = Yes
+WHERE (((tblYearlyPayments.Paid)=No) AND ((tblYearlyPayments.PType)=[Forms]![frmPay]![Activity]) AND ((tblYearlyPayments.Approved)=Yes) AND ((tblYearlyPayments.Selected)=Yes));
+
+Then
+INSERT INTO tblLeaveAllowance ( EntryDate, PFNo, SName, L_Allowance, TCode, Pmonth, PYear )
+SELECT [Forms]![frmPay]![ActivityDate] AS LM, tblStaff.PFNo, tblStaff.SName, tblYearlyPayments.TotalIncome, "01" AS TCode, Month([Forms]![frmPay]![ActivityDate]) AS Pmonth, Year([Forms]![frmPay]![ActivityDate]) AS PYear
+FROM tblStaff INNER JOIN tblYearlyPayments ON tblStaff.PFNo = tblYearlyPayments.PFNo
+WHERE (((tblStaff.empstatus)<>"04") AND ((tblYearlyPayments.ptype)="13"));
+
+Then
+INSERT INTO tblLeaveAllowance ( EntryDate, PFNo, SName, Payment, TCode, PMonth, PYear, TransNo, TimeKeyed, KeyedInBy )
+SELECT DISTINCT Date() AS EntryDate, TBLSTAFF.PFNo, TBLSTAFF.SName, tblLeave.Tax, "03" AS FCode, Month([Forms]![frmPay]![ActivityDate]) AS Pmonth, Year([Forms]![frmPay]![ActivityDate]) AS PYear, tblLeave.LCount, Time() AS KeyedIn, [Forms]![frmtxtLogin] AS KeyedInBy
+FROM (TBLSTAFF INNER JOIN tblLeave ON TBLSTAFF.PFNo = tblLeave.PFNO) INNER JOIN tblEntitle ON TBLSTAFF.PFNo = tblEntitle.PFNo
+GROUP BY Date(), TBLSTAFF.PFNo, TBLSTAFF.SName, tblLeave.Tax, "03", Month([Forms]![frmPay]![ActivityDate]), Year([Forms]![frmPay]![ActivityDate]), tblLeave.LCount, Time(), [Forms]![frmtxtLogin], [Allowance]-[Tax], TBLSTAFF.EmpStatus, tblEntitle.allw13, tblLeave.Basic, [Allowance]-[Basic]
+HAVING (((TBLSTAFF.EmpStatus)="01" Or (TBLSTAFF.EmpStatus)="03") AND ((tblEntitle.allw13)=True));
+
+Then
+UPDATE tblLeaveAllowance SET tblLeaveAllowance.Paid = Yes, tblLeaveAllowance.DatePaid = Date()
+WHERE (((tblLeaveAllowance.Initiated)=Yes));
+
+Then
+UPDATE tblPayroll SET tblPayroll.Operator = [Forms]![frmLogin]![txtUser], tblPayroll.DateKeyed = Date(), tblPayroll.TimeKeyed = Time(), tblPayroll.Approved = No;
+
+Then
+UPDATE tblLeave, tblPayroll SET tblLeave.EntryPassed = Yes, tblLeave.DateEP = Date()
+WHERE (((tblLeave.Approved)=Yes) AND ((tblPayroll.PType)="13"));
+
+
+If Welfare / Code 04 is selected, then run the following queries one after the other
+INSERT INTO tblPayroll ( PDate, SalDate, PFNo, Grade, AccountNo, JobTitle, Salary, TotalIncome, Taxable, Tax, PMonth, PYear, PType, Operator, Paid, NetIncome, Approved, PayThrough, PayingBBAN, Allw13, Allw02, Allw05, Allw15, Bank, Dept, PayingBank, EmpType, PayCurrency )
+SELECT tblYearlyPayments.PDate, Forms!frmPay!ActivityDate AS SalDate, tblStaff.PFNo, tblStaff.CGrade, tblStaff.AccountNo, tblStaff.JobTitle, tblYearlyPayments.Monthly, tblYearlyPayments.TotalIncome, tblYearlyPayments.Taxable, tblYearlyPayments.Tax, tblYearlyPayments.PMonth, tblYearlyPayments.PYear, [Forms]![frmPay]![Activity] AS PType, DLookUp("FullName","tblPassword","Application.menubar=tblPassword!Level") AS Operator, Yes AS Paid, tblYearlyPayments.NetIncome, tblYearlyPayments.Approved, tblEntitle.PayThrough, tblEntitle.PayingBBAN, IIf([PType]="13",[TotalIncome],0) AS Total13, IIf([PType]="02",[TotalIncome],0) AS Total02, IIf([PType]="05",[TotalIncome],0) AS Total05, IIf([PType]="15",[TotalIncome],0) AS Total15, tblEntitle.Bank, tblStaff.CDept, tblEntitle.PayingBank, tblStaff.EmpType, tblStaff.PayCurrency
+FROM (tblStaff INNER JOIN tblEntitle ON tblStaff.PFNo = tblEntitle.PFNo) INNER JOIN tblYearlyPayments ON tblStaff.PFNo = tblYearlyPayments.PFNo
+GROUP BY tblYearlyPayments.PDate, Forms!frmPay!ActivityDate, tblStaff.PFNo, tblStaff.CGrade, tblStaff.AccountNo, tblStaff.JobTitle, tblYearlyPayments.Monthly, tblYearlyPayments.TotalIncome, tblYearlyPayments.Taxable, tblYearlyPayments.Tax, tblYearlyPayments.PMonth, tblYearlyPayments.PYear, [Forms]![frmPay]![Activity], Yes, tblYearlyPayments.NetIncome, tblYearlyPayments.Approved, tblEntitle.PayThrough, tblEntitle.PayingBBAN, IIf([PType]="13",[TotalIncome],0), IIf([PType]="02",[TotalIncome],0), IIf([PType]="05",[TotalIncome],0), IIf([PType]="15",[TotalIncome],0), tblEntitle.Bank, tblStaff.CDept, tblEntitle.PayingBank, tblStaff.EmpType, tblStaff.PayCurrency, tblStaff.CDept, tblStaff.EmpStatus
+HAVING (((tblYearlyPayments.Approved)=Yes) AND ((tblStaff.EmpStatus)<>"04"));
+
+Then
+UPDATE tblYearlyPayments SET tblYearlyPayments.Paid = Yes
+WHERE (((tblYearlyPayments.Paid)=No) AND ((tblYearlyPayments.PType)=[Forms]![frmPay]![Activity]) AND ((tblYearlyPayments.Approved)=Yes) AND ((tblYearlyPayments.Selected)=Yes));
+
+Then
+INSERT INTO tblExport ( EntryDate, AccNo, TDetails, Debit, TCode )
+SELECT DISTINCT qryRentGroup01.EDate, qryRentGroup01.AccountNo, qryRentGroup01.AccountName, Sum(qryRentGroup01.Amount02) AS SumOfAmount02, "00" AS Code
+FROM qryRentGroup01
+GROUP BY qryRentGroup01.EDate, qryRentGroup01.AccountNo, qryRentGroup01.AccountName, "00";
+
+Then
+INSERT INTO tblExport ( TCode, AccNo, EntryDate, Debit, TDetails )
+SELECT DISTINCT "00" AS Code, qryRentGroup02.AccountNo, qryRentGroup02.EDate, Sum(qryRentGroup02.Amount02) AS SumOfAmount02, qryRentGroup02.AccountName
+FROM qryRentGroup02
+GROUP BY "00", qryRentGroup02.AccountNo, qryRentGroup02.EDate, qryRentGroup02.AccountName;
+
+Then
+INSERT INTO tblExport ( EntryDate, AccNo, TDetails, Debit, TCode )
+SELECT DISTINCT qryRentGroup03.EDate, qryRentGroup03.AccountNo, qryRentGroup03.AccountName, Sum(qryRentGroup03.Amount02) AS SumOfAmount02, "00" AS Code
+FROM qryRentGroup03
+GROUP BY qryRentGroup03.EDate, qryRentGroup03.AccountNo, qryRentGroup03.AccountName, "00";
+
+Then
+INSERT INTO tblExport ( EntryDate, AccNo, TDetails, Debit, TCode )
+SELECT DISTINCT qryRentGroup04.EDate, qryRentGroup04.AccountNo, qryRentGroup04.AccountName, Sum(qryRentGroup04.Amount02) AS SumOfAmount02, "00" AS Code
+FROM qryRentGroup04
+GROUP BY qryRentGroup04.EDate, qryRentGroup04.AccountNo, qryRentGroup04.AccountName, "00";
+
+If Inducement / code 05 is selected, run the queries given below one after the other
+INSERT INTO tblPayroll ( PDate, SalDate, PFNo, Grade, AccountNo, JobTitle, Salary, TotalIncome, Taxable, Tax, PMonth, PYear, PType, Operator, Paid, NetIncome, Approved, PayThrough, PayingBBAN, Allw13, Allw02, Allw05, Allw15, Bank, Dept, PayingBank, EmpType, PayCurrency )
+SELECT tblYearlyPayments.PDate, Forms!frmPay!ActivityDate AS SalDate, tblStaff.PFNo, tblStaff.CGrade, tblStaff.AccountNo, tblStaff.JobTitle, tblYearlyPayments.Monthly, tblYearlyPayments.TotalIncome, tblYearlyPayments.Taxable, tblYearlyPayments.Tax, tblYearlyPayments.PMonth, tblYearlyPayments.PYear, [Forms]![frmPay]![Activity] AS PType, DLookUp("FullName","tblPassword","Application.menubar=tblPassword!Level") AS Operator, Yes AS Paid, tblYearlyPayments.NetIncome, tblYearlyPayments.Approved, tblEntitle.PayThrough, tblEntitle.PayingBBAN, IIf([PType]="13",[TotalIncome],0) AS Total13, IIf([PType]="02",[TotalIncome],0) AS Total02, IIf([PType]="05",[TotalIncome],0) AS Total05, IIf([PType]="15",[TotalIncome],0) AS Total15, tblEntitle.Bank, tblStaff.CDept, tblEntitle.PayingBank, tblStaff.EmpType, tblStaff.PayCurrency
+FROM (tblStaff INNER JOIN tblEntitle ON tblStaff.PFNo = tblEntitle.PFNo) INNER JOIN tblYearlyPayments ON tblStaff.PFNo = tblYearlyPayments.PFNo
+GROUP BY tblYearlyPayments.PDate, Forms!frmPay!ActivityDate, tblStaff.PFNo, tblStaff.CGrade, tblStaff.AccountNo, tblStaff.JobTitle, tblYearlyPayments.Monthly, tblYearlyPayments.TotalIncome, tblYearlyPayments.Taxable, tblYearlyPayments.Tax, tblYearlyPayments.PMonth, tblYearlyPayments.PYear, [Forms]![frmPay]![Activity], Yes, tblYearlyPayments.NetIncome, tblYearlyPayments.Approved, tblEntitle.PayThrough, tblEntitle.PayingBBAN, IIf([PType]="13",[TotalIncome],0), IIf([PType]="02",[TotalIncome],0), IIf([PType]="05",[TotalIncome],0), IIf([PType]="15",[TotalIncome],0), tblEntitle.Bank, tblStaff.CDept, tblEntitle.PayingBank, tblStaff.EmpType, tblStaff.PayCurrency, tblStaff.CDept, tblStaff.EmpStatus
+HAVING (((tblYearlyPayments.Approved)=Yes) AND ((tblStaff.EmpStatus)<>"04"));
+
+Then
+UPDATE tblYearlyPayments SET tblYearlyPayments.Paid = Yes
+WHERE (((tblYearlyPayments.Paid)=No) AND ((tblYearlyPayments.PType)=[Forms]![frmPay]![Activity]) AND ((tblYearlyPayments.Approved)=Yes) AND ((tblYearlyPayments.Selected)=Yes));
+
+Then
+UPDATE tblPayroll SET tblPayroll.Paid = Yes, tblPayroll.DatePaid = Date()
+WHERE (((tblPayroll.Paid)=No) AND ((tblPayroll.PType)="05"));
+
+
+If Backlog / Code 07 is selected, then run the below queries one after the other
+INSERT INTO tblpayroll ( PDate, SalDate, PFNo, Salary, Allw02, Allw03, Allw04, Allw05, Allw06, Allw07, Allw08, Allw09, Allw10, Allw11, Allw12, Allw13, Allw14, Allw15, Allw16, Allw17, Allw18, Allw19, Allw20, TotalIncome, Tax, NetIncome, Operator, DateKeyed, TimeKeyed, PType, PayThrough, Bank, AccountNo, Paid, Dept, Grade, PYear, PMonth, GratInst, Approved, MReaction )
+SELECT tblSalaryHistory.PDate, Date() AS SalDate, tblSalaryHistory.PFNo, [tblsalary]![Salary]-[tblsalaryHistory]![Salary] AS DB_Sal, ([tblSalary]![Allw02]-[tblSalaryHistory]![Allw02])*[Multiplier] AS DB_Allw02, ([tblSalary]![Allw03]-[tblSalaryHistory]![Allw03])*[Multiplier] AS DB_Allw03, ([tblSalary]![Allw04]-[tblSalaryHistory]![Allw04])*[Multiplier] AS DB_Allw04, ([tblSalary]![Allw05]-[tblSalaryHistory]![Allw05])*[Multiplier] AS DB_Allw05, ([tblSalary]![Allw06]-[tblSalaryHistory]![Allw06])*[Multiplier] AS DB_Allw06, ([tblSalary]![Allw07]-[tblSalaryHistory]![Allw07])*[Multiplier] AS DB_Allw07, ([tblSalary]![Allw08]-[tblSalaryHistory]![Allw08])*[Multiplier] AS DB_Allw08, ([tblSalary]![Allw09]-[tblSalaryHistory]![Allw09])*[Multiplier] AS DB_Allw09, ([tblSalary]![Allw10]-[tblSalaryHistory]![Allw10])*[Multiplier] AS DB_Allw10, ([tblSalary]![Allw11]-[tblSalaryHistory]![Allw11])*[Multiplier] AS DB_Allw11, ([tblSalary]![Allw12]-[tblSalaryHistory]![Allw12])*[Multiplier] AS DB_Allw12, ([tblSalary]![Allw13]-[tblSalaryHistory]![Allw13])*[Multiplier] AS DB_Allw13, ([tblSalary]![Allw14]-[tblSalaryHistory]![Allw14])*[Multiplier] AS DB_Allw14, ([tblSalary]![Allw15]-[tblSalaryHistory]![Allw15])*[Multiplier] AS DB_Allw15, ([tblSalary]![Allw16]-[tblSalaryHistory]![Allw16])*[Multiplier] AS DB_Allw16, ([tblSalary]![Allw17]-[tblSalaryHistory]![Allw17])*[Multiplier] AS DB_Allw17, ([tblSalary]![Allw18]-[tblSalaryHistory]![Allw18])*[Multiplier] AS DB_Allw18, ([tblSalary]![Allw19]-[tblSalaryHistory]![Allw19])*[Multiplier] AS DB_Allw19, ([tblSalary]![Allw20]-[tblSalaryHistory]![Allw20])*[Multiplier] AS DB_Allw20, [DB_Sal]+[DB_Allw02]+[DB_Allw03]+[DB_Allw04]+[DB_Allw05]+[DB_Allw06]+[DB_Allw07]+[DB_Allw08]+[DB_Allw09]+[DB_Allw10]+[DB_Allw11]+[DB_Allw12]+[DB_Allw13]+[DB_Allw14]+[DB_Allw15]+[DB_Allw16]+[DB_Allw17]+[DB_Allw18]+[DB_Allw19]+[DB_Allw20] AS DB_Total, Round(IIf([DB_Total]<=[R1],[R1]*([R1Tax]/100),IIf([DB_Total]>[R1] And [DB_Total]<=[R2],([DB_Total]-[R1])*([R2Tax]/100),IIf([DB_Total]>[R2] And [DB_Total]<=[R3],([DB_Total]-[R2])*([R3Tax]/100)+(([R2]-[R1])*([R2Tax]/100)),IIf([DB_Total]>[R3] And [DB_Total]<=[R4],([DB_Total]-[R3])*([R4Tax]/100)+(([R3]-[R2])*([R3Tax]/100))+(([R2]-[R1])*([R2Tax]/100)),IIf([DB_Total]>[R4],([DB_Total]-[R4])*([R5Tax]/100)+(([R4]-[R3])*([R4Tax]/100))+(([R3]-[R2])*([R3Tax]/100))+(([R2]-[R1])*([R2Tax]/100)))))))) AS IncTax, [DB_Total]-[IncTax] AS Net_DB, [Forms]![frmLogin]![txtUser] AS Operator, Date() AS DateKeyed, Time() AS TimeKeyed, "07" AS PType, tblSalary.PayThrough, tblSalary.Bank, tblSalary.AccountNo, tblSalary.Paid, tblSalary.Dept, tblSalary.Grade, DMax("Year([PDate])","tblSalaryHistory") AS PYear, DMax("Month([PDate])","tblsalaryHistory") AS PMonth, DLookUp("incNo","tblIncrement","Type='07' and EPassed=0") AS Multiplier, 0 AS PApproved, 99 AS MR
+FROM tblTax, tblStaff INNER JOIN (tblSalary INNER JOIN tblSalaryHistory ON tblSalary.PFNo = tblSalaryHistory.PFNo) ON tblStaff.PFNo = tblSalary.PFNo
+WHERE ((([tblsalary]![Salary]-[tblsalaryHistory]![Salary])>1) AND ((tblSalary.Paid)=False) AND ((tblStaff.empstatus)<>"04"));
+
+Then
+UPDATE tblIncrement SET tblIncrement.EPassed = Yes
+WHERE (((tblIncrement.EPassed)=No) AND ((tblIncrement.Type)="07"));
+
+
+If EOS Benefit / Cide 08 is selected, then run the queries below one after the other
+INSERT INTO tblPayroll ( PMonth, PYear, AccountNo, Grade, Dept, Tax, PType, TotalIncome, NetIncome, Taxable, PFNo, PDate, SalDate, Operator, DateKeyed, TimeKeyed, Approved, ApprovedBy, DateApproved, TimeApproved, Salary, PayThrough, Operator, paid, EmpType, PayCurrency )
+SELECT DISTINCT Month(Date()) AS PM, Year(Date()) AS PYear, TBLSTAFF.AccountNo, TBLSTAFF.CGrade, TBLSTAFF.CDept, tblEOS.tax, "08" AS PType, Round([Benefit]) AS Tot, Round([NetBenefit]) AS NB, Round([netbenefit]-[exemption]) AS Taxable, tblEOS.PFNo, Date() AS Bdate, Date() AS Sal, [Forms]![frmLogin]![txtUser] AS Ops, Date() AS DK, Time() AS TK, tblEOS.Approved, tblEOS.ApprovedBy, tblEOS.DateApproved, tblEOS.TimeApproved, tblEOS.Salary, "02" AS Pyt, [Forms]![frmLogin1txtUser] AS OP, tblEOS.paid, TBLSTAFF.EmpType, TBLSTAFF.PayCurrency
+FROM tblEOSCalc, TBLSTAFF INNER JOIN tblEOS ON TBLSTAFF.PFNo = tblEOS.PFNo
+GROUP BY Month(Date()), Year(Date()), TBLSTAFF.AccountNo, TBLSTAFF.CGrade, TBLSTAFF.CDept, tblEOS.tax, "08", Round([Benefit]), Round([NetBenefit]), Round([netbenefit]-[exemption]), tblEOS.PFNo, [Forms]![frmLogin]![txtUser], Date(), Time(), tblEOS.Approved, tblEOS.ApprovedBy, tblEOS.DateApproved, tblEOS.TimeApproved, tblEOS.Salary, "02", [Forms]![frmLogin1txtUser], tblEOS.paid, TBLSTAFF.EmpType, TBLSTAFF.PayCurrency, Date(), Date(), TBLSTAFF.EmpStatus, tblEOSCalc.Exemption
+HAVING (((tblEOS.paid)=No) AND ((TBLSTAFF.EmpStatus)="01" Or (TBLSTAFF.EmpStatus)="03"));
+
+Then
+UPDATE tblEOS, tblPayroll SET tblEOS.Paid = -1, tblEOS.DatePaid = [Forms]![frmPay]![ActivityDate], tblPayroll.Paid = -1
+WHERE (((tblEOS.Paid)=False));
+
+
+If Bonus / Code 09 is selected, then run the code below one after the other
+INSERT INTO tblPayroll ( PFNo, JobTitle, Dept, Grade, PayThrough, Bank, Branch, AccountNo, Salary, MReaction, TotalIncome, Taxable, Tax, NetIncome, PType, PDate, SalDate, PMonth, PYear )
+SELECT DISTINCT tblBonus.PFNo, TBLSTAFF.jobtitle, tblBonus.Dept, tblBonus.Grade, tblBonus.PayThrough, tblBonus.Bank, tblBonus.Branch, tblBonus.AccountNo, tblBonus.Salary, tblBonus.MReaction, tblBonus.TotalIncome, tblBonus.Taxable, tblBonus.BTax, tblBonus.NetBonus, tblBonus.PType, tblBonus.BDate, Date() AS SDate, tblBonus.PMonth, tblBonus.PYear
+FROM tblBonus INNER JOIN TBLSTAFF ON tblBonus.PFNo = TBLSTAFF.PFNo
+GROUP BY tblBonus.PFNo, TBLSTAFF.jobtitle, tblBonus.Dept, tblBonus.Grade, tblBonus.PayThrough, tblBonus.Bank, tblBonus.Branch, tblBonus.AccountNo, tblBonus.Salary, tblBonus.MReaction, tblBonus.TotalIncome, tblBonus.Taxable, tblBonus.BTax, tblBonus.NetBonus, tblBonus.PType, tblBonus.BDate, Date(), tblBonus.PMonth, tblBonus.PYear, TBLSTAFF.EmpStatus
+HAVING (((tblBonus.MReaction)<>"08" And (tblBonus.MReaction)<>"12") AND ((TBLSTAFF.EmpStatus)="01" Or (TBLSTAFF.EmpStatus)="03"));
+
+
+If Long Service / Code 15 is selected, then run the code below
+INSERT INTO tblPayroll ( PDate, SalDate, PFNo, Grade, AccountNo, JobTitle, Salary, TotalIncome, Taxable, Tax, PMonth, PYear, PType, Operator, Paid, NetIncome, Approved, PayThrough, PayingBBAN, Allw13, Allw02, Allw05, Allw15, Bank, Dept, PayingBank, EmpType, PayCurrency )
+SELECT tblYearlyPayments.PDate, Forms!frmPay!ActivityDate AS SalDate, tblStaff.PFNo, tblStaff.CGrade, tblStaff.AccountNo, tblStaff.JobTitle, tblYearlyPayments.Monthly, tblYearlyPayments.TotalIncome, tblYearlyPayments.Taxable, tblYearlyPayments.Tax, tblYearlyPayments.PMonth, tblYearlyPayments.PYear, [Forms]![frmPay]![Activity] AS PType, DLookUp("FullName","tblPassword","Application.menubar=tblPassword!Level") AS Operator, Yes AS Paid, tblYearlyPayments.NetIncome, tblYearlyPayments.Approved, tblEntitle.PayThrough, tblEntitle.PayingBBAN, IIf([PType]="13",[TotalIncome],0) AS Total13, IIf([PType]="02",[TotalIncome],0) AS Total02, IIf([PType]="05",[TotalIncome],0) AS Total05, IIf([PType]="15",[TotalIncome],0) AS Total15, tblEntitle.Bank, tblStaff.CDept, tblEntitle.PayingBank, tblStaff.EmpType, tblStaff.PayCurrency
+FROM (tblStaff INNER JOIN tblEntitle ON tblStaff.PFNo = tblEntitle.PFNo) INNER JOIN tblYearlyPayments ON tblStaff.PFNo = tblYearlyPayments.PFNo
+GROUP BY tblYearlyPayments.PDate, Forms!frmPay!ActivityDate, tblStaff.PFNo, tblStaff.CGrade, tblStaff.AccountNo, tblStaff.JobTitle, tblYearlyPayments.Monthly, tblYearlyPayments.TotalIncome, tblYearlyPayments.Taxable, tblYearlyPayments.Tax, tblYearlyPayments.PMonth, tblYearlyPayments.PYear, [Forms]![frmPay]![Activity], Yes, tblYearlyPayments.NetIncome, tblYearlyPayments.Approved, tblEntitle.PayThrough, tblEntitle.PayingBBAN, IIf([PType]="13",[TotalIncome],0), IIf([PType]="02",[TotalIncome],0), IIf([PType]="05",[TotalIncome],0), IIf([PType]="15",[TotalIncome],0), tblEntitle.Bank, tblStaff.CDept, tblEntitle.PayingBank, tblStaff.EmpType, tblStaff.PayCurrency, tblStaff.CDept, tblStaff.EmpStatus
+HAVING (((tblYearlyPayments.Approved)=Yes) AND ((tblStaff.EmpStatus)<>"04"));
+
+Then
+UPDATE tblYearlyPayments SET tblYearlyPayments.Paid = Yes
+WHERE (((tblYearlyPayments.Paid)=No) AND ((tblYearlyPayments.PType)=[Forms]![frmPay]![Activity]) AND ((tblYearlyPayments.Approved)=Yes) AND ((tblYearlyPayments.Selected)=Yes));
+
+Then
+UPDATE tblPayroll SET tblPayroll.Paid = Yes, tblPayroll.DatePaid = Date()
+WHERE (((tblPayroll.Paid)=No) AND ((tblPayroll.PType)="15"));

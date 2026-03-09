@@ -56,7 +56,8 @@ const dataEntryController = {
                 { table: 'tblappraisal', label: 'Appraisals', route: '/manager/approve/appraisals' },
                 { table: 'tblentitle', label: 'Entitlements', route: '/manager/approve/entitlement' },
                 { table: 'tblloan', label: 'Loans', route: '/manager/approve/loan' },
-                { table: 'tblbankguarantee', label: 'Bank Guarantees', route: '/manager/approve/guarantee' }
+                { table: 'tblbankguarantee', label: 'Bank Guarantees', route: '/manager/approve/guarantee' },
+                { table: 'tblacting', label: 'Acting Allowance', route: '/manager/approve/acting-allowance' }
             ];
 
             const promises = approvalConfig.map(async (item) => {
@@ -656,6 +657,187 @@ const dataEntryController = {
         } catch (error) {
             console.error(error);
             res.status(500).send('Server Error');
+        }
+    },
+
+    // Bonus Awards
+    getPayrollBonus: async (req, res) => {
+        try {
+            // Company info for header if needed
+            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+
+            res.render('data_entry/payroll/bonus', {
+                title: 'Bonus Awards',
+                group: 'Payroll',
+                path: '/data-entry/payroll/bonus',
+                user: req.session.user || { name: 'Data Entry Clerk' },
+                companyName
+            });
+        } catch (error) {
+            console.error('Bonus Awards Page Error:', error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    // List pending bonus awards (Approved = 0)
+    getBonusAwardsPending: async (req, res) => {
+        try {
+            const [rows] = await pool.query(`
+                SELECT 
+                    ba.*, 
+                    IFNULL(ba.Fixed, 0) as Fixed,
+                    IFNULL(ba.Percent, 0) as Percent,
+                    IFNULL(ba.BTaxable, 0) as BTaxable
+                FROM tblbonusawards ba
+                WHERE IFNULL(ba.Approved, 0) = 0
+                ORDER BY ba.EntryDate DESC
+            `);
+            res.json(rows);
+        } catch (error) {
+            console.error('Bonus Awards Pending Error:', error);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    // Add or update a bonus award (unapproved)
+    postBonusAward: async (req, res) => {
+        try {
+            const {
+                id,
+                entryDate,
+                bonusYear,
+                month,
+                type, // 'fixed' or 'percent'
+                bonus,
+                taxable // 'on'|'1' or boolean
+            } = req.body;
+
+            const now = new Date();
+            const operator = (req.session.user && req.session.user.name) ? req.session.user.name : 'Data Entry Clerk';
+
+            // Discover existing columns for resilient insert/update
+            const [colsRows] = await pool.query(`
+                SELECT COLUMN_NAME, IS_NULLABLE, COLUMN_DEFAULT, DATA_TYPE, EXTRA 
+                FROM information_schema.COLUMNS 
+                WHERE TABLE_NAME = 'tblbonusawards'
+            `);
+            const colSet = new Set(colsRows.map(r => r.COLUMN_NAME));
+
+            const record = {
+                EntryDate: entryDate || now,
+                BonusYear: bonusYear || null,
+                Month: month || null,
+                Fixed: type === 'fixed' ? 1 : 0,
+                Percent: type === 'percent' ? 1 : 0,
+                Bonus: bonus === '' || bonus == null ? null : Number(bonus),
+                BTaxable: (taxable === 'on' || taxable === '1' || taxable === true) ? 1 : 0,
+                Approved: 0,
+                Operator: operator,
+                DateKeyed: now,
+                TimeKeyed: now
+            };
+
+            const fields = [];
+            const values = [];
+            Object.entries(record).forEach(([k, v]) => {
+                if (colSet.has(k)) {
+                    fields.push(k);
+                    values.push(v);
+                }
+            });
+
+            // Update if id provided and corresponding key exists
+            let whereClause = '';
+            let whereParams = [];
+            if (id && (colSet.has('RefNo') || colSet.has('Id') || colSet.has('BonusID'))) {
+                const keyCol = colSet.has('RefNo') ? 'RefNo' : (colSet.has('Id') ? 'Id' : 'BonusID');
+                whereClause = `WHERE ${keyCol} = ?`;
+                whereParams = [id];
+                const [existing] = await pool.query(`SELECT * FROM tblbonusawards ${whereClause}`, whereParams);
+                if (existing.length > 0) {
+                    const setClause = fields.map(f => `${f} = ?`).join(', ');
+                    await pool.query(
+                        `UPDATE tblbonusawards SET ${setClause} ${whereClause}`,
+                        [...values, ...whereParams]
+                    );
+                    return res.json({ success: true, message: 'Bonus award updated' });
+                }
+            }
+
+            // Otherwise insert new; generate reference if column exists
+            let extraCols = [];
+            let extraVals = [];
+            if (colSet.has('RefNo')) {
+                extraCols.push('RefNo');
+                extraVals.push(`BON-${Date.now()}`);
+            }
+            if (colSet.has('CompanyID')) {
+                extraCols.push('CompanyID');
+                extraVals.push(1);
+            }
+            // Provide safe defaults for common non-null flags
+            const defaultFlags = ['Paid', 'Posted', 'Linked', 'FullPay', 'HalfPay', 'WithoutPay'];
+            defaultFlags.forEach(flag => {
+                if (colSet.has(flag)) {
+                    extraCols.push(flag);
+                    extraVals.push(0);
+                }
+            });
+
+            // Add mandatory non-null columns without defaults
+            const provided = new Set([...extraCols, ...fields]);
+            colsRows.forEach(col => {
+                const name = col.COLUMN_NAME;
+                if (provided.has(name)) return;
+                const notNullable = (col.IS_NULLABLE === 'NO');
+                const hasDefault = (col.COLUMN_DEFAULT !== null && col.COLUMN_DEFAULT !== undefined);
+                const isAutoInc = (col.EXTRA || '').toLowerCase().includes('auto_increment');
+                if (notNullable && !hasDefault && !isAutoInc) {
+                    let dv = null;
+                    const dt = (col.DATA_TYPE || '').toLowerCase();
+                    if (['int','bigint','smallint','mediumint','tinyint','decimal','float','double','numeric'].includes(dt)) dv = 0;
+                    else if (['varchar','char','text','longtext','mediumtext','tinytext'].includes(dt)) dv = '';
+                    else if (['datetime','timestamp','date','time'].includes(dt)) dv = now;
+                    else dv = 0; // fallback numeric-like
+                    extraCols.push(name);
+                    extraVals.push(dv);
+                }
+            });
+
+            const allCols = [...extraCols, ...fields];
+            const placeholders = allCols.map(() => '?').join(', ');
+            const allVals = [...extraVals, ...values];
+            await pool.query(
+                `INSERT INTO tblbonusawards (${allCols.join(', ')}) VALUES (${placeholders})`,
+                allVals
+            );
+            res.json({ success: true, message: 'Bonus award saved' });
+        } catch (error) {
+            console.error('Post Bonus Award Error:', error);
+            res.status(500).json({ error: 'Server Error: ' + (error.sqlMessage || error.message || 'Unknown') });
+        }
+    },
+
+    // Fetch single bonus award by id for edit
+    getBonusAwardById: async (req, res) => {
+        try {
+            const { id } = req.params;
+            // Try different key columns
+            const candidates = ['RefNo', 'Id', 'BonusID'];
+            for (const key of candidates) {
+                const [rows] = await pool.query(
+                    `SELECT * FROM tblbonusawards WHERE ${key} = ? LIMIT 1`,
+                    [id]
+                );
+                if (rows.length > 0) {
+                    return res.json(rows[0]);
+                }
+            }
+            res.json(null);
+        } catch (error) {
+            console.error('Get Bonus Award Error:', error);
+            res.status(500).json({ error: 'Server Error' });
         }
     },
 
@@ -3548,192 +3730,718 @@ const dataEntryController = {
         try {
             await conn.beginTransaction();
 
-            const { activity, pdate } = req.body;
-            const processDate = new Date(pdate);
-            
-            // Get PayType Code
-            const [payTypeRows] = await conn.query('SELECT Code FROM tblpaytype WHERE PayType = ?', [activity]);
-            if (payTypeRows.length === 0) throw new Error('Invalid Activity');
-            const payCode = payTypeRows[0].Code;
+            const { pdate, month, year, code } = req.body;
+            const sqlDate = pdate; // 'YYYY-MM-DD'
+            const pMonth = month;
+            const pYear = year;
+            const payCode = code;
 
-            // Get Frequency
-            const [itemRows] = await conn.query('SELECT Freq FROM tblpayrollitems WHERE Code = ?', [payCode]);
-            const freq = itemRows.length > 0 ? itemRows[0].Freq : 'M';
+            // Get Company Info for PayingBank/BBAN
+            const [comInfo] = await conn.query('SELECT AccNo, PayingBank FROM tblcominfo LIMIT 1');
+            const payingBBAN = comInfo.length > 0 ? comInfo[0].AccNo : '';
+            const payingBank = comInfo.length > 0 ? comInfo[0].PayingBank : '';
 
-            // Determine Target Staff
-            let staffQuery = ''; 
-            let staffParams = [];
+            // Get Operator
+            const operator = (req.session.user && req.session.user.name) ? req.session.user.name : 'Data Entry';
+            const [userRow] = await conn.query('SELECT FullName FROM tblpassword WHERE Username = ?', [req.session.user ? req.session.user.username : '']);
+            const operatorFull = userRow.length > 0 ? userRow[0].FullName : operator;
 
-            if (activity === 'RENT' || payCode === '02') {
-                // Assuming RENT uses Allw02 flag in tblentitle, but where is the amount?
-                // If the code expects e.Amount, it's broken. 
-                // We will leave this part as is for now or just fix the Salary part which is critical.
-                staffQuery = `
-                    SELECT s.*, 0 as EntitledAmount 
-                    FROM tblstaff s 
-                    WHERE s.Approved = 1 AND s.Redundant = 0
-                `;
-                 // TODO: Fix Entitlement logic based on actual schema
-            } else if (activity === 'LEAVE' || payCode === '13') {
-                 staffQuery = `
-                    SELECT s.*, 0 as EntitledAmount 
-                    FROM tblstaff s 
-                    WHERE s.Approved = 1 AND s.Redundant = 0
-                `;
-            } else {
-                // For Salary (01)
-                // Fetch Salary from tblpayroll Master Record (PYear=0)
-                staffQuery = `
-                    SELECT s.*, p.Salary as BaseSalary
+            // Delete existing payroll entries for this period and code
+            await conn.query('DELETE FROM tblpayroll WHERE PType = ? AND PMonth = ? AND PYear = ?', [payCode, pMonth, pYear]);
+
+            if (payCode === '01') {
+                // --- Code 01: Salary ---
+                
+                // 1. Insert Full Pay
+                await conn.query(`
+                    INSERT INTO tblpayroll (
+                        SalDate, PDate, PFNo, Dept, Grade, JobTitle, PayThrough, Bank, PayingBBAN, PayingBank, AccountNo, Level, 
+                        Salary, Allw02, Allw03, Allw04, Allw05, Allw06, Allw07, Allw08, Allw09, Allw10, Allw11, Allw12, Allw13, Allw14, Allw15, Allw16, Allw17, Allw18, Allw19, Allw20, 
+                        TotalIncome, Taxable, Tax, NassitEmp, NassitInst, GratEmp, GratInst, NetIncome, Ded1, UnionDues, Ded3, Ded4, Ded5, 
+                        PMonth, PYear, PType, FullPay, HalfPay, WithoutPay, Operator, DateKeyed, TimeKeyed, Approved, ApprovedBy, DateApproved, TimeApproved, EmpType, PayCurrency, ExchRate, Paid
+                    )
+                    SELECT 
+                        ?, CURDATE(), s.PFNo, s.CDept, s.CGrade, s.JobTitle, e.PayThrough, e.Bank, ?, ?, s.AccountNo, s.Level,
+                        sal.Salary, sal.Allw02, sal.Allw03, sal.Allw04, sal.Allw05, sal.Allw06, sal.Allw07, sal.Allw08, sal.Allw09, sal.Allw10, sal.Allw11, sal.Allw12, sal.Allw13, sal.Allw14, sal.Allw15, sal.Allw16, sal.Allw17, sal.Allw18, sal.Allw19, sal.Allw20,
+                        sal.TotalIncome, sal.Taxable, sal.Tax, sal.NassitEmp, sal.NassitInst, sal.GratEmp, sal.GratInst, sal.NetIncome, sal.Ded1, sal.UnionDues, sal.Ded3, sal.Ded4, sal.Ded5,
+                        ?, ?, '01', sal.FullPay, sal.HalfPay, sal.WithoutPay, ?, CURDATE(), CURTIME(), sal.Approved, sal.ApprovedBy, sal.DateApproved, sal.TimeApproved, sal.EmpType, sal.PayCurrency, sal.ExchRate, 0
                     FROM tblstaff s
-                    LEFT JOIN tblpayroll p ON s.PFNo = p.PFNo AND p.PYear = 0
-                    WHERE s.Approved = 1 AND s.Redundant = 0
-                `;
-            }
+                    INNER JOIN tblsalary sal ON s.PFNo = sal.PFNo
+                    INNER JOIN tblentitle e ON s.PFNo = e.PFNo
+                    WHERE 
+                        sal.TotalIncome > 0 
+                        AND sal.FullPay = 1 
+                        AND sal.HalfPay = 0 
+                        AND sal.WithoutPay = 0 
+                        AND sal.Approved = 1 
+                        AND s.Approved = 1 
+                        AND s.EmpStatus <> '04' 
+                        AND sal.Posted = 0 
+                        AND (s.DOE < ? OR s.ReasonDate > ?)
+                `, [sqlDate, payingBBAN, payingBank, pMonth, pYear, operatorFull, sqlDate, sqlDate]);
 
-            const [staffList] = await conn.query(staffQuery, staffParams);
-            let processedCount = 0;
+                // 2. Insert Half Pay
+                // Logic based on Salary Allowance.txt: Most allowances halved, Allw02/13 full, Allw14=0
+                // Adjusted TotalIncome/NetIncome to include the "other half" of Allw02 and Allw13 since they are full
+                await conn.query(`
+                    INSERT INTO tblpayroll (
+                        SalDate, PDate, PFNo, Dept, Grade, JobTitle, PayThrough, Bank, PayingBBAN, PayingBank, AccountNo, Level, 
+                        Salary, Allw02, Allw03, Allw04, Allw05, Allw06, Allw07, Allw08, Allw09, Allw10, Allw11, Allw12, Allw13, Allw14, Allw15, Allw16, Allw17, Allw18, Allw19, Allw20, 
+                        TotalIncome, Taxable, Tax, NassitEmp, NassitInst, GratEmp, GratInst, NetIncome, Ded1, UnionDues, Ded3, Ded4, Ded5, 
+                        PMonth, PYear, PType, FullPay, HalfPay, WithoutPay, Operator, DateKeyed, TimeKeyed, Approved, ApprovedBy, DateApproved, TimeApproved, EmpType, PayCurrency, ExchRate, Paid
+                    )
+                    SELECT 
+                        ?, CURDATE(), s.PFNo, s.CDept, s.CGrade, s.JobTitle, e.PayThrough, e.Bank, ?, ?, s.AccountNo, s.Level,
+                        sal.Salary/2, 
+                        sal.Allw02, -- Not halved
+                        sal.Allw03/2, sal.Allw04/2, sal.Allw05/2, sal.Allw06/2, sal.Allw07/2, sal.Allw08/2, sal.Allw09/2, sal.Allw10/2, sal.Allw11/2, sal.Allw12/2, 
+                        sal.Allw13, -- Not halved
+                        0, -- Allw14 (Acting) set to 0
+                        sal.Allw15/2, sal.Allw16/2, sal.Allw17/2, sal.Allw18/2, sal.Allw19/2, sal.Allw20/2,
+                        (sal.TotalIncome/2 + sal.Allw02/2 + sal.Allw13/2), -- Adjust Total for non-halved items
+                        (sal.Taxable/2 + sal.Allw02/2 + sal.Allw13/2),     -- Adjust Taxable
+                        sal.Tax/2, 
+                        sal.NassitEmp/2, sal.NassitInst/2, sal.GratEmp/2, sal.GratInst/2, 
+                        (sal.NetIncome/2 + sal.Allw02/2 + sal.Allw13/2),   -- Adjust Net
+                        sal.Ded1, sal.UnionDues, sal.Ded3, sal.Ded4, sal.Ded5,
+                        ?, ?, '01', sal.FullPay, sal.HalfPay, sal.WithoutPay, ?, CURDATE(), CURTIME(), sal.Approved, sal.ApprovedBy, sal.DateApproved, sal.TimeApproved, sal.EmpType, sal.PayCurrency, sal.ExchRate, 0
+                    FROM tblstaff s
+                    INNER JOIN tblsalary sal ON s.PFNo = sal.PFNo
+                    INNER JOIN tblentitle e ON s.PFNo = e.PFNo
+                    WHERE 
+                        sal.HalfPay = 1 
+                        AND s.EmpStatus <> '04'
+                `, [sqlDate, payingBBAN, payingBank, pMonth, pYear, operatorFull]);
 
-            for (const staff of staffList) {
-                // Check if already processed for this staff (Double check for Yearly items)
-                if (freq === 'Y') {
-                    const [exists] = await conn.query(
-                        'SELECT COUNT(*) as count FROM tblsalary WHERE PFNo = ? AND PType = ? AND YEAR(PDate) = ?', 
-                        [staff.PFNo, payCode, processDate.getFullYear()]
-                    );
-                    if (exists[0].count > 0) continue;
-                }
+                // 3. Insert Loan Repayment (tblloanrepyt)
+                await conn.query(`
+                    INSERT INTO tblloanrepyt (PFNo, DeductionDate, LoanType, DAmount, DCode, ExpDate, TransRef)
+                    SELECT 
+                        l.PFNo, ?, l.LTypeCode, IF(p.Ded1=0, p.Ded4, p.Ded1), l.LTrans, l.ExpDate, l.TransNo
+                    FROM tblpayroll p
+                    INNER JOIN tblloan l ON p.PFNo = l.PFNo
+                    WHERE 
+                        IF(p.Ded1=0, p.Ded4, p.Ded1) > 0 
+                        AND l.Expired = 0
+                        AND p.PDate = CURDATE()
+                        AND p.PType = '01'
+                `, [sqlDate]);
 
-                // Base Amount
-                let amount = 0;
-                if (payCode === '01') {
-                    amount = staff.BaseSalary || 0;
-                } else {
-                    amount = staff.EntitledAmount || 0;
-                }
+                // 4. Update tblLoan (Insert history)
+                await conn.query(`
+                    INSERT INTO tblloan (PFNo, LTypeCode, LTrans, Amount, EntryDate, TransNo, Approved, Expired, Reschedule, Repaid)
+                    SELECT 
+                        lr.PFNo, lr.LoanType, '03', lr.DAmount, ?, lr.TransRef, 1, 1, 0, 0
+                    FROM tblloanrepyt lr
+                    WHERE lr.DeductionDate = ?
+                `, [sqlDate, sqlDate]);
 
-                // Query/Discipline Check
-                // Check for Half Pay / Without Pay in tblquery based on Percent and Date Range
-                const [queries] = await conn.query(
-                    'SELECT Percent FROM tblquery WHERE PFNo = ? AND Approved = 1 AND ? BETWEEN SDate AND EDate', 
-                    [staff.PFNo, processDate]
-                );
+                // 5. Update tblSalary LoanCounter
+                await conn.query(`
+                    UPDATE tblsalary s
+                    INNER JOIN tblloan l ON s.PFNo = l.PFNo
+                    SET s.LoanCounter = l.DurationBal
+                    WHERE s.LoanCounter > 0 AND l.LTrans NOT IN ('03', '04')
+                `);
 
-                let isWithoutPay = false;
-                let isHalfPay = false;
+                // 6. Update tblLoan Balances
+                await conn.query(`
+                    UPDATE tblloan 
+                    SET 
+                        LoanBal = LoanBal - MonthlyRepayment, 
+                        DurationBal = DurationBal - 1, 
+                        Expired = IF(LoanBal <= 0, 1, 0)
+                    WHERE 
+                        LoanBal > 0 
+                        AND DurationBal > 0 
+                        AND LTrans NOT IN ('03', '04') 
+                        AND LTypeCode NOT IN ('03', '04')
+                `);
 
-                for (const q of queries) {
-                    if (q.Percent == 100) isWithoutPay = true;
-                    if (q.Percent == 50) isHalfPay = true;
-                }
+                // 7. Clear Deductions if Loan Expired
+                await conn.query(`
+                    UPDATE tblsalary s
+                    INNER JOIN tblloan l ON s.PFNo = l.PFNo
+                    SET s.Ded1 = 0, s.LoanCounter = l.DurationBal, l.Expired = 1, s.Ded3 = 0, s.Ded4 = 0
+                    WHERE 
+                        s.LoanCounter <= 0 
+                        AND l.Expired = 0 
+                        AND l.LoanBal <= 0 
+                        AND l.LTrans NOT IN ('03', '04')
+                `);
 
-                if (isWithoutPay) continue; // Skip processing
+                // 8. Delete old Leave Allowance entries (Cleanup)
+                await conn.query('DELETE FROM tblleaveallowance WHERE EntryDate = ? AND TCode = ? AND PMonth = ? AND PYear = ?', [sqlDate, '01', pMonth, pYear]);
 
-                if (isHalfPay) amount = amount / 2;
+                // 9. Insert Leave Allowance
+                // Using REPLACE INTO or INSERT IGNORE to handle duplicates (since we delete by EntryDate but PK might be composite PFNo+Month+Year+TCode)
+                // The error shows '0376-01-11-2025' which looks like PFNo-TCode-PMonth-PYear.
+                await conn.query(`
+                    INSERT IGNORE INTO tblleaveallowance (EntryDate, PFNo, SName, L_Allowance, TCode, PMonth, PYear, Initiated, Paid)
+                    SELECT ?, s.PFNo, s.SName, yp.TotalIncome, '01', ?, ?, 1, 0
+                    FROM tblstaff s
+                    INNER JOIN tblyearlypayments yp ON s.PFNo = yp.PFNo
+                    WHERE s.EmpStatus <> '04' AND yp.PType = '13'
+                `, [sqlDate, pMonth, pYear]);
 
-                // Ensure final amount is rounded to 2 decimal places
-                amount = Math.round(amount * 100) / 100;
+                // 10. Insert PayDay
+                await conn.query(`
+                    INSERT INTO tblpayday (PayDate)
+                    SELECT DISTINCT SalDate FROM tblpayroll WHERE SalDate = ?
+                `, [sqlDate]);
 
-                // Surcharge Check (tblsurcharge)
-                let surcharge = 0;
-                const [surcharges] = await conn.query(
-                    'SELECT SAmount FROM tblsurcharge WHERE PFNo = ? AND Approved = 1 AND ? BETWEEN StarDate AND ExpDate',
-                    [staff.PFNo, processDate]
-                );
+                // 11. Update tblSalary NetIncome
+                await conn.query(`
+                    UPDATE tblsalary s
+                    INNER JOIN tblloan l ON s.PFNo = l.PFNo
+                    SET 
+                        s.Ded1 = 0, 
+                        s.NetIncome = s.TotalIncome - (s.Tax + s.NassitEmp + s.GratEmp + s.UnionDues + s.Ded3 + s.Ded4 + s.Ded5)
+                    WHERE 
+                        l.Expired = 0 
+                        AND l.LTrans = '01' 
+                        AND l.LoanBal > 0 
+                        AND l.RescheduleDate > ? 
+                        AND l.Approved = 1 
+                        AND l.Reschedule = 1 
+                        AND l.Repaid = 0
+                `, [sqlDate]);
+
+                // 12. Update Acting (Reset)
+                await conn.query(`
+                    UPDATE tblacting a
+                    INNER JOIN tblsalary s ON a.PFNo = s.PFNo
+                    SET s.Allw14 = 0, s.Paid = 0
+                    WHERE 
+                        (a.Closed = 1 AND a.Approved = 1 AND a.EDate < CURDATE()) 
+                        OR (a.EDate IS NOT NULL AND a.EDate < CURDATE())
+                `);
+
+                // 13. Insert GLTrans
+                await conn.query(`
+                    INSERT INTO tblgltrans (
+                        GLDate, BasicSalary, Headquarters, Transport, COLA, Responsibility, MaidAllowance, Acting, Risk, Professional, StaffWelfare, Academic, IncomeTax, NassitEmp, ProvidentEmp, SSA, JSA, GLMonth, GLYear, SalAdvance, IntOnAdv, SalaryWages, Rent, Approved
+                    )
+                    SELECT 
+                        MAX(p.PDate),
+                        SUM(IF(p.Dept IN ('06', '12'), 0, p.Salary)),
+                        SUM(IF(p.Dept IN ('06', '12'), p.Salary + p.Allw03 + p.Allw04 + p.Allw05 + p.Allw06 + p.Allw10 + p.Allw11 + p.Allw12 + p.Allw14 + p.Allw16 + p.Allw17 + p.Allw19 + p.Allw20, 0)),
+                        SUM(IF(p.Dept IN ('06', '12'), 0, p.Allw03 + p.Allw10)),
+                        SUM(IF(p.Dept IN ('06', '12'), 0, p.Allw06)),
+                        SUM(IF(p.Dept IN ('06', '12'), 0, p.Allw11)),
+                        SUM(IF(p.Dept IN ('06', '12'), 0, p.Allw12)),
+                        SUM(IF(p.Dept IN ('06', '12'), 0, p.Allw14)),
+                        SUM(IF(p.Dept IN ('06', '12'), 0, p.Allw17)),
+                        SUM(IF(p.Dept IN ('06', '12'), 0, p.Allw16)),
+                        SUM(p.Allw04),
+                        SUM(IF(p.Dept IN ('06', '12'), 0, p.Allw19)),
+                        SUM(p.Tax),
+                        SUM(p.NassitEmp),
+                        SUM(p.GratEmp),
+                        SUM(IF(p.Level = '01', p.Ded2, 0)),
+                        SUM(IF(p.Level = '02', p.Ded2, 0)),
+                        p.PMonth,
+                        MAX(p.PYear),
+                        SUM(p.Ded1),
+                        SUM(p.Ded3),
+                        SUM(p.NetIncome),
+                        SUM(p.Ded4),
+                        0
+                    FROM tblpayroll p
+                    WHERE p.PDate = CURDATE() AND p.PType = '01'
+                    GROUP BY p.PMonth
+                `);
+
+            } else if (payCode === '02') {
+                // --- Code 02: Rent ---
+                // Source: tblYearlyPayments
+                await conn.query(`
+                    INSERT INTO tblpayroll (
+                        PDate, SalDate, PFNo, Grade, AccountNo, JobTitle, Salary, TotalIncome, Taxable, Tax, PMonth, PYear, PType, Operator, Paid, NetIncome, Approved, PayThrough, PayingBBAN, Allw02, Allw13, Allw05, Allw15, Allw04, Bank, Dept, PayingBank, EmpType, PayCurrency, ApprovedBy, DateApproved, TimeApproved
+                    )
+                    SELECT 
+                        yp.PDate, ?, s.PFNo, s.CGrade, s.AccountNo, s.JobTitle, yp.Monthly, yp.TotalIncome, yp.Taxable, yp.Tax, yp.PMonth, yp.PYear, '02', ?, 1, yp.NetIncome, yp.Approved, e.PayThrough, e.PayingBBAN, 
+                        yp.TotalIncome, 0, 0, 0, 0,
+                        e.Bank, s.CDept, e.PayingBank, s.EmpType, s.PayCurrency, yp.ApprovedBy, yp.DateApproved, yp.TimeApproved
+                    FROM tblstaff s
+                    INNER JOIN tblentitle e ON s.PFNo = e.PFNo
+                    INNER JOIN tblyearlypayments yp ON s.PFNo = yp.PFNo
+                    WHERE yp.PType = '02' AND yp.PMonth = ? AND yp.PYear = ? AND yp.Approved = 1 AND s.EmpStatus <> '04'
+                `, [sqlDate, operatorFull, pMonth, pYear]);
+
+                // Update tblYearlyPayments
+                await conn.query(`
+                    UPDATE tblyearlypayments 
+                    SET Paid = 1 
+                    WHERE Paid = 0 AND PType = '02' AND Approved = 1 AND Selected = 1 AND PMonth = ? AND PYear = ?
+                `, [pMonth, pYear]);
+
+            } else if (payCode === '04') {
+                // --- Code 04: Welfare ---
+                // Source: tblYearlyPayments
+                await conn.query(`
+                    INSERT INTO tblpayroll (
+                        PDate, SalDate, PFNo, Grade, AccountNo, JobTitle, Salary, TotalIncome, Taxable, Tax, PMonth, PYear, PType, Operator, Paid, NetIncome, Approved, PayThrough, PayingBBAN, Allw04, Allw13, Allw02, Allw05, Allw15, Bank, Dept, PayingBank, EmpType, PayCurrency, ApprovedBy, DateApproved, TimeApproved
+                    )
+                    SELECT 
+                        yp.PDate, ?, s.PFNo, s.CGrade, s.AccountNo, s.JobTitle, yp.Monthly, yp.TotalIncome, yp.Taxable, yp.Tax, yp.PMonth, yp.PYear, '04', ?, 1, yp.NetIncome, yp.Approved, e.PayThrough, e.PayingBBAN, 
+                        yp.TotalIncome, 0, 0, 0, 0,
+                        e.Bank, s.CDept, e.PayingBank, s.EmpType, s.PayCurrency, yp.ApprovedBy, yp.DateApproved, yp.TimeApproved
+                    FROM tblstaff s
+                    INNER JOIN tblentitle e ON s.PFNo = e.PFNo
+                    INNER JOIN tblyearlypayments yp ON s.PFNo = yp.PFNo
+                    WHERE yp.PType = '04' AND yp.PMonth = ? AND yp.PYear = ? AND yp.Approved = 1 AND s.EmpStatus <> '04'
+                `, [sqlDate, operatorFull, pMonth, pYear]);
+
+                // Update tblYearlyPayments
+                await conn.query(`
+                    UPDATE tblyearlypayments 
+                    SET Paid = 1 
+                    WHERE Paid = 0 AND PType = '04' AND Approved = 1 AND Selected = 1 AND PMonth = ? AND PYear = ?
+                `, [pMonth, pYear]);
                 
-                for (const s of surcharges) {
-                    surcharge += (s.SAmount || 0);
-                }
+                // Export Logic for Rent/Welfare (Code 04)
+                // Maps to qryRentGroup01-04 in Salary Allowance.txt
+                // We implement this directly via SQL aggregation on tblPayroll + tblStaff.
+                await conn.query(`
+                    INSERT INTO tblexport (EntryDate, AccNo, TDetails, Debit, TCode, Exported)
+                    SELECT 
+                        CURDATE(),
+                        p.AccountNo, 
+                        CONCAT(s.SName, ' ', s.FName, ' ', s.MName), 
+                        SUM(p.TotalIncome), 
+                        '00',
+                        0
+                    FROM tblpayroll p
+                    INNER JOIN tblstaff s ON p.PFNo = s.PFNo
+                    WHERE p.PYear = ? AND p.PMonth = ? AND p.PType = '04'
+                    GROUP BY p.AccountNo, s.SName, s.FName, s.MName
+                `, [pYear, pMonth]);
 
-                // Loan Check (Only for Salary?)
-                let loanDeduction = 0;
-                if (payCode === '01') {
-                    const [loans] = await conn.query(
-                        'SELECT * FROM tblloan WHERE PFNo = ? AND Approved = 1 AND Balance > 0', 
-                        [staff.PFNo]
-                    );
-                    for (const loan of loans) {
-                        let ded = loan.Ded || 0; // Assuming 'Ded' is monthly deduction
-                        if (ded > loan.Balance) ded = loan.Balance;
-                        loanDeduction += ded;
-                        
-                        // Optionally update loan balance here or mark for update
-                        // For now, we just record the deduction in tblsalary
+            } else if (payCode === '05') {
+                // --- Code 05: Inducement ---
+                // Source: tblYearlyPayments
+                await conn.query(`
+                    INSERT INTO tblpayroll (
+                        PDate, SalDate, PFNo, Grade, AccountNo, JobTitle, Salary, TotalIncome, Taxable, Tax, PMonth, PYear, PType, Operator, Paid, NetIncome, Approved, PayThrough, PayingBBAN, Allw05, Allw13, Allw02, Allw15, Allw04, Bank, Dept, PayingBank, EmpType, PayCurrency, ApprovedBy, DateApproved, TimeApproved
+                    )
+                    SELECT 
+                        yp.PDate, ?, s.PFNo, s.CGrade, s.AccountNo, s.JobTitle, yp.Monthly, yp.TotalIncome, yp.Taxable, yp.Tax, yp.PMonth, yp.PYear, '05', ?, 1, yp.NetIncome, yp.Approved, e.PayThrough, e.PayingBBAN, 
+                        yp.TotalIncome, 0, 0, 0, 0,
+                        e.Bank, s.CDept, e.PayingBank, s.EmpType, s.PayCurrency, yp.ApprovedBy, yp.DateApproved, yp.TimeApproved
+                    FROM tblstaff s
+                    INNER JOIN tblentitle e ON s.PFNo = e.PFNo
+                    INNER JOIN tblyearlypayments yp ON s.PFNo = yp.PFNo
+                    WHERE yp.PType = '05' AND yp.PMonth = ? AND yp.PYear = ? AND yp.Approved = 1 AND s.EmpStatus <> '04'
+                `, [sqlDate, operatorFull, pMonth, pYear]);
+
+                // Update tblYearlyPayments
+                await conn.query(`
+                    UPDATE tblyearlypayments 
+                    SET Paid = 1 
+                    WHERE Paid = 0 AND PType = '05' AND Approved = 1 AND Selected = 1 AND PMonth = ? AND PYear = ?
+                `, [pMonth, pYear]);
+
+            } else if (payCode === '15') {
+                // --- Code 15: Leave Allowance Arrears (implied from text file patterns) ---
+                // Source: tblYearlyPayments
+                await conn.query(`
+                    INSERT INTO tblpayroll (
+                        PDate, SalDate, PFNo, Grade, AccountNo, JobTitle, Salary, TotalIncome, Taxable, Tax, PMonth, PYear, PType, Operator, Paid, NetIncome, Approved, PayThrough, PayingBBAN, Allw15, Allw13, Allw02, Allw05, Allw04, Bank, Dept, PayingBank, EmpType, PayCurrency, ApprovedBy, DateApproved, TimeApproved
+                    )
+                    SELECT 
+                        yp.PDate, ?, s.PFNo, s.CGrade, s.AccountNo, s.JobTitle, yp.Monthly, yp.TotalIncome, yp.Taxable, yp.Tax, yp.PMonth, yp.PYear, '15', ?, 1, yp.NetIncome, yp.Approved, e.PayThrough, e.PayingBBAN, 
+                        yp.TotalIncome, 0, 0, 0, 0,
+                        e.Bank, s.CDept, e.PayingBank, s.EmpType, s.PayCurrency, yp.ApprovedBy, yp.DateApproved, yp.TimeApproved
+                    FROM tblstaff s
+                    INNER JOIN tblentitle e ON s.PFNo = e.PFNo
+                    INNER JOIN tblyearlypayments yp ON s.PFNo = yp.PFNo
+                    WHERE yp.PType = '15' AND yp.PMonth = ? AND yp.PYear = ? AND yp.Approved = 1 AND s.EmpStatus <> '04'
+                `, [sqlDate, operatorFull, pMonth, pYear]);
+
+                // Update tblYearlyPayments
+                await conn.query(`
+                    UPDATE tblyearlypayments 
+                    SET Paid = 1 
+                    WHERE Paid = 0 AND PType = '15' AND Approved = 1 AND Selected = 1 AND PMonth = ? AND PYear = ?
+                `, [pMonth, pYear]);
+
+
+
+
+
+
+
+            } else if (payCode === '08') {
+                // --- Code 08: EOS Benefit ---
+                // Source: tblEOS + tblEOSCalc
+                await conn.query(`
+                    INSERT INTO tblpayroll (
+                        PMonth, PYear, AccountNo, Grade, Dept, Tax, PType, TotalIncome, NetIncome, Taxable, PFNo, PDate, SalDate, Operator, DateKeyed, TimeKeyed, Approved, ApprovedBy, DateApproved, TimeApproved, Salary, PayThrough, Paid, EmpType, PayCurrency
+                    )
+                    SELECT 
+                        MONTH(CURDATE()), YEAR(CURDATE()), s.AccountNo, s.CGrade, s.CDept, e.Tax, '08', 
+                        ROUND(e.Benefit), ROUND(e.NetBenefit), ROUND(e.NetBenefit - c.Exemption), 
+                        e.PFNo, CURDATE(), CURDATE(), ?, CURDATE(), CURTIME(), e.Approved, e.ApprovedBy, e.DateApproved, e.TimeApproved, e.Salary, '02', e.Paid, s.EmpType, s.PayCurrency
+                    FROM tblstaff s
+                    INNER JOIN tbleos e ON s.PFNo = e.PFNo
+                    CROSS JOIN tbleoscalc c -- Assuming single row or join logic, text implies simple select
+                    WHERE e.Paid = 0 AND (s.EmpStatus = '01' OR s.EmpStatus = '03')
+                `, [operatorFull]);
+
+                // Update tblEOS and tblPayroll
+                await conn.query('UPDATE tbleos SET Paid = 1, DatePaid = ? WHERE Paid = 0', [sqlDate]);
+                await conn.query('UPDATE tblpayroll SET Paid = 1 WHERE PType = "08" AND Paid = 0');
+
+            } else if (payCode === '09') {
+                // --- Code 09: Bonus ---
+                // Source: tblBonus
+                await conn.query(`
+                    INSERT INTO tblpayroll (
+                        PFNo, JobTitle, Dept, Grade, PayThrough, Bank, Branch, AccountNo, Salary, MReaction, TotalIncome, Taxable, Tax, NetIncome, PType, PDate, SalDate, PMonth, PYear
+                    )
+                    SELECT 
+                        b.PFNo, s.JobTitle, b.Dept, b.Grade, b.PayThrough, b.Bank, b.Branch, b.AccountNo, b.Salary, b.MReaction, b.TotalIncome, b.Taxable, b.BTax, b.NetBonus, b.PType, b.BDate, CURDATE(), b.PMonth, b.PYear
+                    FROM tblbonus b
+                    INNER JOIN tblstaff s ON b.PFNo = s.PFNo
+                    WHERE b.MReaction NOT IN ('08', '12') AND (s.EmpStatus = '01' OR s.EmpStatus = '03')
+                `);
+
+
+
+            } else if (payCode === '13') {
+                // --- Code 13: Leave Allowance ---
+                // Source: tblYearlyPayments
+                
+                // 1. Insert into tblPayroll
+                await conn.query(`
+                    INSERT INTO tblpayroll (
+                        PDate, SalDate, PFNo, Grade, AccountNo, JobTitle, Salary, TotalIncome, Taxable, Tax, PMonth, PYear, PType, Operator, Paid, NetIncome, Approved, PayThrough, PayingBBAN, Allw13, Allw02, Allw05, Allw15, Allw04, Bank, Dept, PayingBank, EmpType, PayCurrency, ApprovedBy, DateApproved, TimeApproved
+                    )
+                    SELECT 
+                        yp.PDate, ?, s.PFNo, s.CGrade, s.AccountNo, s.JobTitle, yp.Monthly, yp.TotalIncome, yp.Taxable, yp.Tax, yp.PMonth, yp.PYear, '13', ?, 1, yp.NetIncome, yp.Approved, e.PayThrough, e.PayingBBAN, 
+                        yp.TotalIncome, 0, 0, 0, 0,
+                        e.Bank, s.CDept, e.PayingBank, s.EmpType, s.PayCurrency, yp.ApprovedBy, yp.DateApproved, yp.TimeApproved
+                    FROM tblstaff s
+                    INNER JOIN tblentitle e ON s.PFNo = e.PFNo
+                    INNER JOIN tblyearlypayments yp ON s.PFNo = yp.PFNo
+                    WHERE yp.PType = '13' AND yp.PMonth = ? AND yp.PYear = ? AND yp.Approved = 1 AND s.EmpStatus <> '04'
+                `, [sqlDate, operatorFull, pMonth, pYear]);
+
+                // 2. Update tblYearlyPayments
+                await conn.query(`
+                    UPDATE tblyearlypayments 
+                    SET Paid = 1 
+                    WHERE Paid = 0 AND PType = '13' AND Approved = 1 AND Selected = 1 AND PMonth = ? AND PYear = ?
+                `, [pMonth, pYear]);
+
+                // 3. Clear existing tblLeaveAllowance for this period (TCode 01)
+                await conn.query(`
+                    DELETE FROM tblleaveallowance 
+                    WHERE EntryDate = ? AND TCode = '01' AND PMonth = ? AND PYear = ?
+                `, [sqlDate, pMonth, pYear]);
+
+                // 4. Insert into tblLeaveAllowance (TCode 01)
+                await conn.query(`
+                    INSERT INTO tblleaveallowance (EntryDate, PFNo, SName, L_Allowance, TCode, PMonth, PYear)
+                    SELECT ?, s.PFNo, CONCAT(s.SName, ' ', s.FName, ' ', s.MName), yp.TotalIncome, '01', ?, ?
+                    FROM tblstaff s
+                    INNER JOIN tblyearlypayments yp ON s.PFNo = yp.PFNo
+                    WHERE s.EmpStatus <> '04' AND yp.PType = '13' AND yp.PMonth = ? AND yp.PYear = ?
+                `, [sqlDate, pMonth, pYear, pMonth, pYear]);
+
+                // 5. Insert into tblLeaveAllowance (TCode 03 - Tax/Payment)
+                await conn.query(`
+                    INSERT INTO tblleaveallowance (EntryDate, PFNo, SName, Payment, TCode, PMonth, PYear, TransNo, TimeKeyed, KeyedInBy)
+                    SELECT CURDATE(), s.PFNo, CONCAT(s.SName, ' ', s.FName, ' ', s.MName), l.Tax, '03', ?, ?, l.LCount, CURTIME(), ?
+                    FROM tblstaff s
+                    INNER JOIN tblleave l ON s.PFNo = l.PFNo
+                    INNER JOIN tblentitle e ON s.PFNo = e.PFNo
+                    WHERE (s.EmpStatus = '01' OR s.EmpStatus = '03') AND e.Allw13 = 1
+                    GROUP BY s.PFNo, l.LCount, l.Tax, s.SName, s.FName, s.MName
+                `, [pMonth, pYear, operatorFull]);
+
+                // 6. Update tblLeaveAllowance (Paid)
+                await conn.query(`
+                    UPDATE tblleaveallowance 
+                    SET Paid = 1, DatePaid = CURDATE() 
+                    WHERE Initiated = 'Yes'
+                `);
+
+                // 7. Update tblPayroll (Operator, DateKeyed, Reset Approved)
+                await conn.query(`
+                    UPDATE tblpayroll 
+                    SET Operator = ?, DateKeyed = CURDATE(), TimeKeyed = CURTIME(), Approved = 0
+                    WHERE PType = '13' AND PMonth = ? AND PYear = ?
+                `, [operatorFull, pMonth, pYear]);
+
+                // 8. Update tblLeave (EntryPassed)
+                await conn.query(`
+                    UPDATE tblleave l
+                    INNER JOIN tblpayroll p ON l.PFNo = p.PFNo
+                    SET l.EntryPassed = 1, l.DateEP = CURDATE()
+                    WHERE l.Approved = 1 AND p.PType = '13' AND p.PMonth = ? AND p.PYear = ?
+                `, [pMonth, pYear]);
+
+
+
+            } else if (payCode === '07') {
+                // --- Code 07: Backlog ---
+                // Source: tblSalary vs tblSalaryHistory difference
+                // Logic: Calculate differences, apply progressive tax, insert into tblPayroll
+
+                // 1. Get Tax Rates
+                const [taxRows] = await conn.query('SELECT * FROM tbltax LIMIT 1');
+                const taxRates = taxRows[0];
+
+                // 2. Get Salary Differences
+                const [diffRows] = await conn.query(`
+                    SELECT 
+                        s.PFNo, s.CDept AS SalaryDept, s.CGrade AS SalaryGrade, s.JobTitle, e.PayThrough, e.Bank, s.AccountNo, s.EmpType, s.PayCurrency,
+                        sal.Salary AS Cur_Salary, h.Salary AS Hist_Salary,
+                        sal.Allw02 AS Cur_Allw02, h.Allw02 AS Hist_Allw02,
+                        sal.Allw03 AS Cur_Allw03, h.Allw03 AS Hist_Allw03,
+                        sal.Allw04 AS Cur_Allw04, h.Allw04 AS Hist_Allw04,
+                        sal.Allw05 AS Cur_Allw05, h.Allw05 AS Hist_Allw05,
+                        sal.Allw06 AS Cur_Allw06, h.Allw06 AS Hist_Allw06,
+                        sal.Allw07 AS Cur_Allw07, h.Allw07 AS Hist_Allw07,
+                        sal.Allw08 AS Cur_Allw08, h.Allw08 AS Hist_Allw08,
+                        sal.Allw09 AS Cur_Allw09, h.Allw09 AS Hist_Allw09,
+                        sal.Allw10 AS Cur_Allw10, h.Allw10 AS Hist_Allw10,
+                        sal.Allw11 AS Cur_Allw11, h.Allw11 AS Hist_Allw11,
+                        sal.Allw12 AS Cur_Allw12, h.Allw12 AS Hist_Allw12,
+                        sal.Allw13 AS Cur_Allw13, h.Allw13 AS Hist_Allw13,
+                        sal.Allw14 AS Cur_Allw14, h.Allw14 AS Hist_Allw14,
+                        sal.Allw15 AS Cur_Allw15, h.Allw15 AS Hist_Allw15,
+                        sal.Allw16 AS Cur_Allw16, h.Allw16 AS Hist_Allw16,
+                        sal.Allw17 AS Cur_Allw17, h.Allw17 AS Hist_Allw17,
+                        sal.Allw18 AS Cur_Allw18, h.Allw18 AS Hist_Allw18,
+                        sal.Allw19 AS Cur_Allw19, h.Allw19 AS Hist_Allw19,
+                        sal.Allw20 AS Cur_Allw20, h.Allw20 AS Hist_Allw20,
+                        h.PDate AS Hist_PDate, h.MReaction
+                    FROM tblstaff s
+                    INNER JOIN tblsalary sal ON s.PFNo = sal.PFNo
+                    INNER JOIN tblsalaryhistory h ON s.PFNo = h.PFNo
+                    INNER JOIN tblentitle e ON s.PFNo = e.PFNo
+                    WHERE (sal.Salary - h.Salary) > 1 AND sal.Paid = 0 AND s.EmpStatus <> '04'
+                `);
+
+                // 3. Process and Insert
+                for (const row of diffRows) {
+                    const dbSal = (row.Cur_Salary - row.Hist_Salary) || 0;
+                    const dbAllw02 = (row.Cur_Allw02 - row.Hist_Allw02) || 0;
+                    const dbAllw03 = (row.Cur_Allw03 - row.Hist_Allw03) || 0;
+                    const dbAllw04 = (row.Cur_Allw04 - row.Hist_Allw04) || 0;
+                    const dbAllw05 = (row.Cur_Allw05 - row.Hist_Allw05) || 0;
+                    const dbAllw06 = (row.Cur_Allw06 - row.Hist_Allw06) || 0;
+                    const dbAllw07 = (row.Cur_Allw07 - row.Hist_Allw07) || 0;
+                    const dbAllw08 = (row.Cur_Allw08 - row.Hist_Allw08) || 0;
+                    const dbAllw09 = (row.Cur_Allw09 - row.Hist_Allw09) || 0;
+                    const dbAllw10 = (row.Cur_Allw10 - row.Hist_Allw10) || 0;
+                    const dbAllw11 = (row.Cur_Allw11 - row.Hist_Allw11) || 0;
+                    const dbAllw12 = (row.Cur_Allw12 - row.Hist_Allw12) || 0;
+                    const dbAllw13 = (row.Cur_Allw13 - row.Hist_Allw13) || 0;
+                    const dbAllw14 = (row.Cur_Allw14 - row.Hist_Allw14) || 0;
+                    const dbAllw15 = (row.Cur_Allw15 - row.Hist_Allw15) || 0;
+                    const dbAllw16 = (row.Cur_Allw16 - row.Hist_Allw16) || 0;
+                    const dbAllw17 = (row.Cur_Allw17 - row.Hist_Allw17) || 0;
+                    const dbAllw18 = (row.Cur_Allw18 - row.Hist_Allw18) || 0;
+                    const dbAllw19 = (row.Cur_Allw19 - row.Hist_Allw19) || 0;
+                    const dbAllw20 = (row.Cur_Allw20 - row.Hist_Allw20) || 0;
+
+                    const dbTotal = dbSal + dbAllw02 + dbAllw03 + dbAllw04 + dbAllw05 + dbAllw06 + dbAllw07 + dbAllw08 + dbAllw09 + dbAllw10 + dbAllw11 + dbAllw12 + dbAllw13 + dbAllw14 + dbAllw15 + dbAllw16 + dbAllw17 + dbAllw18 + dbAllw19 + dbAllw20;
+
+                    // Calculate Tax (Progressive)
+                    let tax = 0;
+                    let remaining = dbTotal;
+
+                    // Band 1
+                    if (remaining > 0) {
+                        const taxable = Math.min(remaining, taxRates.R1);
+                        tax += taxable * (taxRates.R1Tax / 100);
+                        remaining -= taxable;
                     }
+                    // Band 2
+                    if (remaining > 0) {
+                        const band2Width = taxRates.R2 - taxRates.R1;
+                        const taxable = Math.min(remaining, band2Width);
+                        tax += taxable * (taxRates.R2Tax / 100);
+                        remaining -= taxable;
+                    }
+                    // Band 3
+                    if (remaining > 0) {
+                        const band3Width = taxRates.R3 - taxRates.R2;
+                        const taxable = Math.min(remaining, band3Width);
+                        tax += taxable * (taxRates.R3Tax / 100);
+                        remaining -= taxable;
+                    }
+                    // Band 4
+                    if (remaining > 0) {
+                        const band4Width = taxRates.R4 - taxRates.R3;
+                        const taxable = Math.min(remaining, band4Width);
+                        tax += taxable * (taxRates.R4Tax / 100);
+                        remaining -= taxable;
+                    }
+                    // Band 5 (Over R4)
+                    if (remaining > 0) {
+                        tax += remaining * (taxRates.R5Tax / 100);
+                    }
+
+                    tax = Math.round(tax * 100) / 100;
+                    const netIncome = dbTotal - tax;
+
+                    await conn.query(`
+                        INSERT INTO tblpayroll (
+                            PDate, SalDate, PFNo, Salary, Allw02, Allw03, Allw04, Allw05, Allw06, Allw07, Allw08, Allw09, Allw10, Allw11, Allw12, Allw13, Allw14, Allw15, Allw16, Allw17, Allw18, Allw19, Allw20, 
+                            TotalIncome, Tax, NetIncome, Operator, DateKeyed, TimeKeyed, PType, PayThrough, Bank, AccountNo, Paid, Dept, Grade, PYear, PMonth, GratInst, Approved, MReaction
+                        ) VALUES (?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), CURTIME(), '07', ?, ?, ?, 0, ?, ?, ?, ?, 0, 1, ?)
+                    `, [
+                        row.Hist_PDate, row.PFNo, dbSal, dbAllw02, dbAllw03, dbAllw04, dbAllw05, dbAllw06, dbAllw07, dbAllw08, dbAllw09, dbAllw10, dbAllw11, dbAllw12, dbAllw13, dbAllw14, dbAllw15, dbAllw16, dbAllw17, dbAllw18, dbAllw19, dbAllw20,
+                        dbTotal, tax, netIncome, operatorFull, row.PayThrough, row.Bank, row.AccountNo, row.SalaryDept, row.SalaryGrade, pYear, pMonth, row.MReaction
+                    ]);
                 }
 
-                // Calculate Net
-                let totalDeduction = loanDeduction + surcharge;
-                let netIncome = amount - totalDeduction;
-                if (netIncome < 0) netIncome = 0;
+                // 4. Update tblIncrement
+                await conn.query(`
+                    UPDATE tblincrement 
+                    SET EPassed = 1
+                    WHERE EPassed = 0 AND Type = '07'
+                `);
 
-                // Insert into tblsalary
-                // We need to map amount to correct column (Salary vs AllwXX)
-                // For simplicity, I'll use 'Salary' for Code 01, and 'Allw02' for Rent, etc.
-                // But I need to know which Allw column corresponds to which PayType.
-                // Usually this mapping is in tblpaytype or fixed.
-                // The prompt doesn't specify.
-                // I'll assume:
-                // Code 01 -> Salary
-                // Code 02 -> Allw02
-                // ...
-                // Code 13 -> Allw13
-                
-                const colName = payCode === '01' ? 'Salary' : `Allw${payCode}`;
-                
-                // Construct INSERT
-                let salaryVal = 0;
-                let totAllwVal = 0;
-                let columns = `PDate, PFNo, PType, Salary, TotAllw, TotalIncome, TotalDeduction, NetIncome, FullPay, HalfPay, WithoutPay, Ded1, Ded3, Approved, Posted, Operator, CompanyID, DateKeyed, TimeKeyed`;
-                let values = `?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 1, NOW(), NOW()`;
-                let params = [];
+            } else if (payCode === '08') {
+                // --- Code 08: EOS Benefit ---
+                // Source: tblEOS + tblEOSCalc
+                await conn.query(`
+                    INSERT INTO tblpayroll (
+                        PMonth, PYear, AccountNo, Grade, Dept, Tax, PType, TotalIncome, NetIncome, Taxable, PFNo, PDate, SalDate, Operator, DateKeyed, TimeKeyed, Approved, ApprovedBy, DateApproved, TimeApproved, Salary, PayThrough, Paid, EmpType, PayCurrency, PayingBBAN, PayingBank
+                    )
+                    SELECT 
+                        ?, ?, s.AccountNo, s.CGrade, s.CDept, 0, '08', 
+                        ROUND(e.Benefit), 
+                        ROUND(e.NetBenefit), 
+                        ROUND(e.NetBenefit - ec.Exemption), 
+                        e.PFNo, CURDATE(), CURDATE(), ?, CURDATE(), CURTIME(), e.Approved, e.ApprovedBy, e.DateApproved, e.TimeApproved, e.Salary, '02', 0, s.EmpType, s.PayCurrency, ?, ?
+                    FROM tbleoscalc ec
+                    CROSS JOIN tblstaff s
+                    INNER JOIN tbleos e ON s.PFNo = e.PFNo
+                    WHERE e.Paid = 0 AND (s.EmpStatus = '01' OR s.EmpStatus = '03')
+                `, [pMonth, pYear, operatorFull, payingBBAN, payingBank]);
 
-                if (payCode === '01') {
-                    salaryVal = amount;
-                    // colName is 'Salary', so we don't need to add it again
-                    params = [
-                        pdate, staff.PFNo, payCode, salaryVal, totAllwVal, amount,
-                        totalDeduction, netIncome,
-                        (!isHalfPay && !isWithoutPay) ? 1 : 0, isHalfPay ? 1 : 0, isWithoutPay ? 1 : 0,
-                        loanDeduction, surcharge,
-                        'Data Entry Clerk'
-                    ];
-                } else {
-                    totAllwVal = amount;
-                    // Add the allowance column dynamically
-                    columns = `PDate, PFNo, PType, ${colName}, Salary, TotAllw, TotalIncome, TotalDeduction, NetIncome, FullPay, HalfPay, WithoutPay, Ded1, Ded3, Approved, Posted, Operator, CompanyID, DateKeyed, TimeKeyed`;
-                    values = `?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 1, NOW(), NOW()`;
-                    params = [
-                        pdate, staff.PFNo, payCode, amount, salaryVal, totAllwVal, amount,
-                        totalDeduction, netIncome,
-                        (!isHalfPay && !isWithoutPay) ? 1 : 0, isHalfPay ? 1 : 0, isWithoutPay ? 1 : 0,
-                        loanDeduction, surcharge,
-                        'Data Entry Clerk'
-                    ];
-                }
+                // Update tblEOS
+                await conn.query(`
+                    UPDATE tbleos 
+                    SET Paid = 1, DatePaid = CURDATE()
+                    WHERE Paid = 0 AND Approved = 1
+                `);
 
-                const insertQuery = `INSERT INTO tblsalary (${columns}) VALUES (${values})`;
+                // Update tblPayroll
+                await conn.query(`
+                    UPDATE tblpayroll 
+                    SET Paid = 1, DatePaid = CURDATE()
+                    WHERE Paid = 0 AND PType = '08'
+                `);
+
+            } else if (payCode === '09') {
+                // --- Code 09: Bonus ---
+                // Source: tblBonus
                 
-                await conn.query(insertQuery, params);
-                
-                processedCount++;
+                await conn.query(`
+                    INSERT INTO tblpayroll (
+                        PFNo, JobTitle, Dept, Grade, PayThrough, Bank, Branch, AccountNo, Salary, MReaction, TotalIncome, Taxable, Tax, NetIncome, PType, PDate, SalDate, PMonth, PYear, PayingBBAN, PayingBank, Paid
+                    )
+                    SELECT 
+                        b.PFNo, s.JobTitle, b.Dept, b.Grade, b.PayThrough, b.Bank, b.Branch, b.AccountNo, b.Salary, b.MReaction, b.TotalIncome, b.Taxable, b.BTax, b.NetBonus, b.PType, b.BDate, CURDATE(), b.PMonth, b.PYear, ?, ?, 0
+                    FROM tblBonus b
+                    INNER JOIN tblstaff s ON b.PFNo = s.PFNo
+                    WHERE b.MReaction NOT IN ('08', '12') AND (s.EmpStatus = '01' OR s.EmpStatus = '03')
+                `, [payingBBAN, payingBank]);
+
             }
 
             await conn.commit();
-            
-            res.render('data_entry/dashboard', {
-                title: 'Data Entry Dashboard',
-                path: '/data-entry/dashboard',
-                user: { name: 'Data Entry Clerk' },
-                successMessage: `Emoluments processed successfully. ${processedCount} records created.`
-            });
+            res.json({ success: true, message: 'Emoluments processed successfully' });
 
         } catch (error) {
             await conn.rollback();
-            console.error(error);
-            res.status(500).send('Server Error: ' + error.message);
+            console.error('Process Emoluments Error:', error);
+            res.status(500).json({ success: false, message: 'Failed to process emoluments: ' + error.message });
         } finally {
             conn.release();
+        }
+    },
+
+
+    getVoucherReportPreview: async (req, res) => {
+        try {
+            const { month, year, group, scope } = req.body;
+            // month: 1-12, year: YYYY
+            // group: 'bank', 'cheque', 'master'
+            // scope: array ['salary', 'yearly', 'eos']
+
+            if (!month || !year) {
+                return res.status(400).json({ error: 'Month and Year are required' });
+            }
+
+            let query = `
+                SELECT 
+                    p.*, 
+                    s.SName, 
+                    s.AccountNo as StaffAccount, 
+                    b.Bank as BankName,
+                    d.Dept as DeptName,
+                    j.JobTitle as JobTitleName
+                FROM tblpayroll p
+                LEFT JOIN tblstaff s ON p.PFNo = s.PFNo
+                LEFT JOIN tblbanks b ON p.Bank = b.Code
+                LEFT JOIN tbldept d ON p.Dept = d.Code
+                LEFT JOIN tbljobtitle j ON p.JobTitle = j.Code
+                WHERE p.PMonth = ? AND p.PYear = ?
+            `;
+            const params = [month, year];
+
+            // Filter by Group (PayThrough)
+            // '01': CHEQUE/CASHIER, '02': BANK
+            if (group === 'bank') {
+                query += " AND p.PayThrough IN ('02', '2')";
+            } else if (group === 'cheque') {
+                query += " AND p.PayThrough IN ('01', '1')";
+            }
+            // If group === 'master', no filter on PayThrough (show all)
+
+            // Filter by Scope (PType)
+            const pTypes = [];
+            const safeScope = Array.isArray(scope) ? scope : (scope ? [scope] : []);
+            
+            if (safeScope.includes('salary')) pTypes.push("'01'", "'1'");
+            if (safeScope.includes('eos')) pTypes.push("'08'");
+            if (safeScope.includes('yearly')) {
+                // Include other common yearly/periodic types
+                pTypes.push("'02'", "'04'", "'05'", "'07'", "'09'", "'13'", "'14'", "'15'", "'33'", "'40'", "'41'", "'42'");
+            }
+            
+            if (pTypes.length > 0) {
+                query += ` AND p.PType IN (${pTypes.join(',')})`;
+            }
+
+            query += " ORDER BY p.PFNo ASC";
+
+            const [rows] = await pool.query(query, params);
+            
+            const [comRows] = await pool.query('SELECT Com_Name, Address, LogoPath FROM tblcominfo LIMIT 1');
+            const company = comRows[0] || { Com_Name: 'Human Resource Payroll', Address: '' };
+
+            res.json({
+                success: true,
+                company,
+                data: rows,
+                meta: {
+                    month, year, group, scope
+                }
+            });
+
+        } catch (error) {
+            console.error('Voucher Preview Error:', error);
+            res.status(500).json({ error: 'Server Error' });
         }
     },
 
@@ -4326,6 +5034,47 @@ const dataEntryController = {
         }
     },
 
+    checkProcessStatus: async (req, res) => {
+        try {
+            const { pdate, activity } = req.query;
+            
+            if (!pdate || !activity) {
+                return res.json({ valid: false, message: 'Please select both date and activity.' });
+            }
+
+            const pDateObj = new Date(pdate);
+            if (isNaN(pDateObj.getTime())) {
+                return res.json({ valid: false, message: 'Invalid date format.' });
+            }
+
+            const pMonth = pDateObj.getMonth() + 1;
+            const pYear = pDateObj.getFullYear();
+
+            // Check if payroll exists and is approved for this period and activity
+            const [rows] = await pool.query(
+                "SELECT COUNT(*) as count, MAX(Approved) as isApproved FROM tblpayroll WHERE PType = ? AND PMonth = ? AND PYear = ?", 
+                [activity, pMonth, pYear]
+            );
+
+            const count = rows[0].count;
+            const isApproved = rows[0].isApproved;
+
+            if (count > 0 && isApproved == 1) {
+                return res.json({ 
+                    valid: false, 
+                    message: `Payroll for this activity (${activity}) and period (${pDateObj.toLocaleString('default', { month: 'long', year: 'numeric' })}) is already APPROVED. You cannot re-process it.` 
+                });
+            }
+
+            // If unapproved records exist, they will be overwritten (handled in postProcessEmoluments)
+            return res.json({ valid: true });
+
+        } catch (error) {
+            console.error('Check Process Status Error:', error);
+            res.status(500).json({ valid: false, message: 'Server Error: ' + error.message });
+        }
+    },
+
     getJournalReport: async (req, res) => {
         try {
             // Fetch distinct dates (ignoring time) from tblgltrans
@@ -4367,6 +5116,226 @@ const dataEntryController = {
         } catch (error) {
             console.error(error);
             res.status(500).send('Server Error');
+        }
+    },
+
+    // Increments / Pay Cut / Backlog
+    getIncrementsPayCutBacklog: async (req, res) => {
+        try {
+            const [types] = await pool.query("SELECT InsCode, InsType FROM tblinstype WHERE InsCode IN ('04', '05', '06', '07') ORDER BY InsCode");
+            const [staff] = await pool.query('SELECT PFNo, SName, CGrade FROM tblstaff WHERE EmpStatus = 1 ORDER BY SName');
+            
+            res.render('data_entry/payroll/increments_pay_cut_backlog', {
+                title: 'Increments / Pay Cut / Backlog',
+                path: '/data-entry/payroll/increments-pay-cut-backlog',
+                user: req.session.user || { name: 'Data Entry Clerk' },
+                types,
+                staffList: staff
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    postIncrementsPayCutBacklog: async (req, res) => {
+        try {
+            const { 
+                target, // 'All' or 'Staff'
+                pfno, 
+                incDate, 
+                grade, 
+                type, 
+                incNo, 
+                days, 
+                payType // 'full', 'part', 'without'
+            } = req.body;
+
+            const user = req.session.user ? req.session.user.name : 'Data Entry Clerk';
+            const now = new Date();
+            
+            let fPay = 0, pPay = 0, wPay = 0;
+            if (payType === 'full') fPay = 1;
+            else if (payType === 'part') pPay = 1;
+            else if (payType === 'without') wPay = 1;
+
+            let records = [];
+            
+            if (target === 'All') {
+                const [staffRows] = await pool.query('SELECT PFNo, CGrade FROM tblstaff WHERE EmpStatus = 1');
+                records = staffRows.map(s => ({ pfno: s.PFNo, grade: s.CGrade }));
+            } else {
+                if (!pfno) return res.redirect('/data-entry/payroll/increments-pay-cut-backlog?error=PFNo is required');
+                records = [{ pfno, grade }];
+            }
+
+            const query = `
+                INSERT INTO tblincrement (
+                    IncDate, PFNo, Grade, Type, IncNo, Days, 
+                    FPay, PPay, WPay, 
+                    Approved, KeyedinBy, DateKeyed, TimeKeyed, CompanyID, EPassed, gRANTED
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, CURDATE(), CURTIME(), 1, 0, 0)
+            `;
+
+            for (const record of records) {
+                await pool.query(query, [
+                    incDate || now,
+                    record.pfno,
+                    record.grade,
+                    type,
+                    incNo || 0,
+                    days || 0,
+                    fPay,
+                    pPay,
+                    wPay,
+                    user
+                ]);
+            }
+
+            res.redirect('/data-entry/payroll/increments-pay-cut-backlog?success=Data saved successfully');
+        } catch (error) {
+            console.error(error);
+            res.redirect('/data-entry/payroll/increments-pay-cut-backlog?error=Server Error: ' + error.message);
+        }
+    },
+
+    // Acting Allowance
+    getActingAllowance: async (req, res) => {
+        try {
+            // Get staff for dropdown
+            const [staff] = await pool.query(`
+                SELECT s.PFNo, s.SName, s.CGrade, s.JobTitle, g.Grade, j.JobTitle as JobTitleName
+                FROM tblstaff s
+                LEFT JOIN tblgrade g ON s.CGrade = g.GradeCode
+                LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code
+                WHERE s.EmpStatus = 1 AND s.Redundant = 0
+                ORDER BY s.SName
+            `);
+
+            // Get departments, grades, and job titles for dropdowns
+            const [departments] = await pool.query('SELECT DeptCode, DeptName FROM tbldept ORDER BY DeptName');
+            const [grades] = await pool.query('SELECT GradeCode, Grade FROM tblgrade ORDER BY GradeCode');
+            const [jobtitles] = await pool.query('SELECT Code, JobTitle FROM tbljobtitle ORDER BY JobTitle');
+
+            // Get payroll item code 14 for allowance calculation
+            const [payrollItem] = await pool.query(`
+                SELECT Percent, TAmount, TPercentage 
+                FROM tblpayrollitems 
+                WHERE Code = '14'
+            `);
+
+            res.render('data_entry/payroll/acting_allowance', {
+                title: 'Acting Allowance',
+                path: '/data-entry/payroll/acting-allowance',
+                user: req.session.user || { name: 'Data Entry Clerk' },
+                staff,
+                departments,
+                grades,
+                jobtitles,
+                payrollItem: payrollItem[0] || { Percent: 1, TAmount: 0, TPercentage: 0 }
+            });
+        } catch (error) {
+            console.error('Acting Allowance Error:', error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    searchActingAllowance: async (req, res) => {
+        try {
+            const { pfno } = req.query;
+            
+            // Search for existing unapproved acting allowance record
+            const [existing] = await pool.query(`
+                SELECT a.*, s.SName, g.Grade as CurrentGradeName, j.JobTitle as CurrentJobTitleName
+                FROM tblacting a
+                LEFT JOIN tblstaff s ON a.PFNo = s.PFNo
+                LEFT JOIN tblgrade g ON a.C_Grade = g.GradeCode
+                LEFT JOIN tbljobtitle j ON a.JobTitle = j.Code
+                WHERE a.PFNo = ? AND a.Approved = 0
+                ORDER BY a.EntryDate DESC
+                LIMIT 1
+            `, [pfno]);
+
+            if (existing.length > 0) {
+                res.json({ found: true, record: existing[0] });
+            } else {
+                res.json({ found: false });
+            }
+        } catch (error) {
+            console.error('Search Acting Allowance Error:', error);
+            res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    postActingAllowance: async (req, res) => {
+        try {
+            const {
+                pfno, entryDate, c_grade, jobTitle, cGrade_salary,
+                a_dept, a_grade, a_jobTitle, gradeDifference, a_days, 
+                sDate, eDate, a_salary
+            } = req.body;
+
+            const user = req.session.user ? req.session.user.name : 'Data Entry Clerk';
+            const now = new Date();
+
+            // Check if there's an existing unapproved record
+            const [existing] = await pool.query(`
+                SELECT RefNo FROM tblacting 
+                WHERE PFNo = ? AND Approved = 0 
+                ORDER BY EntryDate DESC 
+                LIMIT 1
+            `, [pfno]);
+
+            if (existing.length > 0) {
+                // Update existing record
+                await pool.query(`
+                    UPDATE tblacting 
+                    SET EntryDate = ?, C_Grade = ?, JobTitle = ?, CGrade_Salary = ?, 
+                        A_dept = ?, A_Grade = ?, A_JobTitle = ?, GradeDifference = ?, 
+                        A_Days = ?, SDate = ?, EDate = ?, A_Salary = ?, 
+                        Operator = ?, DateKeyed = ?, TimeKeyed = CURTIME()
+                    WHERE RefNo = ?
+                `, [
+                    entryDate, c_grade, jobTitle, cGrade_salary,
+                    a_dept, a_grade, a_jobTitle, gradeDifference,
+                    a_days, sDate, eDate, a_salary,
+                    user, now, existing[0].RefNo
+                ]);
+            } else {
+                // Insert new record
+                const refNo = `ACT-${Date.now()}`;
+                await pool.query(`
+                    INSERT INTO tblacting (
+                        RefNo, PFNo, EntryDate, C_Grade, JobTitle, CGrade_Salary,
+                        A_dept, A_Grade, A_JobTitle, GradeDifference, A_Days, SDate, EDate, A_Salary,
+                        Approved, Operator, DateKeyed, TimeKeyed
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, CURTIME())
+                `, [
+                    refNo, pfno, entryDate, c_grade, jobTitle, cGrade_salary,
+                    a_dept, a_grade, a_jobTitle, gradeDifference, a_days, sDate, eDate, a_salary,
+                    user, now
+                ]);
+            }
+
+            // Update salary table as per requirements
+            // First: Set Approved = No for the staff
+            await pool.query(`
+                UPDATE tblSalary 
+                SET Approved = 0 
+                WHERE PFNo = ?
+            `, [pfno]);
+
+            // Second: Set Allw14 = A_Salary for unapproved records
+            await pool.query(`
+                UPDATE tblSalary 
+                SET Allw14 = ? 
+                WHERE Approved = 0 AND PFNo = ?
+            `, [a_salary, pfno]);
+
+            res.json({ success: true, message: 'Acting allowance saved successfully' });
+        } catch (error) {
+            console.error('Post Acting Allowance Error:', error);
+            res.status(500).json({ error: 'Server Error: ' + error.message });
         }
     }
 };

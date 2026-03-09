@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Acting Allowance · HR & Payroll</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <div>
+                    <h2 class="mb-0">Acting Allowance</h2>
+                    <div class="text-muted">Manage staff acting appointments and allowances</div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-8 mx-auto">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <!-- Search Section -->
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <label for="searchPfno" class="form-label">Search Staff (PFNo)</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="searchPfno" placeholder="Enter PFNo to search existing record">
+                                        <button class="btn btn-outline-secondary" type="button" onclick="searchActingRecord()">
+                                            <i class="bi bi-search"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <form id="actingForm">
+                                <div class="row g-3">
+                                    <!-- Entry Date -->
+                                    <div class="col-md-4">
+                                        <label for="entryDate" class="form-label">Entry Date</label>
+                                        <input type="date" class="form-control" id="entryDate" name="entryDate" value="<%= new Date().toISOString().split('T')[0] %>" required>
+                                    </div>
+
+                                    <!-- Staff Selection -->
+                                    <div class="col-md-4">
+                                        <label for="pfno" class="form-label">Emp-ID</label>
+                                        <select class="form-select" id="pfno" name="pfno" required onchange="loadStaffDetails()">
+                                            <option value="">Select Staff</option>
+                                            <% staff.forEach(s => { %>
+                                                <option value="<%= s.PFNo %>" 
+                                                        data-name="<%= s.SName %>" 
+                                                        data-grade="<%= s.CGrade %>" 
+                                                        data-grade-name="<%= s.Grade %>"
+                                                        data-jobtitle="<%= s.JobTitle %>"
+                                                        data-jobtitle-name="<%= s.JobTitleName %>">
+                                                    <%= s.PFNo %> - <%= s.SName %>
+                                                </option>
+                                            <% }) %>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label for="staffName" class="form-label">Staff Name</label>
+                                        <input type="text" class="form-control" id="staffName" name="staffName" readonly>
+                                    </div>
+
+                                    <!-- Current Position Details -->
+                                    <div class="col-md-3">
+                                        <label for="c_grade" class="form-label">Current Grade</label>
+                                        <input type="text" class="form-control" id="c_grade" name="c_grade" readonly>
+                                    </div>
+
+                                    <div class="col-md-3">
+                                        <label for="jobTitle" class="form-label">Job Title</label>
+                                        <input type="text" class="form-control" id="jobTitle" name="jobTitle" readonly>
+                                    </div>
+
+                                    <div class="col-md-3">
+                                        <label for="cGrade_salary" class="form-label">Current Salary</label>
+                                        <input type="number" class="form-control" id="cGrade_salary" name="cGrade_salary" step="0.01" required>
+                                    </div>
+
+                                    <div class="col-md-3">
+                                        <label for="gradeDifference" class="form-label">Point</label>
+                                        <input type="number" class="form-control" id="gradeDifference" name="gradeDifference" readonly>
+                                    </div>
+
+                                    <!-- Acting Position Details -->
+                                    <div class="col-md-4">
+                                        <label for="a_dept" class="form-label">Acting Department</label>
+                                        <select class="form-select" id="a_dept" name="a_dept" required>
+                                            <option value="">Select Department</option>
+                                            <% departments.forEach(d => { %>
+                                                <option value="<%= d.DeptCode %>"><%= d.DeptName %></option>
+                                            <% }) %>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label for="a_grade" class="form-label">Acting Grade</label>
+                                        <select class="form-select" id="a_grade" name="a_grade" required onchange="calculatePoint()">
+                                            <option value="">Select Grade</option>
+                                            <% grades.forEach(g => { %>
+                                                <option value="<%= g.GradeCode %>"><%= g.Grade %></option>
+                                            <% }) %>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label for="a_jobTitle" class="form-label">Acting Job Title</label>
+                                        <select class="form-select" id="a_jobTitle" name="a_jobTitle" required>
+                                            <option value="">Select Job Title</option>
+                                            <% jobtitles.forEach(j => { %>
+                                                <option value="<%= j.Code %>"><%= j.JobTitle %></option>
+                                            <% }) %>
+                                        </select>
+                                    </div>
+
+                                    <!-- Acting Period -->
+                                    <div class="col-md-3">
+                                        <label for="a_days" class="form-label">Days</label>
+                                        <input type="number" class="form-control" id="a_days" name="a_days" min="1" required onchange="calculateEndDate()">
+                                    </div>
+
+                                    <div class="col-md-3">
+                                        <label for="sDate" class="form-label">Start Date</label>
+                                        <input type="date" class="form-control" id="sDate" name="sDate" required onchange="calculateEndDate()">
+                                    </div>
+
+                                    <div class="col-md-3">
+                                        <label for="eDate" class="form-label">End Date</label>
+                                        <input type="date" class="form-control" id="eDate" name="eDate" readonly>
+                                    </div>
+
+                                    <div class="col-md-3">
+                                        <label for="a_salary" class="form-label">Acting Allowance</label>
+                                        <input type="number" class="form-control" id="a_salary" name="a_salary" step="0.01" readonly>
+                                    </div>
+                                </div>
+
+                                <div class="row mt-4">
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="bi bi-save"></i> Save Acting Allowance
+                                        </button>
+                                        <button type="reset" class="btn btn-secondary ms-2">
+                                            <i class="bi bi-arrow-clockwise"></i> Reset
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const payrollItem = <%- JSON.stringify(payrollItem) %>;
+
+        function loadStaffDetails() {
+            const select = document.getElementById('pfno');
+            const selectedOption = select.options[select.selectedIndex];
+            
+            if (selectedOption.value) {
+                document.getElementById('staffName').value = selectedOption.dataset.name;
+                document.getElementById('c_grade').value = selectedOption.dataset.gradeName;
+                document.getElementById('jobTitle').value = selectedOption.dataset.jobtitleName;
+            } else {
+                document.getElementById('staffName').value = '';
+                document.getElementById('c_grade').value = '';
+                document.getElementById('jobTitle').value = '';
+            }
+        }
+
+        function calculatePoint() {
+            const currentGrade = document.getElementById('c_grade').value;
+            const actingGrade = document.getElementById('a_grade').value;
+            const currentSalary = parseFloat(document.getElementById('cGrade_salary').value) || 0;
+            
+            if (currentGrade && actingGrade) {
+                // Extract grade numbers (assuming format like "G1", "G2", etc.)
+                const currentGradeNum = parseInt(currentGrade.replace(/\D/g, '')) || 0;
+                const actingGradeNum = parseInt(actingGrade.replace(/\D/g, '')) || 0;
+                
+                const difference = actingGradeNum - currentGradeNum;
+                document.getElementById('gradeDifference').value = difference > 0 ? difference : 0;
+                
+                // Calculate acting allowance
+                calculateAllowance();
+            }
+        }
+
+        function calculateAllowance() {
+            const currentSalary = parseFloat(document.getElementById('cGrade_salary').value) || 0;
+            const gradeDifference = parseInt(document.getElementById('gradeDifference').value) || 0;
+            
+            if (currentSalary > 0 && gradeDifference > 0 && payrollItem) {
+                let allowance = 0;
+                
+                if (gradeDifference > payrollItem.Percent) {
+                    allowance = (currentSalary * payrollItem.TPercentage) / 100;
+                } else {
+                    allowance = (currentSalary * payrollItem.TAmount) / 100;
+                }
+                
+                document.getElementById('a_salary').value = allowance.toFixed(2);
+            }
+        }
+
+        function calculateEndDate() {
+            const startDate = document.getElementById('sDate').value;
+            const days = parseInt(document.getElementById('a_days').value) || 0;
+            
+            if (startDate && days > 0) {
+                const start = new Date(startDate);
+                const end = new Date(start);
+                end.setDate(start.getDate() + days - 1); // Subtract 1 because start date counts as day 1
+                
+                document.getElementById('eDate').value = end.toISOString().split('T')[0];
+            }
+        }
+
+        async function searchActingRecord() {
+            const pfno = document.getElementById('searchPfno').value;
+            if (!pfno) {
+                alert('Please enter a PFNo to search');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/payroll/acting-allowance/search?pfno=${pfno}`);
+                const data = await response.json();
+
+                if (data.found) {
+                    if (confirm('Found existing unapproved record. Load it for editing?')) {
+                        loadExistingRecord(data.record);
+                    }
+                } else {
+                    alert('No unapproved acting allowance record found for this staff');
+                    // Set the PFNo in the form
+                    document.getElementById('pfno').value = pfno;
+                    loadStaffDetails();
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+                alert('Error searching for record');
+            }
+        }
+
+        function loadExistingRecord(record) {
+            // Populate form with existing data
+            document.getElementById('pfno').value = record.PFNo;
+            document.getElementById('entryDate').value = new Date(record.EntryDate).toISOString().split('T')[0];
+            document.getElementById('c_grade').value = record.C_Grade;
+            document.getElementById('jobTitle').value = record.JobTitle;
+            document.getElementById('cGrade_salary').value = record.CGrade_Salary;
+            document.getElementById('gradeDifference').value = record.GradeDifference;
+            document.getElementById('a_dept').value = record.A_dept;
+            document.getElementById('a_grade').value = record.A_Grade;
+            document.getElementById('a_jobTitle').value = record.A_JobTitle;
+            document.getElementById('a_days').value = record.A_Days;
+            document.getElementById('sDate').value = new Date(record.SDate).toISOString().split('T')[0];
+            document.getElementById('eDate').value = record.EDate ? new Date(record.EDate).toISOString().split('T')[0] : '';
+            document.getElementById('a_salary').value = record.A_Salary;
+            
+            loadStaffDetails();
+        }
+
+        // Form submission
+        document.getElementById('actingForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+
+            try {
+                const response = await fetch('/data-entry/payroll/acting-allowance', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('Acting allowance saved successfully');
+                    this.reset();
+                    // Reset readonly fields
+                    document.getElementById('staffName').value = '';
+                    document.getElementById('c_grade').value = '';
+                    document.getElementById('jobTitle').value = '';
+                    document.getElementById('gradeDifference').value = '';
+                    document.getElementById('eDate').value = '';
+                    document.getElementById('a_salary').value = '';
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Submit error:', error);
+                alert('Error saving acting allowance');
+            }
+        });
+
+        // Calculate allowance when salary changes
+        document.getElementById('cGrade_salary').addEventListener('input', calculateAllowance);
+    </script>
+</body>
+</html>

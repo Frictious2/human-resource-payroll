@@ -66,6 +66,7 @@
 .main {
     margin-left: 260px;
     padding: 2rem;
+    padding-top: 5rem; /* Ensure content is not hidden behind fixed navbar */
     min-height: 100vh;
 }
 
@@ -83,6 +84,7 @@
     .main {
         margin-left: 0;
         padding: 1rem;
+        padding-top: 5rem;
     }
 }
 

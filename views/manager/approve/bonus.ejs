@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · HR & Payroll</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid pt-3">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+                <h1 class="h2"><%= companyName %></h1>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Approve Bonus Awards</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-bordered" id="bonusTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Entry Date</th>
+                                    <th>Bonus Year</th>
+                                    <th>Months</th>
+                                    <th>Bonus</th>
+                                    <th>Taxable</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% if (!bonuses || bonuses.length === 0) { %>
+                                    <tr><td colspan="6" class="text-center">No pending bonus awards.</td></tr>
+                                <% } else { %>
+                                    <% bonuses.forEach(b => { %>
+                                        <tr>
+                                            <td><%= b.EntryDate ? new Date(b.EntryDate).toISOString().split('T')[0] : '' %></td>
+                                            <td><%= b.BonusYear %></td>
+                                            <td><%= b.Month %></td>
+                                            <td><%= b.Bonus %></td>
+                                            <td><%= b.BTaxable == 1 ? 'Yes' : 'No' %></td>
+                                            <td>
+                                                <% const id = b.RefNo || b.Id || b.BonusID; %>
+                                                <button class="btn btn-sm btn-primary" data-id="<%= id %>" data-bs-toggle="modal" data-bs-target="#viewModal">
+                                                    <i class="bi bi-eye"></i> View
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    <% }) %>
+                                <% } %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- View & Approve Modal -->
+    <div class="modal fade" id="viewModal" tabindex="-1" aria-labelledby="viewModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="viewModalLabel">Bonus Award Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Entry Date</label>
+                            <input type="text" class="form-control" id="vEntryDate" readonly />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Bonus Year</label>
+                            <input type="text" class="form-control" id="vBonusYear" readonly />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Months</label>
+                            <input type="text" class="form-control" id="vMonths" readonly />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Bonus</label>
+                            <input type="text" class="form-control" id="vBonus" readonly />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Type</label>
+                            <input type="text" class="form-control" id="vType" readonly />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Taxable</label>
+                            <input type="text" class="form-control" id="vTaxable" readonly />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <input type="hidden" id="vRecordId" />
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-danger" id="btnReject">Reject</button>
+                    <button type="button" class="btn btn-success" id="btnApprove">Approve</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const viewModalEl = document.getElementById('viewModal');
+        let currentId = '';
+
+        viewModalEl.addEventListener('show.bs.modal', async (e) => {
+            const btn = e.relatedTarget;
+            const id = btn.getAttribute('data-id');
+            if (!id) return;
+            currentId = id;
+            try {
+                const res = await fetch(`/manager/api/bonus-awards/${id}`);
+                const row = await res.json();
+                if (!row) return;
+                document.getElementById('vRecordId').value = id;
+                document.getElementById('vEntryDate').value = row.EntryDate ? new Date(row.EntryDate).toISOString().split('T')[0] : '';
+                document.getElementById('vBonusYear').value = row.BonusYear ?? '';
+                document.getElementById('vMonths').value = row.Month ?? '';
+                document.getElementById('vBonus').value = row.Bonus ?? '';
+                document.getElementById('vType').value = (row.Fixed == 1) ? 'Fixed' : ((row.Percent == 1) ? 'Percent' : '');
+                document.getElementById('vTaxable').value = (row.BTaxable == 1) ? 'Yes' : 'No';
+            } catch (e2) {
+                console.error(e2);
+            }
+        });
+
+        async function act(action) {
+            if (!currentId) return;
+            try {
+                const res = await fetch('/manager/api/approve/bonus', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: currentId, action })
+                });
+                const result = await res.json();
+                if (result && result.success) {
+                    // reload page to reflect changes
+                    location.reload();
+                } else {
+                    alert(result.error || 'Action failed');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Server error');
+            }
+        }
+
+        document.getElementById('btnApprove').addEventListener('click', () => act('approve'));
+        document.getElementById('btnReject').addEventListener('click', () => act('reject'));
+    });
+    </script>
+</body>
+</html>
