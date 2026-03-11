@@ -53,18 +53,18 @@ exports.calculateBenefits = async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        // 1. Delete unapproved records
-        await connection.query('DELETE FROM tblEOSBudget WHERE Approved = 0');
-
-        // 2. Fetch Calculation Parameters
-        const [calcParams] = await connection.query('SELECT * FROM tblEOSCalc LIMIT 1');
-        if (calcParams.length === 0) {
-            throw new Error('EOS Calculation parameters missing');
-        }
-        const params = calcParams[0];
-
         // 3. Prepare Insert Query based on Section
         if (searchType === 'eos') { // End of Service Benefit
+            // 1. Delete unapproved records for EOS
+            await connection.query('DELETE FROM tblEOSBudget WHERE Approved = 0');
+
+            // 2. Fetch Calculation Parameters
+            const [calcParams] = await connection.query('SELECT * FROM tblEOSCalc LIMIT 1');
+            if (calcParams.length === 0) {
+                throw new Error('EOS Calculation parameters missing');
+            }
+            const params = calcParams[0];
+
             if (section === 'all' || section === 'staff') {
                 let query = `
                     INSERT INTO tblEOSBudget (
@@ -249,17 +249,35 @@ exports.calculateBenefits = async (req, res) => {
         await connection.commit();
 
         // 4. Fetch results for Preview
-        // Group by Department if All/Former selected
-        let resultQuery = `
-            SELECT b.*, d.Dept as DeptName 
-            FROM tblEOSBudget b
-            LEFT JOIN tbldept d ON b.Dept = d.Code
-            WHERE b.Approved = 0
-            ORDER BY d.Dept, b.SName
-        `;
+        let rows = [];
         
-        const [rows] = await connection.query(resultQuery);
-
+        if (searchType === 'eos') {
+            // Group by Department if All/Former selected
+            const query = `
+                SELECT b.*, d.Dept as DeptName 
+                FROM tblEOSBudget b
+                LEFT JOIN tbldept d ON b.Dept = d.Code
+                WHERE b.Approved = 0
+                ORDER BY d.Dept, b.SName
+            `;
+            const [results] = await connection.query(query);
+            rows = results;
+        } else if (searchType === 'ex-gracia') {
+            // Fetch from tblexgratia
+            const query = `
+                SELECT e.PFNo, e.SName, COALESCE(g.Grade, e.JobTitle) as Grade, e.DateEmp, e.Age, e.Years, e.Days, 
+                       e.Salary, e.Benefit, e.Taxable, e.Tax, e.Final, 
+                       d.Dept as DeptName
+                FROM tblexgratia e
+                LEFT JOIN tbldept d ON e.Dept = d.Code
+                LEFT JOIN tblgrade g ON e.JobTitle = g.JobTitle
+                WHERE e.Approved = 0
+                ORDER BY d.Dept, e.SName
+            `;
+            const [results] = await connection.query(query);
+            rows = results;
+        }
+        
         // Group data by Department
         const groupedResults = {};
         rows.forEach(row => {

@@ -2282,16 +2282,46 @@ const managerController = {
             const [companyRows] = await pool.query('SELECT * FROM tblcominfo LIMIT 1');
             const companyInfo = companyRows[0] || {};
 
+            // Fetch GL Accounts
+            const [glAccounts] = await pool.query('SELECT * FROM tblglaccounts ORDER BY GLNo');
+
             // Fetch journal entries for the selected date
             const [journalEntries] = await pool.query(`
                 SELECT * FROM tblgltrans 
                 WHERE DATE(GLDate) = ?
             `, [glDate]);
 
+            // Aggregate journal entries
+            const fieldsToSum = [
+                'BasicSalary', 'Headquarters', 'Responsibility', 'MaidAllowance', 'StaffWelfare', 
+                'Transport', 'COLA', 'Risk', 'Acting', 'Professional', 'Academic', 
+                'IncomeTax', 'NassitEmp', 'ProvidentEmp', 'Rent', 'SSA', 'JSA', 
+                'SalAdvance', 'IntOnAdv', 'SalaryWages'
+            ];
+
+            const aggregatedJournal = journalEntries.reduce((acc, entry) => {
+                fieldsToSum.forEach(field => {
+                    const val = parseFloat(entry[field]);
+                    if (!isNaN(val)) {
+                        acc[field] = (acc[field] || 0) + val;
+                    }
+                });
+                return acc;
+            }, {});
+
+            // Preserve metadata from the first entry
+            if (journalEntries.length > 0) {
+                aggregatedJournal.GLDate = journalEntries[0].GLDate;
+                aggregatedJournal.GLMonth = journalEntries[0].GLMonth;
+                aggregatedJournal.GLYear = journalEntries[0].GLYear;
+            }
+
             res.render('reports/journal_preview', {
                 title: 'Journal Report Preview',
                 companyInfo,
-                journalEntries,
+                journalEntries, // Keep for reference
+                aggregatedJournal,
+                glAccounts,
                 glDate,
                 user: req.session.user || { name: 'Manager' },
                 role: 'manager'

@@ -120,14 +120,14 @@
                             <th class="text-end">Benefit</th>
                             <th class="text-end">Taxable</th>
                             <th class="text-end">Tax</th>
-                            <th class="text-end">Net Pay</th>
+                            <th class="text-end">Net Benefit</th>
                         </tr>
                     </thead>
                     <tbody>
                         <% let deptTotal = 0; %>
                         <% results[dept].forEach(row => { %>
-                            <% const netPay = row.Benefit - row.Tax; %>
-                            <% deptTotal += netPay; %>
+                            <% const netPay = (row.Final !== undefined && row.Final !== null) ? row.Final : (row.Benefit - row.Tax); %>
+                            <% deptTotal += parseFloat(netPay || 0); %>
                             <tr>
                                 <td class="text-center"><%= row.PFNo %></td>
                                 <td><%= row.SName %></td>

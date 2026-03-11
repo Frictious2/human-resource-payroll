@@ -17,7 +17,12 @@
             transform: translateY(-5px);
         }
         
+        /* A4 Paper Style for Preview/Print */
         @media print {
+            @page {
+                size: A4;
+                margin: 0;
+            }
             body.print-payslip * {
                 visibility: hidden;
             }
@@ -33,7 +38,20 @@
                 margin: 0;
                 padding: 0;
                 box-shadow: none !important;
+                background-color: white !important;
             }
+            /* Ensure page breaks work in print */
+            .payslip-page {
+                page-break-after: always;
+                min-height: 297mm;
+                height: 297mm;
+                padding: 20mm !important; /* Add padding for print */
+                box-sizing: border-box;
+            }
+            .payslip-page:last-child {
+                page-break-after: auto;
+            }
+            /* Hide modal backdrop and other UI elements */
             body.print-payslip .modal-backdrop,
             body.print-payslip .modal-header,
             body.print-payslip .btn-close {
@@ -44,15 +62,19 @@
         #payslipContainer {
             font-size: 0.82rem;
             line-height: 1.2;
+            background-color: #f8f9fa; /* Gray background for container to show pages */
+            padding: 20px;
         }
-        .payslip-header h3 { font-weight: bold; margin-bottom: 3px; font-size: 1.05rem; }
-        .payslip-header p { margin-bottom: 2px; font-size: 0.8rem; }
-        .payslip-section-title { font-weight: bold; border-bottom: 2px solid #000; margin-bottom: 6px; padding-bottom: 3px; font-size: 0.9rem; }
-        .info-row { margin-bottom: 3px; }
-        .amount-col { text-align: right; }
+        /* Visual separation for preview */
         .payslip-page {
             min-height: 297mm;
-            page-break-after: always;
+            width: 210mm;
+            margin: 0 auto 20px auto; /* Center and add gap between pages */
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            padding: 20mm;
+            box-sizing: border-box;
+            position: relative;
         }
     </style>
 </head>
@@ -88,7 +110,7 @@
                 </div>
 
                 <div class="col-md-4">
-                    <div class="card shadow-sm h-100 report-card">
+                    <div class="card shadow-sm h-100 report-card" data-bs-toggle="modal" data-bs-target="#bonusBacklogModal">
                         <div class="card-body text-center p-5">
                             <i class="bi bi-cash-coin fs-1 text-warning mb-3"></i>
                             <h4 class="card-title">Bonus/Backlog</h4>
@@ -285,6 +307,58 @@
                                         <button type="button" class="btn btn-secondary" id="btnVoucherPrint"><i class="bi bi-printer"></i> Print</button>
                                         <button type="button" class="btn btn-danger" id="btnVoucherPdf"><i class="bi bi-file-pdf"></i> PDF</button>
                                     </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" id="bonusBacklogModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Bonus / Backlog Report</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="bonusBacklogForm">
+                                <div class="mb-3">
+                                    <label for="bbYear" class="form-label">Year</label>
+                                    <input type="number" class="form-control" id="bbYear" name="year" min="2000" max="2100" value="<%= new Date().getFullYear() %>" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label d-block">Report Type</label>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="bbType" id="bbTypeBonus" value="bonus" checked>
+                                        <label class="form-check-label" for="bbTypeBonus">Bonus</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="bbType" id="bbTypeBacklog" value="backlog">
+                                        <label class="form-check-label" for="bbTypeBacklog">Backlog</label>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label d-block">Scope</label>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="bbScope" id="bbScopeAll" value="all" checked>
+                                        <label class="form-check-label" for="bbScopeAll">All</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="bbScope" id="bbScopeStaff" value="staff">
+                                        <label class="form-check-label" for="bbScopeStaff">Staff</label>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="bbStaffId" class="form-label">Staff ID</label>
+                                    <input type="text" class="form-control" id="bbStaffId" name="staffId" readonly>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Name</label>
+                                    <input type="text" class="form-control bg-light" id="bbStaffName" readonly>
+                                </div>
+                                <div class="d-flex justify-content-end">
+                                    <button type="button" class="btn btn-primary" id="btnPreviewBonusBacklog"><i class="bi bi-eye"></i> Preview</button>
                                 </div>
                             </form>
                         </div>
@@ -521,6 +595,13 @@
                 document.getElementById('recordCounter').style.display = 'inline-block';
                 document.querySelector('#previewModal .modal-title').textContent = 'Payslip Preview';
                 
+                // Reset container style for Payslip (single view)
+                const container = document.getElementById('payslipContainer');
+                container.style.backgroundColor = 'white';
+                container.style.width = '210mm';
+                container.style.padding = '20mm';
+                container.style.margin = '0 auto';
+
                 renderPayslip(0);
                 previewModal.show();
 
@@ -988,6 +1069,13 @@
                 document.getElementById('recordCounter').style.display = 'none';
                 document.querySelector('#previewModal .modal-title').textContent = 'Voucher Preview';
 
+                // Setup container for continuous scrolling pages
+                const container = document.getElementById('payslipContainer');
+                container.style.backgroundColor = '#f8f9fa';
+                container.style.width = '100%';
+                container.style.padding = '20px';
+                container.style.margin = '0';
+
                 previewModal.show();
 
                 if (action === 'print') {
@@ -1058,9 +1146,11 @@
 
                  const headerHtml = `
                     <div class="text-center mb-4">
+                        ${page === 0 ? `
                         ${company.LogoPath ? `<img src="${company.LogoPath}" style="height: 60px;" class="mb-2">` : ''}
                         <h3 class="fw-bold mb-0 text-uppercase">${company.Com_Name || 'Company Name'}</h3>
                         <p class="mb-2">${company.Address || ''}</p>
+                        ` : ''}
                         <h4 class="text-uppercase text-decoration-underline mt-3">PAYMENT VOUCHER - ${meta.group.toUpperCase()}</h4>
                         <p class="fw-bold">PERIOD: ${meta.year}-${meta.month}</p>
                     </div>
@@ -1111,6 +1201,70 @@
              }
 
              container.innerHTML = html;
+        }
+        // Bonus/Backlog Logic
+        const bbScopeAll = document.getElementById('bbScopeAll');
+        const bbScopeStaff = document.getElementById('bbScopeStaff');
+        const bbStaffId = document.getElementById('bbStaffId');
+        const bbStaffName = document.getElementById('bbStaffName');
+        const btnPreviewBB = document.getElementById('btnPreviewBonusBacklog');
+        
+        function updateBBScope() {
+            if (bbScopeAll.checked) {
+                bbStaffId.readOnly = true;
+                bbStaffId.value = '';
+                bbStaffName.value = '';
+            } else {
+                bbStaffId.readOnly = false;
+                bbStaffId.focus();
+            }
+        }
+        
+        if (bbScopeAll && bbScopeStaff) {
+            bbScopeAll.addEventListener('change', updateBBScope);
+            bbScopeStaff.addEventListener('change', updateBBScope);
+        }
+        
+        if (bbStaffId) {
+            bbStaffId.addEventListener('blur', async () => {
+                const pfno = bbStaffId.value.trim();
+                if (!pfno) {
+                    bbStaffName.value = '';
+                    return;
+                }
+                try {
+                    bbStaffName.value = 'Loading...';
+                    // Use Manager API since we are in Manager view
+                    const response = await fetch(`/manager/api/staff/${pfno}/name`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        bbStaffName.value = data.name;
+                    } else {
+                        bbStaffName.value = 'Staff not found';
+                    }
+                } catch (error) {
+                    console.error(error);
+                    bbStaffName.value = 'Error fetching name';
+                }
+            });
+        }
+
+        if (btnPreviewBB) {
+            btnPreviewBB.addEventListener('click', () => {
+                const year = document.getElementById('bbYear').value;
+                const type = document.querySelector('input[name="bbType"]:checked').value;
+                const scope = document.querySelector('input[name="bbScope"]:checked').value;
+                const pfno = document.getElementById('bbStaffId').value.trim();
+                
+                if (scope === 'staff' && !pfno) {
+                    alert('Please enter a Staff ID');
+                    return;
+                }
+                
+                // Open Preview in New Tab
+                const url = `/manager/reports/payroll/bonus-backlog/preview?year=${year}&type=${type}&scope=${scope}&pfno=${pfno}`;
+                window.open(url, '_blank');
+            });
         }
     </script>
 </body>

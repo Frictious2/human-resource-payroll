@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> Preview</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 10mm;
+        }
+        body { background: #f8f9fa; }
+        .page-container {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 20px auto;
+            background: white;
+            padding: 15mm;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        @media print {
+            body { background: white; margin: 0; }
+            .page-container { 
+                margin: 0; 
+                box-shadow: none; 
+                width: 100%; 
+                min-height: auto;
+                padding: 0;
+            }
+            .no-print { display: none !important; }
+        }
+        .header-logo { max-height: 80px; }
+        .table-sm th, .table-sm td { font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+
+    <div class="container-fluid no-print py-3 mb-3 border-bottom bg-white">
+        <div class="d-flex justify-content-between align-items-center container">
+            <h5 class="mb-0">Report Preview</h5>
+            <div>
+                <button onclick="window.print()" class="btn btn-primary"><i class="bi bi-printer"></i> Print</button>
+                <button onclick="window.close()" class="btn btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-container">
+        <!-- Header -->
+        <div class="text-center mb-5">
+            <% if (company.LogoPath) { %>
+                <img src="<%= company.LogoPath %>" alt="Logo" class="header-logo mb-2">
+            <% } %>
+            <h3 class="text-uppercase fw-bold mb-0"><%= company.Com_Name %></h3>
+            <p class="mb-3"><%= company.Address %></p>
+            
+            <h4 class="text-uppercase text-decoration-underline"><%= title %> - <%= year %></h4>
+            <p class="text-muted">
+                Scope: <%= scope === 'all' ? 'All Staff' : 'Individual Staff' %> 
+                <%= scope === 'staff' && data.length > 0 ? `(${data[0].PFNo} - ${data[0].SName})` : '' %>
+            </p>
+        </div>
+
+        <!-- Table -->
+        <table class="table table-bordered table-striped table-sm">
+            <thead class="table-dark">
+                <tr>
+                    <th>PF No</th>
+                    <th>Name</th>
+                    <th>Department</th>
+                    <th>Job Title</th>
+                    <th>Remarks</th>
+                    <th class="text-end">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% if (data && data.length > 0) { %>
+                    <% data.forEach(row => { %>
+                        <tr>
+                            <td><%= row.PFNo %></td>
+                            <td><%= row.SName %></td>
+                            <td><%= row.DeptName || '' %></td>
+                            <td><%= row.JobTitleName || '' %></td>
+                            <td><%= row.Remarks %></td>
+                            <td class="text-end"><%= parseFloat(row.BonusAmount || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                        </tr>
+                    <% }); %>
+                    <tr class="fw-bold table-secondary">
+                        <td colspan="5" class="text-end">GRAND TOTAL</td>
+                        <td class="text-end"><%= parseFloat(grandTotal || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                    </tr>
+                <% } else { %>
+                    <tr>
+                        <td colspan="6" class="text-center py-4">No records found for the selected criteria.</td>
+                    </tr>
+                <% } %>
+            </tbody>
+        </table>
+
+        <div class="mt-5 text-center text-muted small">
+            Generated on <%= generatedDate %>
+        </div>
+    </div>
+
+</body>
+</html>

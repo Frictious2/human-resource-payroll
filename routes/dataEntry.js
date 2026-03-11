@@ -161,6 +161,7 @@ router.get('/welfare/redundancy', dataEntryController.getWelfareRedundancy);
 
 // 5. Reports
 router.get('/reports/payroll', dataEntryController.getPayrollReports);
+router.get('/reports/payroll/bonus-backlog/preview', dataEntryController.getBonusBacklogPreview);
 router.get('/api/staff/:pfno/name', dataEntryController.getStaffName);
 router.get('/api/welfare/redundancy', dataEntryController.getRedundancySheetData);
 router.get('/api/reports/payslip', dataEntryController.getPayslipData);

@@ -91,6 +91,8 @@ router.get('/approve/entitlement', managerController.getComingSoon);
 
 // Reports
 router.get('/reports/payroll', managerController.getPayrollReports);
+router.get('/reports/payroll/bonus-backlog/preview', dataEntryController.getBonusBacklogPreview);
+router.get('/api/staff/:pfno/name', dataEntryController.getStaffName);
 router.get('/reports/journal', managerController.getJournalReport);
 router.get('/reports/journal/preview', managerController.getJournalReportPreview);
 router.get('/reports/vehicle-insurance', managerController.getComingSoon);

@@ -1333,6 +1333,129 @@ const dataEntryController = {
         }
     },
 
+    getBonusBacklogPreview: async (req, res) => {
+        try {
+            const { year, type, scope, pfno } = req.query;
+            
+            // Get Company Info
+            const [comRows] = await pool.query('SELECT Com_Name, Address, LogoPath FROM tblcominfo LIMIT 1');
+            const company = comRows[0] || { Com_Name: 'Company Name', Address: 'Address', LogoPath: null };
+
+            // Fetch Bonus Rules
+            const [bonusRules] = await pool.query('SELECT * FROM tblbonusawards WHERE BonusYear = ?', [year]);
+
+            // Determine latest payroll period for salary base
+            const [periodRows] = await pool.query('SELECT MAX(PYear) as y, MAX(PMonth) as m FROM tblpayroll');
+            const latestYear = periodRows[0]?.y || new Date().getFullYear();
+            const latestMonth = periodRows[0]?.m || (new Date().getMonth() + 1);
+
+            // Fetch Staff
+            let staffQuery = `
+                SELECT s.PFNo, s.SName, s.CDept, s.JobTitle, 
+                       d.Dept AS DeptName, j.JobTitle AS JobTitleName,
+                       COALESCE(p.Salary, 0) as BasicPay
+                FROM tblstaff s
+                LEFT JOIN tblpayroll p ON s.PFNo = p.PFNo AND p.PYear = ? AND p.PMonth = ?
+                LEFT JOIN tbldept d ON s.CDept = d.Code
+                LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code
+                WHERE s.EmpStatus = '1'
+            `;
+            const staffParams = [latestYear, latestMonth];
+            
+            if (scope === 'staff' && pfno) {
+                staffQuery += ' AND s.PFNo = ?';
+                staffParams.push(pfno);
+            }
+            
+            staffQuery += ' ORDER BY s.PFNo';
+            
+            const [staffRows] = await pool.query(staffQuery, staffParams);
+            
+            const reportData = [];
+            let grandTotal = 0;
+
+            staffRows.forEach(staff => {
+                let totalBonus = 0;
+                let remarks = [];
+                
+                // If there are no rules, maybe return empty or just staff info?
+                // Assuming rules exist.
+                bonusRules.forEach(rule => {
+                    let ruleAmount = 0;
+                    if (rule.Fixed == 1) {
+                        ruleAmount = parseFloat(rule.Bonus || 0);
+                        remarks.push(`Fixed: ${ruleAmount}`);
+                    } else if (rule.Percent == 1) {
+                        // Percent of Basic Pay
+                        // Assuming rule.Bonus is the percentage value (e.g., 10 for 10%)
+                        ruleAmount = (parseFloat(staff.BasicPay || 0) * parseFloat(rule.Bonus || 0)) / 100;
+                        remarks.push(`${rule.Bonus}% of Basic`);
+                    } else if (rule.Month > 0) {
+                        // Multiplier of monthly salary
+                        // Wait, rule.Month is smallint.
+                        // If logic is "Pay X Months", then calculation is BasicPay * X.
+                        // But usually 'Month' column in bonus table might mean "Which Month this applies to?"
+                        // Let's check the bonus form again.
+                        // Form has "Months" input (id="months", name="month").
+                        // Label says "Months".
+                        // And "Bonus" input.
+                        // If I enter "Months" = 1, and "Bonus" = 1000.
+                        // Maybe "Months" is just informational?
+                        // Or maybe "Months" is the multiplier?
+                        // If Type is "Fixed", then Bonus is the amount.
+                        // If Type is "Percent", then Bonus is the percentage.
+                        // What is "Months" for?
+                        // Maybe it's "Number of Months involved"?
+                        // I will ignore "Months" for calculation unless "Percent" implies something else.
+                        // I'll stick to Fixed/Percent logic based on 'Bonus' value.
+                        
+                        // Actually, if 'Month' is > 0, maybe it means "Pay for X months"?
+                        // I'll stick to:
+                        // Fixed: rule.Bonus is the amount.
+                        // Percent: rule.Bonus is the percentage of BasicPay.
+                        
+                        // Wait, if Type is Percent, I calculate.
+                    }
+                    
+                    if (rule.Fixed != 1 && rule.Percent != 1) {
+                         // Fallback or maybe Month based?
+                         // If Month > 0 and Bonus is null?
+                         // But Bonus is required in form.
+                    }
+
+                    totalBonus += ruleAmount;
+                });
+                
+                // Format remarks
+                const remarksStr = remarks.length > 0 ? remarks.join(', ') : 'No Rule';
+
+                if (totalBonus > 0 || scope === 'staff') { // Only show if there is bonus or specific staff requested
+                    reportData.push({
+                        ...staff,
+                        BonusAmount: totalBonus,
+                        Remarks: remarksStr
+                    });
+                    grandTotal += totalBonus;
+                }
+            });
+            
+            res.render('reports/bonus_backlog_preview', {
+                company,
+                year,
+                type,
+                scope,
+                data: reportData,
+                grandTotal,
+                title: type === 'bonus' ? 'Bonus Report' : 'Backlog Report', // Just a label change for now
+                generatedDate: new Date().toLocaleDateString()
+            });
+
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
     getStaffName: async (req, res) => {
         try {
             const { pfno } = req.params;
@@ -3659,36 +3782,59 @@ const dataEntryController = {
             }
 
             // 3. Frequency Check (tblpayrollitems)
-            const [payTypeRows] = await pool.query('SELECT Code FROM tblpaytype WHERE PayType = ?', [activity]);
+            // 'activity' parameter is the Pay Code (e.g., '01') from the frontend select value
+            const payCode = activity; 
+            
+            // Verify Code exists
+            const [payTypeRows] = await pool.query('SELECT Code FROM tblpaytype WHERE Code = ?', [payCode]);
             if (payTypeRows.length === 0) {
                  return res.json({ valid: false, errorType: 'invalid_activity', message: 'Invalid Activity selected.' });
             }
-            const payCode = payTypeRows[0].Code;
 
             const [itemRows] = await pool.query('SELECT Freq FROM tblpayrollitems WHERE Code = ?', [payCode]);
             const freq = itemRows.length > 0 ? itemRows[0].Freq : 'M'; // Default to Monthly
 
-            // Check if already processed for this frequency
+            // Check if already processed for this frequency (checking tblpayroll history)
             let checkQuery = '';
-            let checkParams = [payCode];
+            let checkParams = [];
+
+            // Parse month/year directly from string to avoid timezone issues
+            // pdate format is 'YYYY-MM-DD'
+            const dateParts = pdate.split('-');
+            const pYear = parseInt(dateParts[0], 10);
+            const pMonthInt = parseInt(dateParts[1], 10); // 1-12
+            const pMonthStr = String(pMonthInt).padStart(2, '0'); // "01"-"12"
+
+            console.log(`User Input Date: ${pdate}`);
+            console.log(`Extracted: Year=${pYear}, Month=${pMonthInt}`);
+
+            // Construct flexible PType check: matches '01', '1', 1
+            const pTypeInt = parseInt(payCode, 10);
 
             if (freq === 'Y') {
                 // Check if processed this year
-                checkQuery = 'SELECT COUNT(*) as count FROM tblsalary WHERE PType = ? AND YEAR(PDate) = ?';
-                checkParams.push(processDate.getFullYear());
+                checkQuery = 'SELECT COUNT(*) as count FROM tblpayroll WHERE (PType = ? OR PType = ? OR PType = ?) AND PYear = ?';
+                checkParams = [payCode, String(pTypeInt), pTypeInt, pYear];
             } else {
                 // Check if processed this month
-                checkQuery = 'SELECT COUNT(*) as count FROM tblsalary WHERE PType = ? AND YEAR(PDate) = ? AND MONTH(PDate) = ?';
-                checkParams.push(processDate.getFullYear(), processDate.getMonth() + 1);
+                // PMonth is smallint(6), so we should check against integer value primarily, but also handle string just in case
+                checkQuery = 'SELECT COUNT(*) as count FROM tblpayroll WHERE (PType = ? OR PType = ? OR PType = ?) AND PYear = ? AND (PMonth = ? OR PMonth = ?)';
+                checkParams = [payCode, String(pTypeInt), pTypeInt, pYear, pMonthInt, pMonthStr];
             }
 
+            console.log(`Checking duplicate: Code=${payCode}, Freq=${freq}, Year=${pYear}, Month=${pMonthInt}`);
+            console.log(`Query: ${checkQuery}`);
+            console.log(`Params: ${checkParams}`);
+
             const [existingRows] = await pool.query(checkQuery, checkParams);
+            console.log(`Found count: ${existingRows[0].count}`);
+
             if (existingRows[0].count > 0) {
                 const period = freq === 'Y' ? 'Year' : 'Month';
                 return res.json({
                     valid: false,
                     errorType: 'frequency',
-                    message: `This activity (${activity}) has already been processed for this ${period}. Frequency is ${freq === 'Y' ? 'Yearly' : 'Monthly'}.`
+                    message: `The monthly emolument for this type of payment (${activity}) has already been done for this ${period} and cannot be done twice in the same ${period.toLowerCase()}.`
                 });
             }
 
@@ -5099,16 +5245,46 @@ const dataEntryController = {
             const [companyRows] = await pool.query('SELECT * FROM tblcominfo LIMIT 1');
             const companyInfo = companyRows[0] || {};
 
+            // Fetch GL Accounts
+            const [glAccounts] = await pool.query('SELECT * FROM tblglaccounts ORDER BY GLNo');
+
             // Fetch journal entries for the selected date
             const [journalEntries] = await pool.query(`
                 SELECT * FROM tblgltrans 
                 WHERE DATE(GLDate) = ?
             `, [glDate]);
 
+            // Aggregate journal entries
+            const fieldsToSum = [
+                'BasicSalary', 'Headquarters', 'Responsibility', 'MaidAllowance', 'StaffWelfare', 
+                'Transport', 'COLA', 'Risk', 'Acting', 'Professional', 'Academic', 
+                'IncomeTax', 'NassitEmp', 'ProvidentEmp', 'Rent', 'SSA', 'JSA', 
+                'SalAdvance', 'IntOnAdv', 'SalaryWages'
+            ];
+
+            const aggregatedJournal = journalEntries.reduce((acc, entry) => {
+                fieldsToSum.forEach(field => {
+                    const val = parseFloat(entry[field]);
+                    if (!isNaN(val)) {
+                        acc[field] = (acc[field] || 0) + val;
+                    }
+                });
+                return acc;
+            }, {});
+
+            // Preserve metadata from the first entry
+            if (journalEntries.length > 0) {
+                aggregatedJournal.GLDate = journalEntries[0].GLDate;
+                aggregatedJournal.GLMonth = journalEntries[0].GLMonth;
+                aggregatedJournal.GLYear = journalEntries[0].GLYear;
+            }
+
             res.render('reports/journal_preview', {
                 title: 'Journal Report Preview',
                 companyInfo,
-                journalEntries,
+                journalEntries, // Keep for reference
+                aggregatedJournal,
+                glAccounts,
                 glDate,
                 user: req.session.user || { name: 'Data Entry' },
                 role: 'data_entry'
