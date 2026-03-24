@@ -1,5 +1,69 @@
-const renderDashboard = (req, res) => {
-  res.render('admin/admin-dashboard', { user: { name: 'David' } });
+function getViewUser(req, fallbackName = 'Admin') {
+    return (req.session && req.session.user) || { name: fallbackName };
+}
+
+function getSessionCompanyId(req) {
+    if (req.user && req.user.companyId) {
+        return req.user.companyId;
+    }
+
+    if (req.session) {
+        return req.session.CompanyID ?? req.session.companyId ?? null;
+    }
+
+    return null;
+}
+
+const renderDashboard = async (req, res) => {
+  try {
+    const companyId = getSessionCompanyId(req);
+    const params = [];
+    let whereClause = '';
+
+    if (companyId) {
+      whereClause = 'WHERE d.CompanyID = ? OR d.CompanyID IS NULL';
+      params.push(companyId);
+    }
+
+    const [departmentRows] = await pool.query(
+      `
+        SELECT
+          d.Code,
+          d.Dept,
+          COUNT(s.PFNo) AS staffCount
+        FROM tbldept d
+        LEFT JOIN tblstaff s
+          ON s.CDept = d.Code
+          AND COALESCE(s.Redundant, 0) = 0
+          AND (
+            s.EmpStatus IS NULL
+            OR s.EmpStatus IN ('1', '01', 1)
+          )
+          ${companyId ? 'AND (s.CompanyID = ? OR s.CompanyID IS NULL)' : ''}
+        ${whereClause}
+        GROUP BY d.Code, d.Dept
+        ORDER BY d.Dept ASC
+      `,
+      companyId ? [companyId, ...params] : params
+    );
+
+    res.render('admin/admin-dashboard', {
+      user: getViewUser(req, 'Admin'),
+      departmentChart: {
+        labels: departmentRows.map((row) => row.Dept || row.Code || 'Unknown Department'),
+        values: departmentRows.map((row) => Number(row.staffCount) || 0)
+      }
+    });
+  } catch (error) {
+    console.error('Admin dashboard error:', error);
+    res.render('admin/admin-dashboard', {
+      user: getViewUser(req, 'Admin'),
+      departmentChart: {
+        labels: [],
+        values: []
+      }
+    });
+  }
 };
 
 const comingSoon = (title, group) => {
@@ -8,7 +72,7 @@ const comingSoon = (title, group) => {
       role: 'admin',
       title,
       group,
-      user: { name: 'David' },
+      user: getViewUser(req, 'Admin'),
     });
   };
 };
@@ -19,6 +83,9 @@ const jwt = require('jsonwebtoken');
 const mailer = require('../config/mailer');
 const multer = require('multer');
 const path = require('path');
+const lookupTableService = require('../services/lookupTableService');
+const controllerAuditHelper = require('../services/controllerAuditHelper');
+const RESET_SECRET = process.env.RESET_TOKEN_SECRET || process.env.JWT_SECRET || 'reset_secret';
 
 // Configure Multer for logo uploads
 const storage = multer.diskStorage({
@@ -52,7 +119,7 @@ async function getCompanyInfo(req, res) {
         res.render('admin/company-info', { 
             title: 'Company Information',
             group: 'Company Info',
-            user: { name: 'David' },
+            user: getViewUser(req, 'Admin'),
             company 
         });
     } catch (err) {
@@ -74,23 +141,40 @@ async function updateCompanyInfo(req, res) {
         const [rows] = await pool.query('SELECT CompanyID FROM tblcominfo LIMIT 1');
         
         if (rows.length > 0) {
-            // Update
-            await pool.query(
-                `UPDATE tblcominfo SET 
-                    Com_Name=?, TinNo=?, Address=?, Town=?, City=?, Country=?, 
-                    AccNo=?, Phone=?, Bank=?, PayingBank=?, Email=?, Manager=?, LogoPath=? 
-                 WHERE CompanyID=?`,
-                [Com_Name, TinNo, Address, Town, City, Country, AccNo, Phone, Bank, PayingBank, Email, Manager, LogoPath, rows[0].CompanyID]
-            );
+            const companyId = rows[0].CompanyID;
+            await controllerAuditHelper.auditUpdate({
+                table: 'tblcominfo',
+                formName: 'admin/company-info',
+                recordId: companyId,
+                fetchQuery: 'SELECT * FROM tblcominfo WHERE CompanyID = ?',
+                fetchParams: [companyId],
+                applyChange: async () => {
+                    await pool.query(
+                        `UPDATE tblcominfo SET 
+                            Com_Name=?, TinNo=?, Address=?, Town=?, City=?, Country=?, 
+                            AccNo=?, Phone=?, Bank=?, PayingBank=?, Email=?, Manager=?, LogoPath=? 
+                         WHERE CompanyID=?`,
+                        [Com_Name, TinNo, Address, Town, City, Country, AccNo, Phone, Bank, PayingBank, Email, Manager, LogoPath, companyId]
+                    );
+                }
+            });
         } else {
-            // Insert
-            await pool.query(
-                `INSERT INTO tblcominfo (
-                    Com_Name, TinNo, Address, Town, City, Country, 
-                    AccNo, Phone, Bank, PayingBank, Email, Manager, LogoPath, DateCreated
-                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-                [Com_Name, TinNo, Address, Town, City, Country, AccNo, Phone, Bank, PayingBank, Email, Manager, LogoPath]
-            );
+            await controllerAuditHelper.auditCreate({
+                table: 'tblcominfo',
+                formName: 'admin/company-info',
+                recordId: 1,
+                fetchQuery: 'SELECT * FROM tblcominfo ORDER BY CompanyID DESC LIMIT 1',
+                fetchParams: [],
+                applyChange: async () => {
+                    await pool.query(
+                        `INSERT INTO tblcominfo (
+                            Com_Name, TinNo, Address, Town, City, Country, 
+                            AccNo, Phone, Bank, PayingBank, Email, Manager, LogoPath, DateCreated
+                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+                        [Com_Name, TinNo, Address, Town, City, Country, AccNo, Phone, Bank, PayingBank, Email, Manager, LogoPath]
+                    );
+                }
+            });
         }
 
         res.redirect('/admin/company-info?success=Company info updated successfully');
@@ -102,7 +186,7 @@ async function updateCompanyInfo(req, res) {
 
 
 async function adminsListPage(req, res) {
-    res.render('admin/admins', { user: { name: 'David' } });
+    res.render('admin/admins', { user: getViewUser(req, 'Admin') });
 }
 
 async function adminsListJson(req, res) {
@@ -122,53 +206,62 @@ async function adminsListJson(req, res) {
 }
 
 async function adminsNewPage(req, res) {
-    res.render('admin/admins-new', { user: { name: 'David' } });
+    res.render('admin/admins-new', { user: getViewUser(req, 'Admin') });
 }
 
-async function createAdmin(req, res) {
+async function createPortalUser(req, res, { level, redirectPath, accountLabel }) {
     try {
         const { Username, Email, FullName } = req.body;
-        const Level = 'Admin';
-        const companyId = (req.session && (req.session.CompanyID ?? req.session.companyId)) || null;
+        const companyId = getSessionCompanyId(req);
         const [result] = await pool.execute(
             `INSERT INTO tblpassword (DateCreated, Level, Username, FullName, Pword, Email, CompanyID)
              VALUES (NOW(), ?, ?, ?, NULL, ?, ?)`,
-            [Level, Username, FullName, Email, companyId]
+            [level, Username, FullName, Email, companyId]
         );
         const pfno = result.insertId;
 
-        const token = jwt.sign({ pfno, email: Email }, process.env.RESET_TOKEN_SECRET, { expiresIn: '30m' });
+        const token = jwt.sign({ pfno, email: Email }, RESET_SECRET, { expiresIn: '30m' });
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         const link = `${baseUrl}/admin/admins/set-password?token=${encodeURIComponent(token)}`;
 
-        const subject = `Set up your HR Payroll admin password`;
+        const subject = `Set up your HR Payroll ${accountLabel} password`;
         const html = `
             <p>Dear ${FullName || Username},</p>
-            <p>An admin account has been created for you on HR Payroll${CompanyID ? ' for your company' : ''}.</p>
+            <p>A ${accountLabel} account has been created for you on HR Payroll${companyId ? ' for your company' : ''}.</p>
             <p>Please click the link below to set your password. The link expires in 30 minutes:</p>
             <p><a href="${link}" target="_blank" rel="noopener">Set Password</a></p>
             <p>If you did not request this, please ignore this email.</p>
             <p>Regards,<br/>HR Payroll Team</p>
         `;
-        await mailer.sendMail({
-            from: process.env.SMTP_USER || 'info@hrpayroll.davisasmedia.com',
-            to: Email,
-            subject,
-            html
-        });
+        if (Email) {
+            await mailer.sendMail({
+                from: process.env.SMTP_USER || 'info@hrpayroll.davisasmedia.com',
+                to: Email,
+                subject,
+                html
+            });
+        }
 
-        res.redirect('/admin/admins');
+        res.redirect(redirectPath);
     } catch (err) {
         console.error(err);
-        res.status(500).send('Error creating admin');
+        res.status(500).send(`Error creating ${accountLabel}`);
     }
+}
+
+async function createAdmin(req, res) {
+    return createPortalUser(req, res, {
+        level: 'Admin',
+        redirectPath: '/admin/admins',
+        accountLabel: 'admin'
+    });
 }
 
 async function setPasswordPage(req, res) {
     const { token } = req.query;
     try {
-        jwt.verify(token, process.env.RESET_TOKEN_SECRET);
-        res.render('admin/admins-set-password', { token, user: { name: 'David' } });
+        jwt.verify(token, RESET_SECRET);
+        res.render('admin/admins-set-password', { token, user: getViewUser(req, 'Admin') });
     } catch (err) {
         res.status(400).send('Invalid or expired link.');
     }
@@ -177,7 +270,7 @@ async function setPasswordPage(req, res) {
 async function setPasswordSubmit(req, res) {
     const { token, password } = req.body;
     try {
-        const payload = jwt.verify(token, process.env.RESET_TOKEN_SECRET);
+        const payload = jwt.verify(token, RESET_SECRET);
         const hash = await bcrypt.hash(password, 10);
         await pool.execute(`UPDATE tblpassword SET Pword = ? WHERE PFNo = ?`, [hash, payload.pfno]);
         res.redirect('/admin/admins');
@@ -192,7 +285,7 @@ async function resendLink(req, res) {
     try {
         const [[admin]] = await pool.execute(`SELECT Email, Username, FullName FROM tblpassword WHERE PFNo = ?`, [pfno]);
         if (!admin) return res.status(404).json({ ok: false, message: 'Admin not found' });
-        const token = jwt.sign({ pfno, email: admin.Email }, process.env.RESET_TOKEN_SECRET, { expiresIn: '30m' });
+        const token = jwt.sign({ pfno, email: admin.Email }, RESET_SECRET, { expiresIn: '30m' });
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         const link = `${baseUrl}/admin/admins/set-password?token=${encodeURIComponent(token)}`;
         const subject = `Set up your HR Payroll admin password`;
@@ -227,50 +320,19 @@ async function deleteAdmin(req, res) {
 }
 
 async function managersNewPage(req, res) {
-    res.render('admin/managers-new', { user: { name: 'David' } });
+    res.render('admin/managers-new', { user: getViewUser(req, 'Admin') });
 }
 
 async function createManager(req, res) {
-    try {
-        const { Username, Email, FullName } = req.body;
-        const Level = 'Manager';
-        const companyId = (req.session && (req.session.CompanyID ?? req.session.companyId)) || null;
-        const [result] = await pool.execute(
-            `INSERT INTO tblpassword (DateCreated, Level, Username, FullName, Pword, Email, CompanyID)
-             VALUES (NOW(), ?, ?, ?, NULL, ?, ?)`,
-            [Level, Username, FullName, Email, companyId]
-        );
-        const pfno = result.insertId;
-
-        const token = jwt.sign({ pfno, email: Email }, process.env.RESET_TOKEN_SECRET, { expiresIn: '30m' });
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-        const link = `${baseUrl}/admin/admins/set-password?token=${encodeURIComponent(token)}`;
-
-        const subject = `Set up your HR Payroll manager password`;
-        const html = `
-            <p>Dear ${FullName || Username},</p>
-            <p>A manager account has been created for you on HR Payroll.</p>
-            <p>Please click the link below to set your password. The link expires in 30 minutes:</p>
-            <p><a href="${link}" target="_blank" rel="noopener">Set Password</a></p>
-            <p>If you did not request this, please ignore this email.</p>
-            <p>Regards,<br/>HR Payroll Team</p>
-        `;
-        await mailer.sendMail({
-            from: process.env.SMTP_USER || 'info@hrpayroll.davisasmedia.com',
-            to: Email,
-            subject,
-            html
-        });
-
-        res.redirect('/admin/managers');
-    } catch (err) {
-        console.error(err);
-        res.status(500).send('Error creating manager');
-    }
+    return createPortalUser(req, res, {
+        level: 'Manager',
+        redirectPath: '/admin/managers',
+        accountLabel: 'manager'
+    });
 }
 
 async function managersListPage(req, res) {
-    res.render('admin/managers', { user: { name: 'David' } });
+    res.render('admin/managers', { user: getViewUser(req, 'Admin') });
 }
 
 async function managersListJson(req, res) {
@@ -290,7 +352,7 @@ async function managersListJson(req, res) {
 }
 
 async function dataEntryListPage(req, res) {
-    res.render('admin/data-entry-officers', { user: { name: 'David' } });
+    res.render('admin/data-entry-officers', { user: getViewUser(req, 'Admin') });
 }
 
 async function dataEntryListJson(req, res) {
@@ -310,46 +372,47 @@ async function dataEntryListJson(req, res) {
 }
 
 async function dataEntryNewPage(req, res) {
-    res.render('admin/data-entry-new', { user: { name: 'David' } });
+    res.render('admin/data-entry-new', { user: getViewUser(req, 'Admin') });
 }
 
 async function createDataEntry(req, res) {
+    return createPortalUser(req, res, {
+        level: 'Data Entry',
+        redirectPath: '/admin/data-entry-officers',
+        accountLabel: 'data entry officer'
+    });
+}
+
+async function auditorsListPage(req, res) {
+    res.render('admin/auditors', { user: getViewUser(req, 'Admin') });
+}
+
+async function auditorsListJson(req, res) {
     try {
-        const { Username, Email, FullName } = req.body;
-        const Level = 'Data Entry';
-        const companyId = (req.session && (req.session.CompanyID ?? req.session.companyId)) || null;
-        const [result] = await pool.execute(
-            `INSERT INTO tblpassword (DateCreated, Level, Username, FullName, Pword, Email, CompanyID)
-             VALUES (NOW(), ?, ?, ?, NULL, ?, ?)`,
-            [Level, Username, FullName, Email, companyId]
+        const [rows] = await pool.execute(
+            `SELECT p.PFNo, p.Username, p.FullName, p.Email, p.CompanyID, p.DateCreated, c.Com_Name
+             FROM tblpassword p
+             LEFT JOIN tblcominfo c ON p.CompanyID = c.CompanyID
+             WHERE p.Level = 'Auditor'
+             ORDER BY p.PFNo DESC`
         );
-        const pfno = result.insertId;
-
-        const token = jwt.sign({ pfno, email: Email }, process.env.RESET_TOKEN_SECRET, { expiresIn: '30m' });
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-        const link = `${baseUrl}/admin/admins/set-password?token=${encodeURIComponent(token)}`;
-
-        const subject = `Set up your HR Payroll data entry password`;
-        const html = `
-            <p>Dear ${FullName || Username},</p>
-            <p>A data entry officer account has been created for you on HR Payroll.</p>
-            <p>Please click the link below to set your password. The link expires in 30 minutes:</p>
-            <p><a href="${link}" target="_blank" rel="noopener">Set Password</a></p>
-            <p>If you did not request this, please ignore this email.</p>
-            <p>Regards,<br/>HR Payroll Team</p>
-        `;
-        await mailer.sendMail({
-            from: process.env.SMTP_USER || 'info@hrpayroll.davisasmedia.com',
-            to: Email,
-            subject,
-            html
-        });
-
-        res.redirect('/admin/data-entry-officers');
+        res.json({ data: rows });
     } catch (err) {
         console.error(err);
-        res.status(500).send('Error creating data entry officer');
+        res.status(500).json({ data: [], error: 'Failed to load auditors' });
     }
+}
+
+async function auditorsNewPage(req, res) {
+    res.render('admin/auditors-new', { user: getViewUser(req, 'Admin') });
+}
+
+async function createAuditor(req, res) {
+    return createPortalUser(req, res, {
+        level: 'Auditor',
+        redirectPath: '/admin/auditors',
+        accountLabel: 'auditor'
+    });
 }
 
 async function deleteManager(req, res) {
@@ -374,6 +437,17 @@ async function deleteDataEntry(req, res) {
     }
 }
 
+async function deleteAuditor(req, res) {
+    const { pfno } = req.params;
+    try {
+        await pool.execute(`DELETE FROM tblpassword WHERE PFNo = ?`, [pfno]);
+        res.json({ ok: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ ok: false, error: 'Failed to delete auditor' });
+    }
+}
+
 // --- Payroll Items Controller Methods ---
 
 const payrollItemsPage = (req, res) => {
@@ -386,7 +460,7 @@ const payrollItemsPage = (req, res) => {
 
 const payrollItemsListJson = async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM tblpayrollitems ORDER BY Code ASC');
+        const rows = await lookupTableService.listRows('tblpayrollitems');
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -396,42 +470,32 @@ const payrollItemsListJson = async (req, res) => {
 
 const createPayrollItem = async (req, res) => {
     try {
-        const [lastItem] = await pool.query('SELECT Code FROM tblpayrollitems ORDER BY Code DESC LIMIT 1');
-        let nextCode = '01';
-        if (lastItem.length > 0) {
-            const lastCodeInt = parseInt(lastItem[0].Code, 10);
-            if (!isNaN(lastCodeInt)) {
-                nextCode = (lastCodeInt + 1).toString().padStart(2, '0');
-            }
-        }
+        const nextCode = await lookupTableService.getNextCode('tblpayrollitems', {
+            startCode: '01',
+            padLength: 2
+        });
 
         const { Income, Taxable, Threshhold, TPercent, TPercentage, TAmount, Mode, Fixed, Percent, Freq } = req.body;
 
         if (!Income) return res.status(400).json({ error: 'Description (Income) is required' });
 
-        const sql = `INSERT INTO tblpayrollitems
-            (Code, Income, Taxable, Threshhold, TPercent, TPercentage, TAmount, Mode, Fixed, Percent, Freq, CompanyID)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-        
-        const values = [
-            nextCode,
+        await lookupTableService.insertRow('tblpayrollitems', {
+            Code: nextCode,
             Income,
-            Taxable ? 1 : 0,
-            Threshhold ? 1 : 0,
-            TPercent ? 1 : 0,
-            TPercentage || 0,
-            TAmount || 0,
-            Mode || '',
-            Fixed ? 1 : 0,
-            Percent || 0,
-            Freq || '',
-            1 
-        ];
+            Taxable: Taxable ? 1 : 0,
+            Threshhold: Threshhold ? 1 : 0,
+            TPercent: TPercent ? 1 : 0,
+            TPercentage: TPercentage || 0,
+            TAmount: TAmount || 0,
+            Mode: Mode || '',
+            Fixed: Fixed ? 1 : 0,
+            Percent: Percent || 0,
+            Freq: Freq || '',
+            CompanyID: 1
+        });
 
-        await pool.query(sql, values);
-        
-        const [newRow] = await pool.query('SELECT * FROM tblpayrollitems WHERE Code = ?', [nextCode]);
-        res.json({ success: true, item: newRow[0] });
+        const newRow = await lookupTableService.getRowById('tblpayrollitems', 'Code', nextCode);
+        res.json({ success: true, item: newRow });
 
     } catch (err) {
         console.error(err);
@@ -454,8 +518,7 @@ const updatePayrollItem = async (req, res) => {
             sqlValue = (value === 'true' || value === true || value == 1) ? 1 : 0;
         }
 
-        const sql = `UPDATE tblpayrollitems SET ${field} = ? WHERE Code = ?`;
-        await pool.query(sql, [sqlValue, code]);
+        await lookupTableService.updateRow('tblpayrollitems', 'Code', code, { [field]: sqlValue });
         
         res.json({ success: true });
     } catch (err) {
@@ -467,7 +530,7 @@ const updatePayrollItem = async (req, res) => {
 const deletePayrollItem = async (req, res) => {
     const { code } = req.params;
     try {
-        await pool.query('DELETE FROM tblpayrollitems WHERE Code = ?', [code]);
+        await lookupTableService.deleteRow('tblpayrollitems', 'Code', code);
         res.json({ success: true });
     } catch (err) {
         console.error(err);
@@ -487,7 +550,7 @@ const departmentsPage = (req, res) => {
 
 const departmentsListJson = async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM tbldept ORDER BY Code ASC');
+        const rows = await lookupTableService.listRows('tbldept');
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -497,23 +560,18 @@ const departmentsListJson = async (req, res) => {
 
 const createDepartment = async (req, res) => {
     try {
-        const [lastItem] = await pool.query('SELECT Code FROM tbldept ORDER BY Code DESC LIMIT 1');
-        let nextCode = '001'; // Departments usually have 3 or 4 char codes, based on schema (varchar(4))
-        if (lastItem.length > 0) {
-            const lastCodeInt = parseInt(lastItem[0].Code, 10);
-            if (!isNaN(lastCodeInt)) {
-                nextCode = (lastCodeInt + 1).toString().padStart(3, '0');
-            }
-        }
+        const nextCode = await lookupTableService.getNextCode('tbldept', {
+            startCode: '001',
+            padLength: 3
+        });
 
         const { Dept } = req.body;
         if (!Dept) return res.status(400).json({ error: 'Department Name is required' });
 
-        const sql = `INSERT INTO tbldept (Code, Dept, CompanyID) VALUES (?, ?, ?)`;
-        await pool.query(sql, [nextCode, Dept, 1]);
-        
-        const [newRow] = await pool.query('SELECT * FROM tbldept WHERE Code = ?', [nextCode]);
-        res.json({ success: true, item: newRow[0] });
+        await lookupTableService.insertRow('tbldept', { Code: nextCode, Dept, CompanyID: 1 });
+
+        const newRow = await lookupTableService.getRowById('tbldept', 'Code', nextCode);
+        res.json({ success: true, item: newRow });
 
     } catch (err) {
         console.error(err);
@@ -528,8 +586,7 @@ const updateDepartment = async (req, res) => {
     if (!Dept) return res.status(400).json({ error: 'Department Name is required' });
 
     try {
-        const sql = `UPDATE tbldept SET Dept = ? WHERE Code = ?`;
-        await pool.query(sql, [Dept, code]);
+        await lookupTableService.updateRow('tbldept', 'Code', code, { Dept });
         res.json({ success: true });
     } catch (err) {
         console.error(err);
@@ -540,7 +597,7 @@ const updateDepartment = async (req, res) => {
 const deleteDepartment = async (req, res) => {
     const { code } = req.params;
     try {
-        await pool.query('DELETE FROM tbldept WHERE Code = ?', [code]);
+        await lookupTableService.deleteRow('tbldept', 'Code', code);
         res.json({ success: true });
     } catch (err) {
         console.error(err);
@@ -560,7 +617,7 @@ const jobTitlesPage = (req, res) => {
 
 const jobTitlesListJson = async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM tbljobtitle ORDER BY Code ASC');
+        const rows = await lookupTableService.listRows('tbljobtitle');
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -570,23 +627,18 @@ const jobTitlesListJson = async (req, res) => {
 
 const createJobTitle = async (req, res) => {
     try {
-        const [lastItem] = await pool.query('SELECT Code FROM tbljobtitle ORDER BY Code DESC LIMIT 1');
-        let nextCode = '0001';
-        if (lastItem.length > 0) {
-            const lastCodeInt = parseInt(lastItem[0].Code, 10);
-            if (!isNaN(lastCodeInt)) {
-                nextCode = (lastCodeInt + 1).toString().padStart(4, '0');
-            }
-        }
+        const nextCode = await lookupTableService.getNextCode('tbljobtitle', {
+            startCode: '0001',
+            padLength: 4
+        });
 
         const { JobTitle } = req.body;
         if (!JobTitle) return res.status(400).json({ error: 'Job Title is required' });
 
-        const sql = `INSERT INTO tbljobtitle (Code, JobTitle, CompanyID) VALUES (?, ?, ?)`;
-        await pool.query(sql, [nextCode, JobTitle, 1]);
-        
-        const [newRow] = await pool.query('SELECT * FROM tbljobtitle WHERE Code = ?', [nextCode]);
-        res.json({ success: true, item: newRow[0] });
+        await lookupTableService.insertRow('tbljobtitle', { Code: nextCode, JobTitle, CompanyID: 1 });
+
+        const newRow = await lookupTableService.getRowById('tbljobtitle', 'Code', nextCode);
+        res.json({ success: true, item: newRow });
 
     } catch (err) {
         console.error(err);
@@ -601,8 +653,7 @@ const updateJobTitle = async (req, res) => {
     if (!JobTitle) return res.status(400).json({ error: 'Job Title is required' });
 
     try {
-        const sql = `UPDATE tbljobtitle SET JobTitle = ? WHERE Code = ?`;
-        await pool.query(sql, [JobTitle, code]);
+        await lookupTableService.updateRow('tbljobtitle', 'Code', code, { JobTitle });
         res.json({ success: true });
     } catch (err) {
         console.error(err);
@@ -613,7 +664,7 @@ const updateJobTitle = async (req, res) => {
 const deleteJobTitle = async (req, res) => {
     const { code } = req.params;
     try {
-        await pool.query('DELETE FROM tbljobtitle WHERE Code = ?', [code]);
+        await lookupTableService.deleteRow('tbljobtitle', 'Code', code);
         res.json({ success: true });
     } catch (err) {
         console.error(err);
@@ -754,7 +805,7 @@ const banksPage = async (req, res) => {
 
 const banksListJson = async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM tblbanks ORDER BY Code');
+        const rows = await lookupTableService.listRows('tblbanks', { orderBy: 'Code' });
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -764,24 +815,27 @@ const banksListJson = async (req, res) => {
 
 const createBank = async (req, res) => {
     try {
-        const [lastItem] = await pool.query('SELECT Code FROM tblbanks ORDER BY Code DESC LIMIT 1');
-        let nextCode = '01';
-        if (lastItem.length > 0) {
-            const lastCodeInt = parseInt(lastItem[0].Code, 10);
-            if (!isNaN(lastCodeInt)) {
-                nextCode = (lastCodeInt + 1).toString().padStart(2, '0');
-            }
-        }
+        const nextCode = await lookupTableService.getNextCode('tblbanks', {
+            startCode: '01',
+            padLength: 2
+        });
 
         const { Bank, Short, BankCode, Street_Address, Town_Address } = req.body;
         
         if (!Bank) return res.status(400).json({ error: 'Bank Name is required' });
 
-        const sql = `INSERT INTO tblbanks (Code, Bank, Short, BankCode, Street_Address, Town_Address, CompanyID) VALUES (?, ?, ?, ?, ?, ?, ?)`;
-        await pool.query(sql, [nextCode, Bank, Short || null, BankCode || null, Street_Address || null, Town_Address || null, 1]);
-        
-        const [newRow] = await pool.query('SELECT * FROM tblbanks WHERE Code = ?', [nextCode]);
-        res.json({ success: true, item: newRow[0] });
+        await lookupTableService.insertRow('tblbanks', {
+            Code: nextCode,
+            Bank,
+            Short: Short || null,
+            BankCode: BankCode || null,
+            Street_Address: Street_Address || null,
+            Town_Address: Town_Address || null,
+            CompanyID: 1
+        });
+
+        const newRow = await lookupTableService.getRowById('tblbanks', 'Code', nextCode);
+        res.json({ success: true, item: newRow });
 
     } catch (err) {
         console.error(err);
@@ -805,13 +859,11 @@ const updateBank = async (req, res) => {
 
         if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
 
-        const sql = `UPDATE tblbanks SET ${fields.join(', ')} WHERE Code = ?`;
-        values.push(code);
+        const updateData = Object.fromEntries(fields.map((field, index) => [field.replace(' = ?', ''), values[index]]));
+        await lookupTableService.updateRow('tblbanks', 'Code', code, updateData);
 
-        await pool.query(sql, values);
-        
-        const [updatedRow] = await pool.query('SELECT * FROM tblbanks WHERE Code = ?', [code]);
-        res.json({ success: true, item: updatedRow[0] });
+        const updatedRow = await lookupTableService.getRowById('tblbanks', 'Code', code);
+        res.json({ success: true, item: updatedRow });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to update bank' });
@@ -821,7 +873,7 @@ const updateBank = async (req, res) => {
 const deleteBank = async (req, res) => {
     const { code } = req.params;
     try {
-        await pool.query('DELETE FROM tblbanks WHERE Code = ?', [code]);
+        await lookupTableService.deleteRow('tblbanks', 'Code', code);
         res.json({ success: true });
     } catch (err) {
         console.error(err);
@@ -847,7 +899,7 @@ const companyBBANPage = async (req, res) => {
 
 const companyBBANListJson = async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM tblpayingbank ORDER BY Code');
+        const rows = await lookupTableService.listRows('tblpayingbank', { orderBy: 'Code' });
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -857,24 +909,25 @@ const companyBBANListJson = async (req, res) => {
 
 const createCompanyBBAN = async (req, res) => {
     try {
-        const [lastItem] = await pool.query('SELECT Code FROM tblpayingbank ORDER BY Code DESC LIMIT 1');
-        let nextCode = '01';
-        if (lastItem.length > 0) {
-            const lastCodeInt = parseInt(lastItem[0].Code, 10);
-            if (!isNaN(lastCodeInt)) {
-                nextCode = (lastCodeInt + 1).toString().padStart(2, '0');
-            }
-        }
+        const nextCode = await lookupTableService.getNextCode('tblpayingbank', {
+            startCode: '01',
+            padLength: 2
+        });
 
         const { Bank, BBAN, Short } = req.body;
         
         if (!Bank) return res.status(400).json({ error: 'Bank Name is required' });
 
-        const sql = `INSERT INTO tblpayingbank (Code, Bank, BBAN, Short, CompanyID) VALUES (?, ?, ?, ?, ?)`;
-        await pool.query(sql, [nextCode, Bank, BBAN || null, Short || null, 1]);
-        
-        const [newRow] = await pool.query('SELECT * FROM tblpayingbank WHERE Code = ?', [nextCode]);
-        res.json({ success: true, item: newRow[0] });
+        await lookupTableService.insertRow('tblpayingbank', {
+            Code: nextCode,
+            Bank,
+            BBAN: BBAN || null,
+            Short: Short || null,
+            CompanyID: 1
+        });
+
+        const newRow = await lookupTableService.getRowById('tblpayingbank', 'Code', nextCode);
+        res.json({ success: true, item: newRow });
 
     } catch (err) {
         console.error(err);
@@ -896,13 +949,11 @@ const updateCompanyBBAN = async (req, res) => {
 
         if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
 
-        const sql = `UPDATE tblpayingbank SET ${fields.join(', ')} WHERE Code = ?`;
-        values.push(code);
+        const updateData = Object.fromEntries(fields.map((field, index) => [field.replace(' = ?', ''), values[index]]));
+        await lookupTableService.updateRow('tblpayingbank', 'Code', code, updateData);
 
-        await pool.query(sql, values);
-        
-        const [updatedRow] = await pool.query('SELECT * FROM tblpayingbank WHERE Code = ?', [code]);
-        res.json({ success: true, item: updatedRow[0] });
+        const updatedRow = await lookupTableService.getRowById('tblpayingbank', 'Code', code);
+        res.json({ success: true, item: updatedRow });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to update company bban' });
@@ -912,7 +963,7 @@ const updateCompanyBBAN = async (req, res) => {
 const deleteCompanyBBAN = async (req, res) => {
     const { code } = req.params;
     try {
-        await pool.query('DELETE FROM tblpayingbank WHERE Code = ?', [code]);
+        await lookupTableService.deleteRow('tblpayingbank', 'Code', code);
         res.json({ success: true });
     } catch (err) {
         console.error(err);
@@ -936,7 +987,7 @@ const glAccountsPage = async (req, res) => {
 
 const glAccountsListJson = async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM tblglaccounts ORDER BY GLNo');
+        const rows = await lookupTableService.listRows('tblglaccounts', { orderBy: 'GLNo' });
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -946,24 +997,25 @@ const glAccountsListJson = async (req, res) => {
 
 const createGLAccount = async (req, res) => {
     try {
-        const [lastItem] = await pool.query('SELECT GLNo FROM tblglaccounts ORDER BY GLNo DESC LIMIT 1');
-        let nextCode = '01';
-        if (lastItem.length > 0) {
-            const lastCodeInt = parseInt(lastItem[0].GLNo, 10);
-            if (!isNaN(lastCodeInt)) {
-                nextCode = (lastCodeInt + 1).toString().padStart(2, '0');
-            }
-        }
+        const nextCode = await lookupTableService.getNextCode('tblglaccounts', {
+            codeColumn: 'GLNo',
+            startCode: '01',
+            padLength: 2
+        });
 
         const { AccountsHead, Code } = req.body;
         
         if (!AccountsHead) return res.status(400).json({ error: 'Account Head is required' });
 
-        const sql = `INSERT INTO tblglaccounts (GLNo, AccountsHead, Code, CompanyID) VALUES (?, ?, ?, ?)`;
-        await pool.query(sql, [nextCode, AccountsHead, Code || null, 1]);
-        
-        const [newRow] = await pool.query('SELECT * FROM tblglaccounts WHERE GLNo = ?', [nextCode]);
-        res.json({ success: true, item: newRow[0] });
+        await lookupTableService.insertRow('tblglaccounts', {
+            GLNo: nextCode,
+            AccountsHead,
+            Code: Code || null,
+            CompanyID: 1
+        });
+
+        const newRow = await lookupTableService.getRowById('tblglaccounts', 'GLNo', nextCode);
+        res.json({ success: true, item: newRow });
 
     } catch (err) {
         console.error(err);
@@ -984,13 +1036,11 @@ const updateGLAccount = async (req, res) => {
 
         if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
 
-        const sql = `UPDATE tblglaccounts SET ${fields.join(', ')} WHERE GLNo = ?`;
-        values.push(glNo);
+        const updateData = Object.fromEntries(fields.map((field, index) => [field.replace(' = ?', ''), values[index]]));
+        await lookupTableService.updateRow('tblglaccounts', 'GLNo', glNo, updateData);
 
-        await pool.query(sql, values);
-        
-        const [updatedRow] = await pool.query('SELECT * FROM tblglaccounts WHERE GLNo = ?', [glNo]);
-        res.json({ success: true, item: updatedRow[0] });
+        const updatedRow = await lookupTableService.getRowById('tblglaccounts', 'GLNo', glNo);
+        res.json({ success: true, item: updatedRow });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to update gl account' });
@@ -1000,7 +1050,7 @@ const updateGLAccount = async (req, res) => {
 const deleteGLAccount = async (req, res) => {
     const { glNo } = req.params;
     try {
-        await pool.query('DELETE FROM tblglaccounts WHERE GLNo = ?', [glNo]);
+        await lookupTableService.deleteRow('tblglaccounts', 'GLNo', glNo);
         res.json({ success: true });
     } catch (err) {
         console.error(err);
@@ -1024,7 +1074,7 @@ const disciplineReasonsPage = async (req, res) => {
 
 const disciplineReasonsListJson = async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM tblreason ORDER BY ReasonCode');
+        const rows = await lookupTableService.listRows('tblreason', { orderBy: 'ReasonCode' });
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -1034,21 +1084,18 @@ const disciplineReasonsListJson = async (req, res) => {
 
 const createDisciplineReason = async (req, res) => {
     try {
-        const [lastItem] = await pool.query('SELECT ReasonCode FROM tblreason ORDER BY ReasonCode DESC LIMIT 1');
-        let nextCode = '01';
-        if (lastItem.length > 0) {
-            const lastCodeInt = parseInt(lastItem[0].ReasonCode, 10);
-            if (!isNaN(lastCodeInt)) {
-                nextCode = (lastCodeInt + 1).toString().padStart(2, '0');
-            }
-        }
+        const nextCode = await lookupTableService.getNextCode('tblreason', {
+            codeColumn: 'ReasonCode',
+            startCode: '01',
+            padLength: 2
+        });
 
         const { Reason } = req.body;
         if (!Reason) return res.status(400).json({ error: 'Reason is required' });
 
-        await pool.query('INSERT INTO tblreason (ReasonCode, Reason, CompanyID) VALUES (?, ?, ?)', [nextCode, Reason, 1]);
-        const [newRow] = await pool.query('SELECT * FROM tblreason WHERE ReasonCode = ?', [nextCode]);
-        res.json({ success: true, item: newRow[0] });
+        await lookupTableService.insertRow('tblreason', { ReasonCode: nextCode, Reason, CompanyID: 1 });
+        const newRow = await lookupTableService.getRowById('tblreason', 'ReasonCode', nextCode);
+        res.json({ success: true, item: newRow });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to create discipline reason' });
@@ -1059,9 +1106,9 @@ const updateDisciplineReason = async (req, res) => {
     const { code } = req.params;
     const { Reason } = req.body;
     try {
-        await pool.query('UPDATE tblreason SET Reason = ? WHERE ReasonCode = ?', [Reason, code]);
-        const [updatedRow] = await pool.query('SELECT * FROM tblreason WHERE ReasonCode = ?', [code]);
-        res.json({ success: true, item: updatedRow[0] });
+        await lookupTableService.updateRow('tblreason', 'ReasonCode', code, { Reason });
+        const updatedRow = await lookupTableService.getRowById('tblreason', 'ReasonCode', code);
+        res.json({ success: true, item: updatedRow });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to update discipline reason' });
@@ -1071,7 +1118,7 @@ const updateDisciplineReason = async (req, res) => {
 const deleteDisciplineReason = async (req, res) => {
     const { code } = req.params;
     try {
-        await pool.query('DELETE FROM tblreason WHERE ReasonCode = ?', [code]);
+        await lookupTableService.deleteRow('tblreason', 'ReasonCode', code);
         res.json({ success: true });
     } catch (err) {
         console.error(err);
@@ -1095,7 +1142,7 @@ const queriesPage = async (req, res) => {
 
 const queriesListJson = async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM tblqtype ORDER BY Code');
+        const rows = await lookupTableService.listRows('tblqtype', { orderBy: 'Code' });
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -1105,21 +1152,17 @@ const queriesListJson = async (req, res) => {
 
 const createQuery = async (req, res) => {
     try {
-        const [lastItem] = await pool.query('SELECT Code FROM tblqtype ORDER BY Code DESC LIMIT 1');
-        let nextCode = '01';
-        if (lastItem.length > 0) {
-            const lastCodeInt = parseInt(lastItem[0].Code, 10);
-            if (!isNaN(lastCodeInt)) {
-                nextCode = (lastCodeInt + 1).toString().padStart(2, '0');
-            }
-        }
+        const nextCode = await lookupTableService.getNextCode('tblqtype', {
+            startCode: '01',
+            padLength: 2
+        });
 
         const { QType } = req.body;
         if (!QType) return res.status(400).json({ error: 'Query Type is required' });
 
-        await pool.query('INSERT INTO tblqtype (Code, QType, CompanyID) VALUES (?, ?, ?)', [nextCode, QType, 1]);
-        const [newRow] = await pool.query('SELECT * FROM tblqtype WHERE Code = ?', [nextCode]);
-        res.json({ success: true, item: newRow[0] });
+        await lookupTableService.insertRow('tblqtype', { Code: nextCode, QType, CompanyID: 1 });
+        const newRow = await lookupTableService.getRowById('tblqtype', 'Code', nextCode);
+        res.json({ success: true, item: newRow });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to create query' });
@@ -1130,9 +1173,9 @@ const updateQuery = async (req, res) => {
     const { code } = req.params;
     const { QType } = req.body;
     try {
-        await pool.query('UPDATE tblqtype SET QType = ? WHERE Code = ?', [QType, code]);
-        const [updatedRow] = await pool.query('SELECT * FROM tblqtype WHERE Code = ?', [code]);
-        res.json({ success: true, item: updatedRow[0] });
+        await lookupTableService.updateRow('tblqtype', 'Code', code, { QType });
+        const updatedRow = await lookupTableService.getRowById('tblqtype', 'Code', code);
+        res.json({ success: true, item: updatedRow });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to update query' });
@@ -1142,7 +1185,7 @@ const updateQuery = async (req, res) => {
 const deleteQuery = async (req, res) => {
     const { code } = req.params;
     try {
-        await pool.query('DELETE FROM tblqtype WHERE Code = ?', [code]);
+        await lookupTableService.deleteRow('tblqtype', 'Code', code);
         res.json({ success: true });
     } catch (err) {
         console.error(err);
@@ -1165,7 +1208,7 @@ const disciplineOutcomesPage = async (req, res) => {
 
 const disciplineOutcomesListJson = async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM tblmreaction ORDER BY Code');
+        const rows = await lookupTableService.listRows('tblmreaction', { orderBy: 'Code' });
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -1175,21 +1218,17 @@ const disciplineOutcomesListJson = async (req, res) => {
 
 const createDisciplineOutcome = async (req, res) => {
     try {
-        const [lastItem] = await pool.query('SELECT Code FROM tblmreaction ORDER BY Code DESC LIMIT 1');
-        let nextCode = '01';
-        if (lastItem.length > 0) {
-            const lastCodeInt = parseInt(lastItem[0].Code, 10);
-            if (!isNaN(lastCodeInt)) {
-                nextCode = (lastCodeInt + 1).toString().padStart(2, '0');
-            }
-        }
+        const nextCode = await lookupTableService.getNextCode('tblmreaction', {
+            startCode: '01',
+            padLength: 2
+        });
 
         const { Reaction } = req.body;
         if (!Reaction) return res.status(400).json({ error: 'Reaction is required' });
 
-        await pool.query('INSERT INTO tblmreaction (Code, Reaction, CompanyID) VALUES (?, ?, ?)', [nextCode, Reaction, 1]);
-        const [newRow] = await pool.query('SELECT * FROM tblmreaction WHERE Code = ?', [nextCode]);
-        res.json({ success: true, item: newRow[0] });
+        await lookupTableService.insertRow('tblmreaction', { Code: nextCode, Reaction, CompanyID: 1 });
+        const newRow = await lookupTableService.getRowById('tblmreaction', 'Code', nextCode);
+        res.json({ success: true, item: newRow });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to create discipline outcome' });
@@ -1200,9 +1239,9 @@ const updateDisciplineOutcome = async (req, res) => {
     const { code } = req.params;
     const { Reaction } = req.body;
     try {
-        await pool.query('UPDATE tblmreaction SET Reaction = ? WHERE Code = ?', [Reaction, code]);
-        const [updatedRow] = await pool.query('SELECT * FROM tblmreaction WHERE Code = ?', [code]);
-        res.json({ success: true, item: updatedRow[0] });
+        await lookupTableService.updateRow('tblmreaction', 'Code', code, { Reaction });
+        const updatedRow = await lookupTableService.getRowById('tblmreaction', 'Code', code);
+        res.json({ success: true, item: updatedRow });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to update discipline outcome' });
@@ -1212,7 +1251,7 @@ const updateDisciplineOutcome = async (req, res) => {
 const deleteDisciplineOutcome = async (req, res) => {
     const { code } = req.params;
     try {
-        await pool.query('DELETE FROM tblmreaction WHERE Code = ?', [code]);
+        await lookupTableService.deleteRow('tblmreaction', 'Code', code);
         res.json({ success: true });
     } catch (err) {
         console.error(err);
@@ -1236,7 +1275,7 @@ const coursesPage = async (req, res) => {
 
 const coursesListJson = async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM tblcoursetype ORDER BY CourseCode');
+        const rows = await lookupTableService.listRows('tblcoursetype', { orderBy: 'CourseCode' });
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -1246,21 +1285,18 @@ const coursesListJson = async (req, res) => {
 
 const createCourse = async (req, res) => {
     try {
-        const [lastItem] = await pool.query('SELECT CourseCode FROM tblcoursetype ORDER BY CourseCode DESC LIMIT 1');
-        let nextCode = '01';
-        if (lastItem.length > 0) {
-            const lastCodeInt = parseInt(lastItem[0].CourseCode, 10);
-            if (!isNaN(lastCodeInt)) {
-                nextCode = (lastCodeInt + 1).toString().padStart(2, '0');
-            }
-        }
+        const nextCode = await lookupTableService.getNextCode('tblcoursetype', {
+            codeColumn: 'CourseCode',
+            startCode: '01',
+            padLength: 2
+        });
 
         const { CType } = req.body;
         if (!CType) return res.status(400).json({ error: 'Course Type is required' });
 
-        await pool.query('INSERT INTO tblcoursetype (CourseCode, CType, CompanyID) VALUES (?, ?, ?)', [nextCode, CType, 1]);
-        const [newRow] = await pool.query('SELECT * FROM tblcoursetype WHERE CourseCode = ?', [nextCode]);
-        res.json({ success: true, item: newRow[0] });
+        await lookupTableService.insertRow('tblcoursetype', { CourseCode: nextCode, CType, CompanyID: 1 });
+        const newRow = await lookupTableService.getRowById('tblcoursetype', 'CourseCode', nextCode);
+        res.json({ success: true, item: newRow });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to create course' });
@@ -1271,9 +1307,9 @@ const updateCourse = async (req, res) => {
     const { code } = req.params;
     const { CType } = req.body;
     try {
-        await pool.query('UPDATE tblcoursetype SET CType = ? WHERE CourseCode = ?', [CType, code]);
-        const [updatedRow] = await pool.query('SELECT * FROM tblcoursetype WHERE CourseCode = ?', [code]);
-        res.json({ success: true, item: updatedRow[0] });
+        await lookupTableService.updateRow('tblcoursetype', 'CourseCode', code, { CType });
+        const updatedRow = await lookupTableService.getRowById('tblcoursetype', 'CourseCode', code);
+        res.json({ success: true, item: updatedRow });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to update course' });
@@ -1283,7 +1319,7 @@ const updateCourse = async (req, res) => {
 const deleteCourse = async (req, res) => {
     const { code } = req.params;
     try {
-        await pool.query('DELETE FROM tblcoursetype WHERE CourseCode = ?', [code]);
+        await lookupTableService.deleteRow('tblcoursetype', 'CourseCode', code);
         res.json({ success: true });
     } catch (err) {
         console.error(err);
@@ -1307,7 +1343,7 @@ const empStatusPage = async (req, res) => {
 
 const empStatusListJson = async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM tblempstatus ORDER BY Code');
+        const rows = await lookupTableService.listRows('tblempstatus', { orderBy: 'Code' });
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -1317,21 +1353,17 @@ const empStatusListJson = async (req, res) => {
 
 const createEmpStatus = async (req, res) => {
     try {
-        const [lastItem] = await pool.query('SELECT Code FROM tblempstatus ORDER BY Code DESC LIMIT 1');
-        let nextCode = '01';
-        if (lastItem.length > 0) {
-            const lastCodeInt = parseInt(lastItem[0].Code, 10);
-            if (!isNaN(lastCodeInt)) {
-                nextCode = (lastCodeInt + 1).toString().padStart(2, '0');
-            }
-        }
+        const nextCode = await lookupTableService.getNextCode('tblempstatus', {
+            startCode: '01',
+            padLength: 2
+        });
 
         const { EmpStatus } = req.body;
         if (!EmpStatus) return res.status(400).json({ error: 'Status is required' });
 
-        await pool.query('INSERT INTO tblempstatus (Code, EmpStatus, CompanyID) VALUES (?, ?, ?)', [nextCode, EmpStatus, 1]);
-        const [newRow] = await pool.query('SELECT * FROM tblempstatus WHERE Code = ?', [nextCode]);
-        res.json({ success: true, item: newRow[0] });
+        await lookupTableService.insertRow('tblempstatus', { Code: nextCode, EmpStatus, CompanyID: 1 });
+        const newRow = await lookupTableService.getRowById('tblempstatus', 'Code', nextCode);
+        res.json({ success: true, item: newRow });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to create emp status' });
@@ -1342,9 +1374,9 @@ const updateEmpStatus = async (req, res) => {
     const { code } = req.params;
     const { EmpStatus } = req.body;
     try {
-        await pool.query('UPDATE tblempstatus SET EmpStatus = ? WHERE Code = ?', [EmpStatus, code]);
-        const [updatedRow] = await pool.query('SELECT * FROM tblempstatus WHERE Code = ?', [code]);
-        res.json({ success: true, item: updatedRow[0] });
+        await lookupTableService.updateRow('tblempstatus', 'Code', code, { EmpStatus });
+        const updatedRow = await lookupTableService.getRowById('tblempstatus', 'Code', code);
+        res.json({ success: true, item: updatedRow });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to update emp status' });
@@ -1354,7 +1386,7 @@ const updateEmpStatus = async (req, res) => {
 const deleteEmpStatus = async (req, res) => {
     const { code } = req.params;
     try {
-        await pool.query('DELETE FROM tblempstatus WHERE Code = ?', [code]);
+        await lookupTableService.deleteRow('tblempstatus', 'Code', code);
         res.json({ success: true });
     } catch (err) {
         console.error(err);
@@ -2174,6 +2206,11 @@ module.exports = {
   dataEntryNewPage,
   createDataEntry,
   deleteDataEntry,
+  auditorsListPage,
+  auditorsListJson,
+  auditorsNewPage,
+  createAuditor,
+  deleteAuditor,
   payrollItemsPage,
   payrollItemsListJson,
   createPayrollItem,

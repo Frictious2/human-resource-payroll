@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Auditors · List</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link href="https://cdn.datatables.net/v/bs5/dt-1.13.8/b-2.4.2/b-html5-2.4.2/b-print-2.4.2/datatables.min.css" rel="stylesheet"/>
+  <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+  <%- include('partials/topbar', { user }) %>
+  <%- include('partials/sidebar') %>
+
+  <main class="main">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center justify-content-between mb-4">
+        <h2 class="mb-0">Auditors</h2>
+        <a class="btn btn-primary" href="/admin/auditors/new"><i class="bi bi-plus-circle me-2"></i>Add Auditor</a>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <table id="auditorsTable" class="table table-striped table-hover w-100">
+            <thead>
+              <tr>
+                <th>Picture</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Company</th>
+                <th>Date Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+          </table>
+        </div>
+      </div>
+
+      <footer class="mt-4 py-3 text-center text-muted border-top">
+        <%- include('partials/footer') %>
+      </footer>
+    </div>
+  </main>
+
+  <script src="/vendor/bootstrap.bundle.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.datatables.net/v/bs5/dt-1.13.8/b-2.4.2/b-html5-2.4.2/b-print-2.4.2/datatables.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+  <script>
+    $(function () {
+      const table = $('#auditorsTable').DataTable({
+        ajax: { url: '/admin/api/auditors', dataSrc: 'data' },
+        columns: [
+          { data: 'PFNo', orderable: false, searchable: false, render: (pfno) => `<img src="https://picsum.photos/seed/auditor-${pfno}/40" class="rounded-circle" alt="avatar">` },
+          { data: null, render: (row) => row.FullName || row.Username || '' },
+          { data: 'Email' },
+          { data: 'Com_Name', defaultContent: '' },
+          { data: 'DateCreated', render: (val) => val ? new Date(val).toLocaleString() : '' },
+          { data: null, orderable: false, searchable: false, render: (row) => `
+            <button class="btn btn-sm btn-warning resend-link" data-id="${row.PFNo}">Resend Link</button>
+            <button class="btn btn-sm btn-danger delete-auditor" data-id="${row.PFNo}">Delete</button>
+          ` }
+        ],
+        dom: 'Bfrtip',
+        buttons: [
+          { extend: 'excelHtml5', title: 'Auditors' },
+          { extend: 'pdfHtml5', title: 'Auditors', orientation: 'landscape', pageSize: 'A4' }
+        ],
+        responsive: true,
+      });
+
+      $(document).on('click', '.resend-link', async function() {
+        const id = $(this).data('id');
+        try {
+          const res = await fetch('/admin/api/auditors/' + id + '/resend-link', { method: 'POST' });
+          if (res.ok) alert('Link resent');
+        } catch (e) {
+          alert('Failed to resend link');
+        }
+      });
+
+      $(document).on('click', '.delete-auditor', async function() {
+        const id = $(this).data('id');
+        if (!confirm('Delete this auditor?')) return;
+        try {
+          const res = await fetch('/admin/api/auditors/' + id, { method: 'DELETE' });
+          if (res.ok) table.ajax.reload(null, false);
+        } catch (e) {
+          alert('Failed to delete auditor');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

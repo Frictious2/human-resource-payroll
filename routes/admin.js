@@ -34,6 +34,13 @@ router.post('/data-entry-officers', adminController.createDataEntry);
 router.post('/api/data-entry-officers/:pfno/resend-link', adminController.resendLink);
 router.delete('/api/data-entry-officers/:pfno', adminController.deleteDataEntry);
 
+router.get('/auditors', adminController.auditorsListPage);
+router.get('/api/auditors', adminController.auditorsListJson);
+router.get('/auditors/new', adminController.auditorsNewPage);
+router.post('/auditors', adminController.createAuditor);
+router.post('/api/auditors/:pfno/resend-link', adminController.resendLink);
+router.delete('/api/auditors/:pfno', adminController.deleteAuditor);
+
 router.get('/parameters/payroll-items', adminController.payrollItemsPage);
 router.get('/api/parameters/payroll-items', adminController.payrollItemsListJson);
 router.post('/api/parameters/payroll-items', adminController.createPayrollItem);

@@ -4,9 +4,14 @@ const bcrypt = require('bcrypt');
 const SALT_ROUNDS = 10;
 const mailer = require('../config/mailer');
 const jwt = require('jsonwebtoken');
+const RESET_SECRET = process.env.RESET_TOKEN_SECRET || process.env.JWT_SECRET || 'reset_secret';
+
+function getViewUser(req, fallbackName = 'Developer') {
+  return (req.session && req.session.user) || { name: fallbackName };
+}
 
 const renderDashboard = (req, res) => {
-  res.render('developer/developers-dashboard', { user: { name: 'David' } });
+  res.render('developer/developers-dashboard', { user: getViewUser(req, 'Developer') });
 };
 
 const comingSoon = (title, group) => {
@@ -15,14 +20,14 @@ const comingSoon = (title, group) => {
       role: 'developer',
       title,
       group,
-      user: { name: 'David' },
+      user: getViewUser(req, 'Developer'),
     });
   };
 };
 
 // List page
 const listPage = async (req, res) => {
-  res.render('developer/developers', { user: { name: 'David' } });
+  res.render('developer/developers', { user: getViewUser(req, 'Developer') });
 };
 
 // List JSON for DataTables
@@ -40,7 +45,7 @@ const listJson = async (req, res) => {
 
 // Add form page
 const newPage = async (req, res) => {
-  res.render('developer/developers-new', { user: { name: 'David' }, error: null });
+  res.render('developer/developers-new', { user: getViewUser(req, 'Developer'), error: null });
 };
 
 // Create developer (with bcrypt hashing)
@@ -48,7 +53,7 @@ const createDeveloper = async (req, res) => {
   const { FullName, username, email, password, createdBy } = req.body;
   if (!FullName || !username || !email) {
     return res.status(400).render('developer/developers-new', {
-      user: { name: 'David' },
+      user: getViewUser(req, 'Developer'),
       error: 'Full name, username, and email are required.',
     });
   }
@@ -62,7 +67,7 @@ const createDeveloper = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).render('developer/developers-new', {
-      user: { name: 'David' },
+      user: getViewUser(req, 'Developer'),
       error: 'Failed to create developer.',
     });
   }
@@ -73,7 +78,7 @@ const editPage = async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM developer WHERE ID = ?', [req.params.id]);
     if (!rows.length) return res.status(404).send('Developer not found');
-    res.render('developer/developers-edit', { user: { name: 'David' }, dev: rows[0], error: null });
+    res.render('developer/developers-edit', { user: getViewUser(req, 'Developer'), dev: rows[0], error: null });
   } catch (err) {
     console.error(err);
     res.status(500).send('Failed to load developer');
@@ -100,7 +105,7 @@ const updateDeveloper = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).render('developer/developers-edit', {
-      user: { name: 'David' },
+      user: getViewUser(req, 'Developer'),
       dev: { ID: req.params.id, FullName, username, email, password, createdBy },
       error: 'Failed to update developer.',
     });
@@ -120,7 +125,7 @@ const deleteDeveloper = async (req, res) => {
 
 // Companies: list page
 const companiesListPage = async (req, res) => {
-  res.render('developer/companies', { user: { name: 'David' } });
+  res.render('developer/companies', { user: getViewUser(req, 'Developer') });
 };
 
 // Companies: list JSON for DataTables (include all table columns)
@@ -142,7 +147,7 @@ const companiesListJson = async (req, res) => {
 
 // Companies: add form page
 const companiesNewPage = async (req, res) => {
-  res.render('developer/companies-new', { user: { name: 'David' }, error: null });
+  res.render('developer/companies-new', { user: getViewUser(req, 'Developer'), error: null });
 };
 
 // Companies: create (only specified fields)
@@ -195,7 +200,7 @@ async function createCompany(req, res) {
 };
 // define admin handlers (developer dashboard)
 async function adminsListPage(req, res) {
-  res.render('developer/admins', { user: { name: 'David' } });
+  res.render('developer/admins', { user: getViewUser(req, 'Developer') });
 }
 
 async function adminsListJson(req, res) {
@@ -230,7 +235,7 @@ async function adminsListJson(req, res) {
 async function adminsNewPage(req, res) {
   try {
     const [companies] = await pool.query(`SELECT CompanyID, Com_Name FROM tblcominfo ORDER BY Com_Name`);
-    res.render('developer/admins-new', { title: 'Add Admin', companies, user: { name: 'David' } });
+    res.render('developer/admins-new', { title: 'Add Admin', companies, user: getViewUser(req, 'Developer') });
   } catch (err) {
     console.error(err);
     res.status(500).send('Failed to load form');
@@ -248,7 +253,7 @@ async function createAdmin(req, res) {
     );
 
     const pfno = result.insertId;
-    const token = jwt.sign({ pfno }, process.env.JWT_SECRET, { expiresIn: '30m' });
+    const token = jwt.sign({ pfno }, RESET_SECRET, { expiresIn: '30m' });
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const link = `${baseUrl}/developer/admins/${pfno}/set-password?token=${encodeURIComponent(token)}`;
 
@@ -284,8 +289,8 @@ async function setAdminPasswordPage(req, res) {
   const { pfno } = req.params;
   const { token } = req.query;
   try {
-    jwt.verify(token, process.env.JWT_SECRET);
-    res.render('developer/admins-set-password', { title: 'Set Password', pfno, token, user: { name: 'David' } });
+    jwt.verify(token, RESET_SECRET);
+    res.render('developer/admins-set-password', { title: 'Set Password', pfno, token, user: getViewUser(req, 'Developer') });
   } catch {
     res.status(400).send('Invalid or expired link');
   }
@@ -297,7 +302,7 @@ async function setAdminPasswordUpdate(req, res) {
   const { password } = req.body;
 
   try {
-    jwt.verify(token, process.env.JWT_SECRET);
+    jwt.verify(token, RESET_SECRET);
     const hash = await bcrypt.hash(password, SALT_ROUNDS);
     await pool.query(`UPDATE tblpassword SET Pword = ? WHERE PFNo = ?`, [hash, pfno]);
     res.redirect('/developer/admins');
@@ -320,7 +325,7 @@ async function deleteAdmin(req, res) {
 
 // License handlers
 async function licensesListPage(req, res) {
-  res.render('developer/licenses', { user: { name: 'David' } });
+  res.render('developer/licenses', { user: getViewUser(req, 'Developer') });
 }
 
 async function licensesListJson(req, res) {

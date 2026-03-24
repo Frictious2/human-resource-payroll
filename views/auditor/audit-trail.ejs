@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title><%= title %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+  <%- include('./partials/topbar', { user }) %>
+  <%- include('./partials/sidebar') %>
+
+  <main class="main">
+    <div class="container-fluid">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+          <h1 class="h3 mb-1">Audit Trail</h1>
+          <p class="text-muted mb-0">Review who changed what, when it happened, and which part of the system it touched.</p>
+        </div>
+        <a class="btn btn-outline-primary" href="/auditor/dashboard">
+          <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+        </a>
+      </div>
+
+      <div class="card shadow-sm mb-4">
+        <div class="card-body">
+          <form method="GET" action="/auditor/audit-trail" class="row g-3">
+            <div class="col-12 col-md-6 col-xl-3">
+              <label class="form-label">User</label>
+              <select class="form-select" name="userName">
+                <option value="">All users</option>
+                <% options.users.forEach(function(userName) { %>
+                  <option value="<%= userName %>" <%= filters.userName === userName ? 'selected' : '' %>><%= userName %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-12 col-md-6 col-xl-3">
+              <label class="form-label">Action</label>
+              <select class="form-select" name="action">
+                <option value="">All actions</option>
+                <% options.actions.forEach(function(action) { %>
+                  <option value="<%= action %>" <%= filters.action === action ? 'selected' : '' %>><%= action %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-12 col-md-6 col-xl-3">
+              <label class="form-label">Form</label>
+              <select class="form-select" name="formName">
+                <option value="">All forms</option>
+                <% options.forms.forEach(function(formName) { %>
+                  <option value="<%= formName %>" <%= filters.formName === formName ? 'selected' : '' %>><%= formName %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-12 col-md-6 col-xl-3">
+              <label class="form-label">From Date</label>
+              <input class="form-control" type="date" name="dateFrom" value="<%= filters.dateFrom %>">
+            </div>
+            <div class="col-12 col-md-6 col-xl-3">
+              <label class="form-label">To Date</label>
+              <input class="form-control" type="date" name="dateTo" value="<%= filters.dateTo %>">
+            </div>
+            <div class="col-12 d-flex gap-2">
+              <button class="btn btn-primary" type="submit"><i class="bi bi-funnel me-2"></i>Apply Filters</button>
+              <a class="btn btn-outline-secondary" href="/auditor/audit-trail">Reset</a>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-header bg-body d-flex justify-content-between align-items-center">
+          <h2 class="h6 mb-0">Entries</h2>
+          <span class="text-muted small"><%= pagination.totalCount %> record(s)</span>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Date</th>
+                  <th>User</th>
+                  <th>Form</th>
+                  <th>Action</th>
+                  <th>Record</th>
+                  <th>Field</th>
+                  <th>Old Value</th>
+                  <th>New Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!entries.length) { %>
+                  <tr>
+                    <td colspan="8" class="text-center py-4 text-muted">No audit entries match the selected filters.</td>
+                  </tr>
+                <% } %>
+                <% entries.forEach(function(entry) { %>
+                  <tr>
+                    <td><%= entry.ChangeDate ? new Date(entry.ChangeDate).toLocaleString() : '' %></td>
+                    <td><%= entry.UserName || 'System' %></td>
+                    <td><%= entry.FormName || '-' %></td>
+                    <td><span class="badge text-bg-light"><%= entry.Action || '-' %></span></td>
+                    <td><%= entry.RecordID || '-' %></td>
+                    <td><%= entry.FieldName || '-' %></td>
+                    <td class="small text-break"><%= entry.OldValue || '-' %></td>
+                    <td class="small text-break"><%= entry.NewValue || '-' %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card-footer bg-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div class="text-muted small">Page <%= pagination.page %> of <%= pagination.totalPages %></div>
+          <div class="d-flex gap-2">
+            <% const queryBase = new URLSearchParams(); %>
+            <% if (filters.userName) queryBase.set('userName', filters.userName); %>
+            <% if (filters.action) queryBase.set('action', filters.action); %>
+            <% if (filters.formName) queryBase.set('formName', filters.formName); %>
+            <% if (filters.dateFrom) queryBase.set('dateFrom', filters.dateFrom); %>
+            <% if (filters.dateTo) queryBase.set('dateTo', filters.dateTo); %>
+            <% const prevParams = new URLSearchParams(queryBase.toString()); prevParams.set('page', String(Math.max(pagination.page - 1, 1))); %>
+            <% const nextParams = new URLSearchParams(queryBase.toString()); nextParams.set('page', String(Math.min(pagination.page + 1, pagination.totalPages))); %>
+            <a class="btn btn-sm btn-outline-secondary <%= pagination.page <= 1 ? 'disabled' : '' %>" href="/auditor/audit-trail?<%= prevParams.toString() %>">Previous</a>
+            <a class="btn btn-sm btn-outline-secondary <%= pagination.page >= pagination.totalPages ? 'disabled' : '' %>" href="/auditor/audit-trail?<%= nextParams.toString() %>">Next</a>
+          </div>
+        </div>
+      </div>
+
+      <footer class="mt-4 py-3 text-center text-muted border-top">
+        <%- include('./partials/footer') %>
+      </footer>
+    </div>
+  </main>
+
+  <script src="/vendor/bootstrap.bundle.min.js"></script>
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

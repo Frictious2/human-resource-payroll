@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const dataEntryController = require('../controllers/dataEntryController');
 const benefitController = require('../controllers/benefitController');
+const payrollGlPostingRoutes = require('./payrollGlPostingRoutes');
 const multer = require('multer');
 const path = require('path');
 
@@ -127,7 +128,8 @@ router.post('/payroll/view-payroll/preview', dataEntryController.postPayrollView
 router.get('/payroll/process-emoluments', dataEntryController.getProcessEmoluments);
 router.get('/api/payroll/check-process-status', dataEntryController.checkProcessStatus);
 router.post('/payroll/process-emoluments', dataEntryController.postProcessEmoluments);
-router.get('/payroll/post-to-accounts', dataEntryController.getComingSoon);
+router.use('/payroll/post-to-accounts', payrollGlPostingRoutes);
+router.use('/payroll/gl-posting', payrollGlPostingRoutes);
 router.get('/payroll/yearly-payments', dataEntryController.getComingSoon);
 router.get('/payroll/increments-pay-cut-backlog', dataEntryController.getIncrementsPayCutBacklog);
 router.post('/payroll/increments-pay-cut-backlog', dataEntryController.postIncrementsPayCutBacklog);
@@ -164,6 +166,7 @@ router.get('/reports/payroll', dataEntryController.getPayrollReports);
 router.get('/reports/payroll/bonus-backlog/preview', dataEntryController.getBonusBacklogPreview);
 router.get('/api/staff/:pfno/name', dataEntryController.getStaffName);
 router.get('/api/welfare/redundancy', dataEntryController.getRedundancySheetData);
+router.get('/api/reports/redundancy', dataEntryController.getRedundancySheetData);
 router.get('/api/reports/payslip', dataEntryController.getPayslipData);
 router.post('/api/reports/voucher/preview', dataEntryController.getVoucherReportPreview);
 router.get('/reports/journal', dataEntryController.getJournalReport);
@@ -184,7 +187,7 @@ router.get('/reports/yearly-payments', dataEntryController.getComingSoon);
 router.get('/reports/benefit-status', benefitController.getBenefitStatusReport);
 router.post('/api/reports/benefit-status/calculate', benefitController.calculateBenefits);
 router.get('/reports/travel', dataEntryController.getComingSoon);
-router.get('/reports/redundancy', dataEntryController.getComingSoon);
+router.get('/reports/redundancy', dataEntryController.getReportsRedundancy);
 router.get('/reports/master-pay-sheet', dataEntryController.getComingSoon);
 
 module.exports = router;

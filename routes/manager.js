@@ -93,6 +93,7 @@ router.get('/approve/entitlement', managerController.getComingSoon);
 router.get('/reports/payroll', managerController.getPayrollReports);
 router.get('/reports/payroll/bonus-backlog/preview', dataEntryController.getBonusBacklogPreview);
 router.get('/api/staff/:pfno/name', dataEntryController.getStaffName);
+router.get('/api/reports/redundancy', dataEntryController.getRedundancySheetData);
 router.get('/reports/journal', managerController.getJournalReport);
 router.get('/reports/journal/preview', managerController.getJournalReportPreview);
 router.get('/reports/vehicle-insurance', managerController.getComingSoon);
@@ -111,7 +112,7 @@ router.get('/reports/yearly-payments', managerController.getComingSoon);
 router.get('/reports/benefit-status', benefitController.getBenefitStatusManager);
 router.post('/api/reports/benefit-status/calculate', benefitController.calculateBenefits);
 router.get('/reports/travel', managerController.getComingSoon);
-router.get('/reports/redundancy', managerController.getComingSoon);
+router.get('/reports/redundancy', managerController.getReportsRedundancy);
 router.get('/reports/master-pay-sheet', managerController.getComingSoon);
 
 module.exports = router;

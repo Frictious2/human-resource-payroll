@@ -264,7 +264,7 @@
                     document.getElementById('jobTitleDisplay').value = data.staff.JobTitleName || '';
                 }
                 if (data.salary) {
-                    payrollMode = 'edit';
+                    payrollMode = data.salary.isDerivedOnly ? 'new' : 'edit';
                     const s = data.salary;
                     document.getElementById('annual').value = s.Annual ?? '';
                     document.getElementById('salary').value = s.Salary ?? '';

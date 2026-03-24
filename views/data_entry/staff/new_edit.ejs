@@ -13,9 +13,20 @@
             font-weight: bold;
             border-top: 3px solid #0d6efd;
         }
+        .dependant-over-age {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        body.staff-new-edit-page {
+            overflow-y: auto !important;
+        }
+        body.staff-new-edit-page.modal-open {
+            overflow-y: auto !important;
+            padding-right: 0 !important;
+        }
     </style>
 </head>
-<body>
+<body class="staff-new-edit-page">
     <%- include('../partials/topbar', { user }) %>
     <%- include('../partials/sidebar') %>
 
@@ -43,10 +54,11 @@
                             <label for="searchStaff" class="form-label">Search Staff (PFNo or Name)</label>
                             <div class="input-group">
                                 <input type="text" class="form-control" id="searchStaff" placeholder="Enter PFNo or Name...">
-                                <button class="btn btn-primary" type="button" onclick="searchStaff()">
+                                <button class="btn btn-primary" type="button" id="searchStaffButton" onclick="searchStaff({ manual: true })">
                                     <i class="bi bi-search"></i> Search
                                 </button>
                             </div>
+                            <div class="d-flex align-items-center gap-2 mt-2 small text-muted" id="searchStaffStatus" aria-live="polite"></div>
                         </div>
                         <div class="col-md-6">
                             <div class="text-muted small mt-2">
@@ -182,7 +194,14 @@
                                         <select class="form-select" id="cGrade" name="cGrade">
                                             <option value="">Select...</option>
                                             <% grades.forEach(g => { %>
-                                                <option value="<%= g.GradeCode %>"><%= g.Grade %></option>
+                                                <option
+                                                    value="<%= g.GradeCode %>"
+                                                    data-notch-incr="<%= g.NotchIncr || 0 %>"
+                                                    data-start-salary="<%= g.StartLevel || 0 %>"
+                                                    data-end-salary="<%= g.EndLevel || 0 %>"
+                                                    data-scale-notches="<%= g.ScaleNotches || 0 %>"
+                                                    data-increment="<%= g.ScaleIncrement || 0 %>"
+                                                ><%= g.Grade %></option>
                                             <% }) %>
                                         </select>
                                     </div>
@@ -243,6 +262,26 @@
                                     <div class="col-md-3">
                                         <label for="notch" class="form-label">Notch</label>
                                         <input type="number" class="form-control" id="notch" name="notch">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Start Salary</label>
+                                        <input type="text" class="form-control bg-light" id="calcStartSalary" readonly>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">End Salary</label>
+                                        <input type="text" class="form-control bg-light" id="calcEndSalary" readonly>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Basic Salary</label>
+                                        <input type="text" class="form-control bg-light" id="calcBasicSalary" readonly>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Annual Salary</label>
+                                        <input type="text" class="form-control bg-light" id="calcAnnualSalary" readonly>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Increment Per Notch</label>
+                                        <input type="text" class="form-control bg-light" id="calcSalaryIncrement" readonly>
                                     </div>
                                     <div class="col-md-3">
                                         <label for="level" class="form-label">Level</label>
@@ -446,7 +485,7 @@
                                         <tbody id="dependantsBody">
                                         </tbody>
                                     </table>
-                                    <div class="text-muted small">Children above 18 are hidden.</div>
+                                    <div class="text-muted small">Dependants above 18 are shown in red.</div>
                                 </div>
                                 <div class="mt-4 d-flex justify-content-between">
                                     <button type="button" class="btn btn-secondary" onclick="prevTab('education-tab')"><i class="bi bi-arrow-left"></i> Previous</button>
@@ -488,11 +527,179 @@
         </div>
     </div>
 
+    <div class="modal fade" id="notchLimitModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Notch Limit Reached</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0" id="notchLimitMessage">
+                        The data-entry officer has gone beyond the total notch value for this grade for the staff and cannot be increased further.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let searchResults = [];
          const qualifTypes = <%- JSON.stringify(qualifTypes) %>;
          const retireAge = <%= retireAge %>;
+         let lastNotchLimitMessage = '';
+         let searchTimeout = null;
+         let activeSearchController = null;
+
+        function setSearchLoading(isLoading, message = '') {
+            const searchButton = document.getElementById('searchStaffButton');
+            const searchStatus = document.getElementById('searchStaffStatus');
+
+            if (isLoading) {
+                searchButton.disabled = true;
+                searchStatus.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span><span>Searching staff records...</span>';
+                return;
+            }
+
+            searchButton.disabled = false;
+            searchStatus.textContent = message;
+        }
+
+        function formatMoney(value) {
+            const numericValue = Number(value);
+            if (!Number.isFinite(numericValue)) {
+                return '';
+            }
+
+            return numericValue.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function getSelectedGradeScale() {
+            const gradeSelect = document.getElementById('cGrade');
+            const selectedOption = gradeSelect.options[gradeSelect.selectedIndex];
+
+            if (!selectedOption || !selectedOption.value) {
+                return {
+                    maxNotch: null,
+                    startSalary: 0,
+                    endSalary: 0,
+                    scaleNotches: 0,
+                    increment: 0
+                };
+            }
+
+            const maxNotch = Number(selectedOption.dataset.notchIncr);
+            const startSalary = Number(selectedOption.dataset.startSalary);
+            const endSalary = Number(selectedOption.dataset.endSalary);
+            const scaleNotches = Number(selectedOption.dataset.scaleNotches);
+            let increment = Number(selectedOption.dataset.increment);
+
+            const safeMaxNotch = Number.isFinite(maxNotch) ? maxNotch : 0;
+            const safeScaleNotches = Number.isFinite(scaleNotches) && scaleNotches > 0 ? scaleNotches : safeMaxNotch;
+            const safeStartSalary = Number.isFinite(startSalary) ? startSalary : 0;
+            const safeEndSalary = Number.isFinite(endSalary) ? endSalary : 0;
+
+            if ((!Number.isFinite(increment) || increment === 0) && safeScaleNotches > 0) {
+                increment = (safeEndSalary - safeStartSalary) / safeScaleNotches;
+            }
+
+            return {
+                maxNotch: Number.isFinite(maxNotch) ? maxNotch : null,
+                startSalary: safeStartSalary,
+                endSalary: safeEndSalary,
+                scaleNotches: safeScaleNotches,
+                increment: Number.isFinite(increment) ? increment : 0
+            };
+        }
+
+        function updateSalaryPreview() {
+            const notchInput = document.getElementById('notch');
+            const {
+                maxNotch,
+                startSalary,
+                endSalary,
+                increment
+            } = getSelectedGradeScale();
+            const enteredNotch = Math.max(Number(notchInput.value) || 0, 0);
+            const appliedNotch = maxNotch === null ? enteredNotch : Math.min(enteredNotch, maxNotch);
+            const annualSalary = startSalary + (appliedNotch * increment);
+            const basicSalary = annualSalary / 12;
+
+            document.getElementById('calcStartSalary').value = formatMoney(startSalary);
+            document.getElementById('calcEndSalary').value = formatMoney(endSalary);
+            document.getElementById('calcSalaryIncrement').value = formatMoney(increment);
+            document.getElementById('calcAnnualSalary').value = formatMoney(annualSalary);
+            document.getElementById('calcBasicSalary').value = formatMoney(basicSalary);
+        }
+
+        function showNotchLimitModal(message) {
+            if (lastNotchLimitMessage === message) {
+                return;
+            }
+
+            lastNotchLimitMessage = message;
+            document.getElementById('notchLimitMessage').textContent = message;
+            const modal = new bootstrap.Modal(document.getElementById('notchLimitModal'));
+            modal.show();
+        }
+
+        function closeSearchModal() {
+            const modalEl = document.getElementById('searchModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+
+            if (modal) {
+                modal.hide();
+            }
+
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('padding-right');
+            document.body.style.removeProperty('overflow');
+            document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
+        }
+
+        function restorePageScroll() {
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('padding-right');
+            document.body.style.removeProperty('overflow');
+            document.documentElement.style.removeProperty('overflow');
+            document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
+        }
+
+        function validateNotchLimit() {
+            const notchInput = document.getElementById('notch');
+            const { maxNotch } = getSelectedGradeScale();
+            const notchValue = Number(notchInput.value);
+
+            if (!notchInput.value || !Number.isFinite(notchValue) || maxNotch === null) {
+                notchInput.setCustomValidity('');
+                lastNotchLimitMessage = '';
+                updateSalaryPreview();
+                return true;
+            }
+
+            if (notchValue > maxNotch) {
+                const message = `The data-entry officer has gone beyond the total notch value for this grade for the staff. The notch cannot be increased beyond ${maxNotch}.`;
+                notchInput.value = maxNotch;
+                notchInput.setCustomValidity(message);
+                updateSalaryPreview();
+                showNotchLimitModal(message);
+                notchInput.reportValidity();
+                notchInput.focus();
+                return false;
+            }
+
+            notchInput.setCustomValidity('');
+            lastNotchLimitMessage = '';
+            updateSalaryPreview();
+            return true;
+        }
 
         function nextTab(tabId) {
             const tab = new bootstrap.Tab(document.getElementById(tabId));
@@ -504,21 +711,45 @@
             tab.show();
         }
 
-        async function searchStaff() {
-            const query = document.getElementById('searchStaff').value;
-            if (!query) return;
+        async function searchStaff(options = {}) {
+            const { manual = false } = options;
+            const query = document.getElementById('searchStaff').value.trim();
+            if (!query) {
+                setSearchLoading(false, '');
+                if (manual) {
+                    alert('Enter a PF number or staff name to search.');
+                }
+                return;
+            }
 
             try {
-                const response = await fetch(`/data-entry/staff/new-edit/search?q=${encodeURIComponent(query)}`);
+                if (activeSearchController) {
+                    activeSearchController.abort();
+                }
+
+                activeSearchController = new AbortController();
+                setSearchLoading(true);
+
+                const response = await fetch(`/data-entry/staff/new-edit/search?q=${encodeURIComponent(query)}`, {
+                    signal: activeSearchController.signal
+                });
                 const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Search failed');
+                }
+
                 searchResults = data;
 
                 if (data.length === 0) {
+                    setSearchLoading(false, 'No staff found.');
                     alert('No staff found.');
                 } else if (data.length === 1) {
+                    setSearchLoading(false, '1 staff record found.');
                     populateForm(0);
-                    alert('Staff details loaded.');
+                    setSearchLoading(false, 'Staff details loaded.');
                 } else {
+                    setSearchLoading(false, `${data.length} staff records found.`);
                     // Show modal
                     const tbody = document.getElementById('searchResultsBody');
                     tbody.innerHTML = '';
@@ -527,8 +758,8 @@
                             <tr>
                                 <td>${staff.PFNo}</td>
                                 <td>${staff.SName}</td>
-                                <td>${staff.CDept || '-'}</td>
-                                <td>${staff.JobTitle || '-'}</td>
+                                <td>${staff.CDeptName || staff.CDept || '-'}</td>
+                                <td>${staff.JobTitleName || staff.JobTitle || '-'}</td>
                                 <td>
                                     <button type="button" class="btn btn-sm btn-primary" onclick="selectStaff(${index})">
                                         Select
@@ -541,16 +772,22 @@
                     modal.show();
                 }
             } catch (err) {
+                if (err.name === 'AbortError') {
+                    return;
+                }
+
                 console.error(err);
-                alert('Error searching staff.');
+                setSearchLoading(false, '');
+                alert(err.message || 'Error searching staff.');
+            } finally {
+                activeSearchController = null;
             }
         }
 
         function selectStaff(index) {
+            closeSearchModal();
             populateForm(index);
-            const modal = bootstrap.Modal.getInstance(document.getElementById('searchModal'));
-            modal.hide();
-            alert('Staff details loaded.');
+            setSearchLoading(false, 'Staff details loaded.');
         }
 
         function populateForm(index) {
@@ -592,6 +829,7 @@
             if (staff.CDeptDate) document.getElementById('cDeptDate').value = staff.CDeptDate.split('T')[0];
             document.getElementById('dEmp').value = staff.DEmp || '';
             document.getElementById('notch').value = staff.Notch || '';
+            validateNotchLimit();
             document.getElementById('level').value = staff.Level || '';
             document.getElementById('unionMember').checked = staff.UnionMember === 'Y';
             document.getElementById('hod').value = staff.HOD === 'Y' ? 'Y' : 'N';
@@ -627,9 +865,7 @@
             document.getElementById('nassitNo').value = staff.NASSITNo || '';
             
             // Hide modal if open
-            const modalEl = document.getElementById('searchModal');
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            if (modal) modal.hide();
+            closeSearchModal();
         }
         
         function calculateStats() {
@@ -802,30 +1038,24 @@
                  const list = data.dependants || [];
                  let count = 0;
                  list.forEach(d => {
-                     // Compute age
-                     let include = true;
-                     const rel = d.Relation ? d.Relation.toUpperCase() : '';
-                     if (rel === 'SON' || rel === 'DAUGHTER') {
-                         if (d.Birthdate) {
-                             const dob = new Date(d.Birthdate);
-                             const now = new Date();
-                             let age = now.getFullYear() - dob.getFullYear();
-                             const m = now.getMonth() - dob.getMonth();
-                             if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) {
-                                 age--;
-                             }
-                             include = age <= 18;
+                     let isOver18 = false;
+                     if (d.Birthdate) {
+                         const dob = new Date(d.Birthdate);
+                         const now = new Date();
+                         let age = now.getFullYear() - dob.getFullYear();
+                         const m = now.getMonth() - dob.getMonth();
+                         if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) {
+                             age--;
                          }
+                         isOver18 = age > 18;
                      }
-                     if (include) {
-                         tbody.innerHTML += `
-                             <tr>
-                                 <td>${d.Dependant}</td>
-                                 <td>${d.Relation}</td>
-                                 <td>${d.Birthdate || ''}</td>
-                             </tr>
-                         `;
-                     }
+                     tbody.innerHTML += `
+                         <tr class="${isOver18 ? 'dependant-over-age' : ''}">
+                             <td>${d.Dependant}</td>
+                             <td>${d.Relation}</td>
+                             <td>${d.Birthdate || ''}</td>
+                         </tr>
+                     `;
                  });
                  // Count of active dependants (Closed=0 in API already)
                  count = list.length;
@@ -844,6 +1074,51 @@
                  fetchDependants(pfno);
              }
          });
+
+         document.getElementById('searchStaff').addEventListener('keydown', function(event) {
+             if (event.key === 'Enter') {
+                 event.preventDefault();
+                 if (searchTimeout) {
+                     clearTimeout(searchTimeout);
+                     searchTimeout = null;
+                 }
+                 searchStaff({ manual: true });
+             }
+         });
+
+         document.getElementById('searchStaff').addEventListener('input', function() {
+             const query = this.value.trim();
+
+             if (searchTimeout) {
+                 clearTimeout(searchTimeout);
+             }
+
+             if (!query) {
+                 if (activeSearchController) {
+                     activeSearchController.abort();
+                 }
+                 setSearchLoading(false, '');
+                 return;
+             }
+
+             setSearchLoading(false, 'Waiting for you to finish typing...');
+             searchTimeout = setTimeout(() => {
+                 searchStaff();
+             }, 450);
+         });
+
+         document.getElementById('cGrade').addEventListener('change', validateNotchLimit);
+         document.getElementById('notch').addEventListener('input', validateNotchLimit);
+         document.getElementById('notch').addEventListener('change', validateNotchLimit);
+         document.getElementById('staffForm').addEventListener('submit', function(event) {
+             if (!validateNotchLimit()) {
+                 event.preventDefault();
+             }
+         });
+         updateSalaryPreview();
+         document.getElementById('searchModal').addEventListener('hidden.bs.modal', restorePageScroll);
+         window.addEventListener('pageshow', restorePageScroll);
+         document.addEventListener('DOMContentLoaded', restorePageScroll);
     </script>
 </body>
 </html>

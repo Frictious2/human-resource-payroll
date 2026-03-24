@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · Data Entry</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../../data_entry/partials/topbar', { user }) %>
+    <%- include('../../data_entry/partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid py-3">
+            <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
+                <div>
+                    <h2 class="mb-1"><%= title %></h2>
+                    <p class="text-muted mb-0"><%= subtitle %></p>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mt-2 mb-0">
+                            <li class="breadcrumb-item"><a class="text-decoration-none" href="/data-entry/dashboard">Home</a></li>
+                            <li class="breadcrumb-item">Payroll</li>
+                            <li class="breadcrumb-item active" aria-current="page"><%= breadcrumbCurrent %></li>
+                        </ol>
+                    </nav>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="<%= historyUrl %>" class="btn btn-outline-secondary">
+                        <i class="bi bi-clock-history"></i> Posting History
+                    </a>
+                    <a href="<%= closeUrl %>" class="btn btn-outline-dark">
+                        <i class="bi bi-arrow-left"></i> Back to Payroll
+                    </a>
+                </div>
+            </div>
+
+            <div id="submissionAlert"></div>
+
+            <div class="row g-4">
+                <div class="col-xl-7">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <form id="glPostingForm" action="<%= postUrl %>" method="POST" class="row g-3" novalidate>
+                                <div class="col-12">
+                                    <h5 class="card-title mb-1">Post Payroll Items to GL Accounts</h5>
+                                    <p class="text-muted mb-0">Use this screen once per month to post approved payroll activity to GL accounts.</p>
+                                </div>
+
+                                <input type="hidden" id="companyId" name="companyId" value="<%= companyId %>">
+
+                                <div class="col-md-6">
+                                    <label for="activity" class="form-label">Activity</label>
+                                    <select class="form-select" id="activity" name="activity" required>
+                                        <% activities.forEach(activity => { %>
+                                            <option value="<%= activity.code %>" <%= activity.code === defaultActivityCode ? 'selected' : '' %>>
+                                                <%= activity.code %> - <%= activity.name %>
+                                            </option>
+                                        <% }) %>
+                                    </select>
+                                    <div class="invalid-feedback">Select the payroll activity to post.</div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label for="postingDate" class="form-label">Posting Date</label>
+                                    <input type="date" class="form-control" id="postingDate" name="postingDate" value="<%= new Date().toISOString().split('T')[0] %>" required>
+                                    <div class="invalid-feedback">Enter a valid posting date.</div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label for="activityLabel" class="form-label">Selected Activity</label>
+                                    <input type="text" class="form-control bg-light" id="activityLabel" readonly>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label for="postingPeriod" class="form-label">Posting Period</label>
+                                    <input type="text" class="form-control bg-light" id="postingPeriod" readonly>
+                                </div>
+
+                                <div class="col-12">
+                                    <div class="alert alert-light border mb-0">
+                                        <div class="fw-semibold mb-1">Company</div>
+                                        <div><%= company.Com_Name %></div>
+                                        <% if (company.Address) { %>
+                                            <div class="text-muted small"><%= company.Address %></div>
+                                        <% } %>
+                                    </div>
+                                </div>
+
+                                <div class="col-12 d-flex flex-wrap justify-content-end gap-2 pt-2">
+                                    <button type="button" class="btn btn-primary" id="openConfirmModal">
+                                        <i class="bi bi-upload"></i> Post
+                                    </button>
+                                    <a href="<%= closeUrl %>" class="btn btn-outline-secondary">
+                                        <i class="bi bi-x-lg"></i> Close
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Posting Notes</h5>
+                            <ul class="small text-muted mb-0">
+                                <li>Only approved monthly payroll can be posted.</li>
+                                <li>The same company, activity, month, and year cannot be posted twice unless reversed.</li>
+                                <li>Salary posting uses monthly payroll results first and groups entries into controlled GL lines.</li>
+                                <li>Additional activities can be extended in the GL posting service when their posting rules are confirmed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="mt-4 py-3 text-center text-muted border-top">
+                <%- include('../../data_entry/partials/footer') %>
+            </footer>
+        </div>
+    </main>
+
+    <div class="modal fade" id="confirmPostingModal" tabindex="-1" aria-labelledby="confirmPostingModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmPostingModalLabel">Confirm GL Posting</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to post this monthly payroll activity to GL accounts? This action should only be done once for the selected period.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmPostButton">Yes, Post Now</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const activitySelect = document.getElementById('activity');
+            const activityLabel = document.getElementById('activityLabel');
+            const postingDateInput = document.getElementById('postingDate');
+            const postingPeriodInput = document.getElementById('postingPeriod');
+            const companyIdInput = document.getElementById('companyId');
+            const form = document.getElementById('glPostingForm');
+            const alertContainer = document.getElementById('submissionAlert');
+            const confirmModal = new bootstrap.Modal(document.getElementById('confirmPostingModal'));
+            const openConfirmButton = document.getElementById('openConfirmModal');
+            const confirmPostButton = document.getElementById('confirmPostButton');
+            let isSubmitting = false;
+
+            function renderAlert(type, message, extraHtml = '') {
+                alertContainer.innerHTML = `
+                    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                        ${message}
+                        ${extraHtml}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+            }
+
+            function clearValidationState() {
+                [activitySelect, postingDateInput].forEach((field) => {
+                    field.classList.remove('is-invalid');
+                });
+            }
+
+            function validateForm() {
+                clearValidationState();
+                let isValid = true;
+
+                if (!activitySelect.value) {
+                    activitySelect.classList.add('is-invalid');
+                    isValid = false;
+                }
+
+                if (!postingDateInput.value) {
+                    postingDateInput.classList.add('is-invalid');
+                    isValid = false;
+                }
+
+                return isValid;
+            }
+
+            function updateActivityLabel() {
+                const selectedOption = activitySelect.options[activitySelect.selectedIndex];
+                activityLabel.value = selectedOption ? selectedOption.text.replace(/^\d+\s-\s/, '') : '';
+            }
+
+            function updatePostingPeriod() {
+                if (!postingDateInput.value) {
+                    postingPeriodInput.value = '';
+                    return;
+                }
+
+                const postingDate = new Date(postingDateInput.value + 'T00:00:00');
+                postingPeriodInput.value = postingDate.toLocaleDateString(undefined, {
+                    month: 'long',
+                    year: 'numeric'
+                });
+            }
+
+            openConfirmButton.addEventListener('click', () => {
+                if (!validateForm()) {
+                    renderAlert('danger', 'Please fix the highlighted fields before posting.');
+                    return;
+                }
+                alertContainer.innerHTML = '';
+                confirmModal.show();
+            });
+
+            confirmPostButton.addEventListener('click', async () => {
+                if (isSubmitting) {
+                    return;
+                }
+
+                if (!validateForm()) {
+                    confirmModal.hide();
+                    renderAlert('danger', 'Please fix the highlighted fields before posting.');
+                    return;
+                }
+
+                isSubmitting = true;
+                confirmPostButton.disabled = true;
+                confirmPostButton.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Posting...';
+
+                try {
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            companyId: companyIdInput.value,
+                            activityCode: activitySelect.value,
+                            postingDate: postingDateInput.value
+                        })
+                    });
+
+                    const result = await response.json();
+                    confirmModal.hide();
+
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Payroll GL posting failed.');
+                    }
+
+                    const data = result.data || {};
+                    renderAlert(
+                        'success',
+                        `<i class="bi bi-check-circle-fill"></i> ${result.message}`,
+                        `<div class="mt-2 small">
+                            Batch <strong>#${data.batchId}</strong> posted for <strong>${String(data.postingMonth).padStart(2, '0')}/${data.postingYear}</strong>.
+                            Total lines: <strong>${data.totalLines}</strong>.
+                            Total amount: <strong>${Number(data.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>.
+                            <a href="<%= historyUrl %>?batchId=${data.batchId}" class="alert-link ms-2">View posting history</a>
+                        </div>`
+                    );
+                } catch (error) {
+                    renderAlert('danger', `<i class="bi bi-exclamation-triangle-fill"></i> ${error.message}`);
+                } finally {
+                    isSubmitting = false;
+                    confirmPostButton.disabled = false;
+                    confirmPostButton.innerHTML = 'Yes, Post Now';
+                }
+            });
+
+            activitySelect.addEventListener('change', updateActivityLabel);
+            postingDateInput.addEventListener('change', updatePostingPeriod);
+
+            updateActivityLabel();
+            updatePostingPeriod();
+        });
+    </script>
+</body>
+</html>

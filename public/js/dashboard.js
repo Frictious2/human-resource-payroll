@@ -62,11 +62,16 @@
     }
 
     // Department data (total employees per department)
-    const deptLabels = ['HR', 'Payroll', 'Engineering', 'Sales', 'Marketing'];
-    const deptData = [12, 6, 48, 24, 14];
-    const deptColors = ['#6c757d', '#198754', '#0d6efd', '#fd7e14', '#6610f2'];
+    const dashboardData = window.adminDashboardData || {};
+    const departmentChart = dashboardData.departmentChart || {};
+    const deptLabels = Array.isArray(departmentChart.labels) ? departmentChart.labels : [];
+    const deptData = Array.isArray(departmentChart.values) ? departmentChart.values : [];
+    const deptColors = deptLabels.map((_, index) => {
+        const palette = ['#0f766e', '#0d6efd', '#198754', '#fd7e14', '#6f42c1', '#dc3545', '#20c997', '#6c757d'];
+        return palette[index % palette.length];
+    });
 
-    if (barCtx) {
+    if (barCtx && deptLabels.length) {
         new Chart(barCtx, {
             type: 'bar',
             data: {
@@ -87,6 +92,11 @@
                 }
             }
         });
+    } else if (barCtx) {
+        const emptyState = document.createElement('div');
+        emptyState.className = 'text-muted text-center py-5';
+        emptyState.textContent = 'No department staff data is available yet.';
+        barCtx.replaceWith(emptyState);
     }
 
     // Calendar: show leaves, retirements, meetings, holidays for current month

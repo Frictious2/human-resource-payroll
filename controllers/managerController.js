@@ -2,6 +2,7 @@ const pool = require('../config/db');
 const transporter = require('../config/mailer');
 const ejs = require('ejs');
 const path = require('path');
+const controllerAuditHelper = require('../services/controllerAuditHelper');
 
 const managerController = {
     getDashboard: async (req, res) => {
@@ -124,10 +125,19 @@ const managerController = {
             const user = req.session.user ? req.session.user.name : 'Manager';
             const now = new Date();
 
-            await pool.query(
-                'UPDATE tblbankguarantee SET Approved = ?, Approvedby = ?, Dateapproved = ? WHERE RefNo = ?',
-                [status, user, now, refNo]
-            );
+            await controllerAuditHelper.auditUpdate({
+                table: 'tblbankguarantee',
+                formName: 'manager/approve/guarantee',
+                recordId: refNo,
+                fetchQuery: 'SELECT * FROM tblbankguarantee WHERE RefNo = ?',
+                fetchParams: [refNo],
+                applyChange: async () => {
+                    await pool.query(
+                        'UPDATE tblbankguarantee SET Approved = ?, Approvedby = ?, Dateapproved = ? WHERE RefNo = ?',
+                        [status, user, now, refNo]
+                    );
+                }
+            });
 
             res.json({ success: true });
         } catch (error) {
@@ -206,11 +216,20 @@ const managerController = {
             if (action === 'approve') status = 1;
             else if (action === 'reject') status = 2; // Assuming 2 is Rejected
 
-            await pool.query(`
-                UPDATE tblloan 
-                SET Approved = ?, ApprovedBy = ?, DateApproved = ?
-                WHERE TransNo = ?
-            `, [status, approvedBy, now, transNo]);
+            await controllerAuditHelper.auditUpdate({
+                table: 'tblloan',
+                formName: 'manager/approve/loan',
+                recordId: transNo,
+                fetchQuery: 'SELECT * FROM tblloan WHERE TransNo = ?',
+                fetchParams: [transNo],
+                applyChange: async () => {
+                    await pool.query(`
+                        UPDATE tblloan 
+                        SET Approved = ?, ApprovedBy = ?, DateApproved = ?
+                        WHERE TransNo = ?
+                    `, [status, approvedBy, now, transNo]);
+                }
+            });
 
             res.json({ success: true });
         } catch (error) {
@@ -1287,7 +1306,7 @@ const managerController = {
         }
     },
 
-    approveRedundancy: async (req, res) => {
+  approveRedundancy: async (req, res) => {
         try {
             const { pfno } = req.body;
             // Approve Redundancy (Set Redundant = 1, DateRedundant = NOW)
@@ -1295,6 +1314,26 @@ const managerController = {
             res.redirect('/manager/approve/redundancy');
         } catch (err) {
             console.error(err);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getReportsRedundancy: async (req, res) => {
+        try {
+            const [comRows] = await pool.query('SELECT Com_Name, Address, LogoPath FROM tblcominfo LIMIT 1');
+            const company = comRows[0] || { Com_Name: 'Human Resource Payroll', Address: '', LogoPath: null };
+
+            res.render('manager/reports/redundancy', {
+                title: 'Redundancy',
+                group: 'Reports',
+                path: '/manager/reports/redundancy',
+                user: { name: 'Manager' },
+                company,
+                staffNameApiBase: '/manager/api/staff',
+                redundancyApiPath: '/manager/api/reports/redundancy'
+            });
+        } catch (error) {
+            console.error(error);
             res.status(500).send('Server Error');
         }
     },
@@ -1814,16 +1853,34 @@ const managerController = {
                 }
             }
 
-            await pool.query(
-                'UPDATE tblstaff SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE PFNo = ?',
-                [approvedStatus, user, now, now, pfno]
-            );
+            await controllerAuditHelper.auditUpdate({
+                table: 'tblstaff',
+                formName: 'manager/approve/new-staff',
+                recordId: pfno,
+                fetchQuery: 'SELECT * FROM tblstaff WHERE PFNo = ?',
+                fetchParams: [pfno],
+                applyChange: async () => {
+                    await pool.query(
+                        'UPDATE tblstaff SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE PFNo = ?',
+                        [approvedStatus, user, now, now, pfno]
+                    );
+                }
+            });
 
             // Also update Salary Master Record in tblpayroll
-            await pool.query(
-                'UPDATE tblpayroll SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE PFNo = ? AND PYear = 0',
-                [approvedStatus, user, now, now, pfno]
-            );
+            await controllerAuditHelper.auditUpdate({
+                table: 'tblpayroll',
+                formName: 'manager/approve/new-staff',
+                recordId: pfno,
+                fetchQuery: 'SELECT * FROM tblpayroll WHERE PFNo = ? AND PYear = 0 AND PMonth = 0',
+                fetchParams: [pfno],
+                applyChange: async () => {
+                    await pool.query(
+                        'UPDATE tblpayroll SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE PFNo = ? AND PYear = 0',
+                        [approvedStatus, user, now, now, pfno]
+                    );
+                }
+            });
 
             res.redirect('/manager/approve/new-staff');
         } catch (error) {
@@ -1866,10 +1923,19 @@ const managerController = {
             // 1 = Approved, 2 = Rejected
             const status = action === 'approve' ? 1 : 2;
 
-            await pool.query(
-                'UPDATE tblleave SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE LCount = ?',
-                [status, operator, now, now, id]
-            );
+            await controllerAuditHelper.auditUpdate({
+                table: 'tblleave',
+                formName: 'manager/approve/leave-application',
+                recordId: id,
+                fetchQuery: 'SELECT * FROM tblleave WHERE LCount = ?',
+                fetchParams: [id],
+                applyChange: async () => {
+                    await pool.query(
+                        'UPDATE tblleave SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE LCount = ?',
+                        [status, operator, now, now, id]
+                    );
+                }
+            });
 
             res.json({ success: true });
         } catch (error) {
@@ -1936,15 +2002,33 @@ const managerController = {
                 const newPart = (leave.Part || 0) - daysRemaining;
                 const finalPart = newPart < 0 ? 0 : newPart; // Safety check
                 
-                await pool.query(
-                    'UPDATE tblleave SET Recalled = 1, Part = ? WHERE LCount = ?',
-                    [finalPart, lCount]
-                );
+                await controllerAuditHelper.auditUpdate({
+                    table: 'tblleave',
+                    formName: 'manager/approve/leave-recall',
+                    recordId: lCount,
+                    fetchQuery: 'SELECT * FROM tblleave WHERE LCount = ?',
+                    fetchParams: [lCount],
+                    applyChange: async () => {
+                        await pool.query(
+                            'UPDATE tblleave SET Recalled = 1, Part = ? WHERE LCount = ?',
+                            [finalPart, lCount]
+                        );
+                    }
+                });
             } else {
-                await pool.query(
-                    'UPDATE tblleave SET Recalled = 0, DateRecalled = NULL WHERE LCount = ?',
-                    [lCount]
-                );
+                await controllerAuditHelper.auditUpdate({
+                    table: 'tblleave',
+                    formName: 'manager/approve/leave-recall',
+                    recordId: lCount,
+                    fetchQuery: 'SELECT * FROM tblleave WHERE LCount = ?',
+                    fetchParams: [lCount],
+                    applyChange: async () => {
+                        await pool.query(
+                            'UPDATE tblleave SET Recalled = 0, DateRecalled = NULL WHERE LCount = ?',
+                            [lCount]
+                        );
+                    }
+                });
             }
             
             res.json({ success: true });
@@ -1998,10 +2082,19 @@ const managerController = {
             const user = req.session.user ? req.session.user.name : 'Manager';
             const now = new Date();
 
-            await pool.query(
-                'UPDATE tblleave SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE LCount = ?',
-                [status, user, now, now, lCount]
-            );
+            await controllerAuditHelper.auditUpdate({
+                table: 'tblleave',
+                formName: 'manager/approve/leave-purchase',
+                recordId: lCount,
+                fetchQuery: 'SELECT * FROM tblleave WHERE LCount = ?',
+                fetchParams: [lCount],
+                applyChange: async () => {
+                    await pool.query(
+                        'UPDATE tblleave SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE LCount = ?',
+                        [status, user, now, now, lCount]
+                    );
+                }
+            });
 
             res.redirect('/manager/approve/leave-purchase');
         } catch (error) {
@@ -2061,10 +2154,19 @@ const managerController = {
             const user = req.session.user ? req.session.user.name : 'Manager';
             const now = new Date();
 
-            await pool.query(
-                'UPDATE tblloan SET Approved = ?, ApprovedBy = ?, DateApproved = ? WHERE TransNo = ?',
-                [status, user, now, transNo]
-            );
+            await controllerAuditHelper.auditUpdate({
+                table: 'tblloan',
+                formName: 'manager/approve/loan',
+                recordId: transNo,
+                fetchQuery: 'SELECT * FROM tblloan WHERE TransNo = ?',
+                fetchParams: [transNo],
+                applyChange: async () => {
+                    await pool.query(
+                        'UPDATE tblloan SET Approved = ?, ApprovedBy = ?, DateApproved = ? WHERE TransNo = ?',
+                        [status, user, now, transNo]
+                    );
+                }
+            });
 
             res.json({ success: true });
         } catch (error) {
