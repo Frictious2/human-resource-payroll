@@ -67,9 +67,9 @@
                     <div class="alert alert-danger login-alert" role="alert"><%= error %></div>
                 <% } %>
 
-                <form action="/login" method="post" novalidate>
-                    <div class="mb-3">
-                        <label for="identifier" class="form-label">Username or Email</label>
+                <form action="/login" method="post" novalidate class="login-form">
+                    <div class="login-field">
+                        <label for="identifier" class="form-label login-form-label">Username or Email</label>
                         <div class="login-input-group">
                             <span class="login-input-group__icon"><i class="bi bi-person-circle"></i></span>
                             <input
@@ -85,8 +85,8 @@
                         </div>
                     </div>
 
-                    <div class="mb-4">
-                        <label for="password" class="form-label">Password</label>
+                    <div class="login-field login-field--spaced">
+                        <label for="password" class="form-label login-form-label">Password</label>
                         <div class="login-input-group">
                             <span class="login-input-group__icon"><i class="bi bi-key"></i></span>
                             <input
@@ -103,7 +103,7 @@
 
                     <button type="submit" class="btn btn-primary login-submit-btn">
                         <span>Sign in</span>
-                        <i class="bi bi-arrow-right-circle"></i>
+                        <span class="login-submit-btn__icon"><i class="bi bi-arrow-right"></i></span>
                     </button>
                 </form>
 
