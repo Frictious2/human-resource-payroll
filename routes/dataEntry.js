@@ -3,6 +3,7 @@ const router = express.Router();
 const dataEntryController = require('../controllers/dataEntryController');
 const benefitController = require('../controllers/benefitController');
 const payrollGlPostingRoutes = require('./payrollGlPostingRoutes');
+const processEmolumentsRoutes = require('./processEmolumentsRoutes');
 const multer = require('multer');
 const path = require('path');
 
@@ -125,9 +126,7 @@ router.get('/payroll/edit-payroll', dataEntryController.getPayrollEdit);
 router.post('/payroll/edit-payroll', dataEntryController.postPayrollEdit);
 router.get('/payroll/view-payroll', dataEntryController.getPayrollView);
 router.post('/payroll/view-payroll/preview', dataEntryController.postPayrollViewPreview);
-router.get('/payroll/process-emoluments', dataEntryController.getProcessEmoluments);
-router.get('/api/payroll/check-process-status', dataEntryController.checkProcessStatus);
-router.post('/payroll/process-emoluments', dataEntryController.postProcessEmoluments);
+router.use('/payroll/process-emoluments', processEmolumentsRoutes);
 router.use('/payroll/post-to-accounts', payrollGlPostingRoutes);
 router.use('/payroll/gl-posting', payrollGlPostingRoutes);
 router.get('/payroll/yearly-payments', dataEntryController.getComingSoon);

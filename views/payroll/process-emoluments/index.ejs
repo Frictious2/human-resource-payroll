@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · Data Entry</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../../data_entry/partials/topbar', { user }) %>
+    <%- include('../../data_entry/partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid py-3">
+            <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
+                <div>
+                    <h2 class="mb-1"><%= title %></h2>
+                    <p class="text-muted mb-0">Generate monthly payroll transactions for the selected activity.</p>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mt-2 mb-0">
+                            <li class="breadcrumb-item"><a class="text-decoration-none" href="/data-entry/dashboard">Home</a></li>
+                            <li class="breadcrumb-item">Payroll</li>
+                            <li class="breadcrumb-item active" aria-current="page">Process Emoluments</li>
+                        </ol>
+                    </nav>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="<%= historyUrl %>" class="btn btn-outline-secondary">
+                        <i class="bi bi-clock-history"></i> Processing History
+                    </a>
+                    <a href="<%= closeUrl %>" class="btn btn-outline-dark">
+                        <i class="bi bi-arrow-left"></i> Close
+                    </a>
+                </div>
+            </div>
+
+            <div id="submissionAlert"></div>
+
+            <div class="row g-4">
+                <div class="col-xl-7">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <form id="processEmolumentsForm" action="<%= postUrl %>" method="POST" class="row g-3" novalidate>
+                                <div class="col-12">
+                                    <h5 class="card-title mb-1">Monthly Payroll Activity</h5>
+                                    <p class="text-muted mb-0">A payroll activity can only be processed once per month.</p>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label for="activityCode" class="form-label">Activity</label>
+                                    <select class="form-select" id="activityCode" name="activityCode" required>
+                                        <% activities.forEach(activity => { %>
+                                            <option value="<%= activity.code %>" data-name="<%= activity.name %>" <%= activity.code === defaultActivityCode ? 'selected' : '' %>>
+                                                <%= activity.code %> - <%= activity.name %>
+                                            </option>
+                                        <% }) %>
+                                    </select>
+                                    <div class="invalid-feedback">Select the payroll activity to process.</div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label for="payrollDate" class="form-label">Payroll Date</label>
+                                    <input type="date" class="form-control" id="payrollDate" name="payrollDate" value="<%= new Date().toISOString().split('T')[0] %>" required>
+                                    <div class="invalid-feedback">Enter the payroll date to process.</div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label for="activityName" class="form-label">Activity Name</label>
+                                    <input type="text" class="form-control bg-light" id="activityName" readonly>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label for="payrollPeriod" class="form-label">Payroll Period</label>
+                                    <input type="text" class="form-control bg-light" id="payrollPeriod" readonly>
+                                </div>
+
+                                <div class="col-12 d-flex flex-wrap justify-content-end gap-2 pt-2">
+                                    <button type="button" class="btn btn-primary" id="openProcessConfirm">
+                                        <i class="bi bi-play-circle"></i> Process
+                                    </button>
+                                    <a href="<%= closeUrl %>" class="btn btn-outline-secondary">
+                                        <i class="bi bi-x-lg"></i> Close
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Processing Notes</h5>
+                            <ul class="small text-muted mb-0">
+                                <li>Salary processing is fully implemented in this first phase.</li>
+                                <li>Duplicate processing is blocked directly against existing <code>tblPayroll</code> rows for the same company, month, year, and activity.</li>
+                                <li>Processing uses approved salary setup data from the existing legacy payroll tables and writes results into <code>tblPayroll</code>.</li>
+                                <li>Additional activities are scaffolded in the service for later extension.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="mt-4 py-3 text-center text-muted border-top">
+                <%- include('../../data_entry/partials/footer') %>
+            </footer>
+        </div>
+    </main>
+
+    <div class="modal fade" id="confirmProcessModal" tabindex="-1" aria-labelledby="confirmProcessModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmProcessModalLabel">Confirm Processing</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to process emoluments for this activity and month? A payroll activity can only be processed once per month.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmProcessButton">Yes, Process Now</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('processEmolumentsForm');
+            const activitySelect = document.getElementById('activityCode');
+            const payrollDateInput = document.getElementById('payrollDate');
+            const activityNameInput = document.getElementById('activityName');
+            const payrollPeriodInput = document.getElementById('payrollPeriod');
+            const alertContainer = document.getElementById('submissionAlert');
+            const openConfirmButton = document.getElementById('openProcessConfirm');
+            const confirmProcessButton = document.getElementById('confirmProcessButton');
+            const confirmModal = new bootstrap.Modal(document.getElementById('confirmProcessModal'));
+            let isSubmitting = false;
+
+            function renderAlert(type, message, extraHtml = '') {
+                alertContainer.innerHTML = `
+                    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                        ${message}
+                        ${extraHtml}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+            }
+
+            function updateActivityName() {
+                const selected = activitySelect.options[activitySelect.selectedIndex];
+                activityNameInput.value = selected ? (selected.dataset.name || '') : '';
+            }
+
+            function updatePayrollPeriod() {
+                if (!payrollDateInput.value) {
+                    payrollPeriodInput.value = '';
+                    return;
+                }
+
+                const date = new Date(payrollDateInput.value + 'T00:00:00');
+                payrollPeriodInput.value = date.toLocaleDateString(undefined, {
+                    month: 'long',
+                    year: 'numeric'
+                });
+            }
+
+            function validateForm() {
+                let valid = true;
+                [activitySelect, payrollDateInput].forEach((field) => field.classList.remove('is-invalid'));
+
+                if (!activitySelect.value) {
+                    activitySelect.classList.add('is-invalid');
+                    valid = false;
+                }
+
+                if (!payrollDateInput.value) {
+                    payrollDateInput.classList.add('is-invalid');
+                    valid = false;
+                }
+
+                return valid;
+            }
+
+            openConfirmButton.addEventListener('click', () => {
+                if (!validateForm()) {
+                    renderAlert('danger', 'Please complete the highlighted fields before processing.');
+                    return;
+                }
+
+                alertContainer.innerHTML = '';
+                confirmModal.show();
+            });
+
+            confirmProcessButton.addEventListener('click', async () => {
+                if (isSubmitting) {
+                    return;
+                }
+
+                isSubmitting = true;
+                confirmProcessButton.disabled = true;
+                confirmProcessButton.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Processing...';
+
+                try {
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            activityCode: activitySelect.value,
+                            payrollDate: payrollDateInput.value
+                        })
+                    });
+
+                    const result = await response.json();
+                    confirmModal.hide();
+
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.message || 'Failed to process emoluments.');
+                    }
+
+                    const data = result.data || {};
+                    renderAlert(
+                        'success',
+                        `<i class="bi bi-check-circle-fill"></i> ${result.message}`,
+                        `<div class="mt-2 small">
+                            Reference <strong>${data.batchId}</strong> created for
+                            <strong>${String(data.payrollMonth).padStart(2, '0')}/${data.payrollYear}</strong>.
+                            Staff processed: <strong>${data.totalStaff}</strong>.
+                            Gross: <strong>${Number(data.totalGross || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>.
+                            Net: <strong>${Number(data.totalNet || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>.
+                            <div class="mt-2">
+                                <a class="btn btn-sm btn-outline-success" href="/data-entry/payroll/process-emoluments/history/${data.batchId}">View Batch Details</a>
+                            </div>
+                        </div>`
+                    );
+                } catch (error) {
+                    renderAlert('danger', `<i class="bi bi-exclamation-triangle-fill"></i> ${error.message}`);
+                } finally {
+                    isSubmitting = false;
+                    confirmProcessButton.disabled = false;
+                    confirmProcessButton.innerHTML = 'Yes, Process Now';
+                }
+            });
+
+            activitySelect.addEventListener('change', updateActivityName);
+            payrollDateInput.addEventListener('change', updatePayrollPeriod);
+
+            updateActivityName();
+            updatePayrollPeriod();
+        });
+    </script>
+</body>
+</html>

@@ -16,72 +16,294 @@ function roundMoney(value) {
     return Math.round((amount + Number.EPSILON) * 100) / 100;
 }
 
+function isHeadquartersDepartment(deptCode) {
+    return ['06', '12'].includes(String(deptCode || '').trim());
+}
+
 function buildPostingComponents(record) {
-    return [
-        {
-            payComponentCode: 'BASIC_SALARY',
-            employeeId: record.employee_id,
-            amount: roundMoney(record.basic_salary),
-            sourceTable: 'tblpayroll',
-            sourceRecordId: Number.isFinite(record.employee_id) ? record.employee_id : null
-        },
-        {
-            payComponentCode: 'ALLOWANCES',
-            employeeId: record.employee_id,
-            amount: roundMoney(record.allowances_total),
-            sourceTable: 'tblpayroll',
-            sourceRecordId: Number.isFinite(record.employee_id) ? record.employee_id : null
-        },
-        {
-            payComponentCode: 'PAYE',
-            employeeId: record.employee_id,
-            amount: roundMoney(record.paye),
-            sourceTable: 'tblpayroll',
-            sourceRecordId: Number.isFinite(record.employee_id) ? record.employee_id : null
-        },
-        {
-            payComponentCode: 'NASSIT_EMPLOYEE',
-            employeeId: record.employee_id,
-            amount: roundMoney(record.nassit_employee),
-            sourceTable: 'tblpayroll',
-            sourceRecordId: Number.isFinite(record.employee_id) ? record.employee_id : null
-        },
-        {
-            payComponentCode: 'LOAN_DEDUCTION',
-            employeeId: record.employee_id,
-            amount: roundMoney(record.loan_deduction),
-            sourceTable: 'tblpayroll',
-            sourceRecordId: Number.isFinite(record.employee_id) ? record.employee_id : null
-        },
-        {
-            payComponentCode: 'NET_PAY',
-            employeeId: record.employee_id,
-            amount: roundMoney(record.net_pay),
-            sourceTable: 'tblpayroll',
-            sourceRecordId: Number.isFinite(record.employee_id) ? record.employee_id : null
+    const sourceTable = record.source_table || 'tblpayroll';
+    const sourceRecordId = Number.isFinite(Number(record.result_id))
+        ? Number(record.result_id)
+        : (Number.isFinite(Number(record.employee_id)) ? Number(record.employee_id) : null);
+    const isHeadquarters = isHeadquartersDepartment(record.Dept || record.dept);
+    const level = String(record.Level || record.level || '').trim();
+
+    const basicSalary = roundMoney(record.basic_salary);
+    const allw03 = roundMoney(record.allw03);
+    const allw04 = roundMoney(record.allw04);
+    const allw05 = roundMoney(record.allw05);
+    const allw06 = roundMoney(record.allw06);
+    const allw07 = roundMoney(record.allw07);
+    const allw10 = roundMoney(record.allw10);
+    const allw11 = roundMoney(record.allw11);
+    const allw12 = roundMoney(record.allw12);
+    const allw14 = roundMoney(record.allw14);
+    const allw16 = roundMoney(record.allw16);
+    const allw17 = roundMoney(record.allw17);
+    const allw19 = roundMoney(record.allw19);
+    const allw20 = roundMoney(record.allw20);
+    const grossPay = roundMoney(record.gross_pay);
+    const paye = roundMoney(record.paye);
+    const nassitEmployee = roundMoney(record.nassit_employee);
+    const gratuityEmployee = roundMoney(record.gratuity_employee);
+    const ded1 = roundMoney(record.ded1);
+    const ded2 = roundMoney(record.ded2);
+    const ded3 = roundMoney(record.ded3);
+    const ded4 = roundMoney(record.ded4);
+
+    let salaryAmount = isHeadquarters ? 0 : basicSalary;
+    let headquartersAmount = isHeadquarters
+        ? roundMoney(
+            basicSalary +
+            allw03 +
+            allw04 +
+            allw05 +
+            allw06 +
+            allw10 +
+            allw11 +
+            allw12 +
+            allw14 +
+            allw16 +
+            allw17 +
+            allw19 +
+            allw20
+        )
+        : 0;
+    const transportAmount = isHeadquarters ? 0 : roundMoney(allw03 + allw10);
+    const staffWelfareAmount = roundMoney(allw04 + allw07);
+    const colaAmount = isHeadquarters ? 0 : allw06;
+    const responsibilityAmount = isHeadquarters ? 0 : allw11;
+    const maidAmount = isHeadquarters ? 0 : allw12;
+    const actingAmount = isHeadquarters ? 0 : allw14;
+    const riskAmount = isHeadquarters ? 0 : allw17;
+    const professionalAmount = isHeadquarters ? 0 : allw16;
+    const academicAmount = isHeadquarters ? 0 : allw19;
+
+    const mappedDebitTotal = roundMoney(
+        salaryAmount +
+        headquartersAmount +
+        transportAmount +
+        staffWelfareAmount +
+        colaAmount +
+        responsibilityAmount +
+        maidAmount +
+        actingAmount +
+        riskAmount +
+        professionalAmount +
+        academicAmount
+    );
+
+    const debitResidual = roundMoney(grossPay - mappedDebitTotal);
+    if (Math.abs(debitResidual) > 0.0001) {
+        if (isHeadquarters) {
+            headquartersAmount = roundMoney(headquartersAmount + debitResidual);
+        } else {
+            salaryAmount = roundMoney(salaryAmount + debitResidual);
         }
-    ].filter((component) => component.amount > 0);
+    }
+
+    const salaryAdvanceAmount = ded1;
+    const ssaAmount = level === '01' ? ded2 : 0;
+    const jsaAmount = level === '02' ? ded2 : 0;
+    const interestOnAdvanceAmount = ded3;
+    const rentDeductionAmount = ded4;
+
+    // Salary and wages control acts as the balancing control line for legacy
+    // deductions that do not have one of the configured 20 GL accounts, such as
+    // UnionDues or any residual rounding carried in tblPayroll.
+    const salaryWagesAmount = roundMoney(
+        grossPay -
+        paye -
+        nassitEmployee -
+        gratuityEmployee -
+        ssaAmount -
+        jsaAmount -
+        salaryAdvanceAmount -
+        interestOnAdvanceAmount -
+        rentDeductionAmount
+    );
+
+    const components = [
+        {
+            payComponentCode: 'SALARY',
+            employeeId: record.employee_id,
+            amount: salaryAmount,
+            sourceTable,
+            sourceRecordId
+        },
+        {
+            payComponentCode: 'HEADQUARTERS',
+            employeeId: record.employee_id,
+            amount: headquartersAmount,
+            sourceTable,
+            sourceRecordId
+        },
+        {
+            payComponentCode: 'TRANSPORT',
+            employeeId: record.employee_id,
+            amount: transportAmount,
+            sourceTable,
+            sourceRecordId
+        },
+        {
+            payComponentCode: 'STAFF_WELFARE',
+            employeeId: record.employee_id,
+            amount: staffWelfareAmount,
+            sourceTable,
+            sourceRecordId
+        },
+        {
+            payComponentCode: 'COLA',
+            employeeId: record.employee_id,
+            amount: colaAmount,
+            sourceTable,
+            sourceRecordId
+        },
+        {
+            payComponentCode: 'RESPONSIBILITY',
+            employeeId: record.employee_id,
+            amount: responsibilityAmount,
+            sourceTable,
+            sourceRecordId
+        },
+        {
+            payComponentCode: 'MAID',
+            employeeId: record.employee_id,
+            amount: maidAmount,
+            sourceTable,
+            sourceRecordId
+        },
+        {
+            payComponentCode: 'ACTING',
+            employeeId: record.employee_id,
+            amount: actingAmount,
+            sourceTable,
+            sourceRecordId
+        },
+        {
+            payComponentCode: 'RISK',
+            employeeId: record.employee_id,
+            amount: riskAmount,
+            sourceTable,
+            sourceRecordId
+        },
+        {
+            payComponentCode: 'PROFESSIONAL',
+            employeeId: record.employee_id,
+            amount: professionalAmount,
+            sourceTable,
+            sourceRecordId
+        },
+        {
+            payComponentCode: 'ACADEMIC',
+            employeeId: record.employee_id,
+            amount: academicAmount,
+            sourceTable,
+            sourceRecordId
+        },
+        {
+            payComponentCode: 'INCOME_TAX',
+            employeeId: record.employee_id,
+            amount: paye,
+            sourceTable,
+            sourceRecordId
+        },
+        {
+            payComponentCode: 'NASSIT_EMP',
+            employeeId: record.employee_id,
+            amount: nassitEmployee,
+            sourceTable,
+            sourceRecordId
+        },
+        {
+            payComponentCode: 'PROVIDENT_EMP',
+            employeeId: record.employee_id,
+            amount: gratuityEmployee,
+            sourceTable,
+            sourceRecordId
+        },
+        {
+            payComponentCode: 'DED2_SSA',
+            employeeId: record.employee_id,
+            amount: ssaAmount,
+            sourceTable,
+            sourceRecordId
+        },
+        {
+            payComponentCode: 'DED2_JSA',
+            employeeId: record.employee_id,
+            amount: jsaAmount,
+            sourceTable,
+            sourceRecordId
+        },
+        {
+            payComponentCode: 'SALARY_ADVANCE',
+            employeeId: record.employee_id,
+            amount: salaryAdvanceAmount,
+            sourceTable,
+            sourceRecordId
+        },
+        {
+            payComponentCode: 'INTEREST_ON_ADVANCE',
+            employeeId: record.employee_id,
+            amount: interestOnAdvanceAmount,
+            sourceTable,
+            sourceRecordId
+        },
+        {
+            payComponentCode: 'RENT_DEDUCTION',
+            employeeId: record.employee_id,
+            amount: rentDeductionAmount,
+            sourceTable,
+            sourceRecordId
+        },
+        {
+            payComponentCode: 'SALARY_WAGES',
+            employeeId: record.employee_id,
+            amount: salaryWagesAmount,
+            sourceTable,
+            sourceRecordId
+        }
+    ];
+
+    return components.filter((component) => component.amount > 0);
 }
 
 function getDefaultSalaryMappings() {
     return [
-        { pay_component_code: 'BASIC_SALARY', gl_account_code: '90102', gl_account_name: 'Basic Salary Expense', entry_type: 'debit' },
-        { pay_component_code: 'ALLOWANCES', gl_account_code: '90115', gl_account_name: 'Allowance Expense', entry_type: 'debit' },
-        { pay_component_code: 'PAYE', gl_account_code: '50109', gl_account_name: 'PAYE Payable', entry_type: 'credit' },
-        { pay_component_code: 'NASSIT_EMPLOYEE', gl_account_code: '90106', gl_account_name: 'NASSIT Employee Payable', entry_type: 'credit' },
-        { pay_component_code: 'LOAN_DEDUCTION', gl_account_code: '20104', gl_account_name: 'Loan Deductions Payable', entry_type: 'credit' },
-        { pay_component_code: 'NET_PAY', gl_account_code: '90103', gl_account_name: 'Net Salaries Payable', entry_type: 'credit' }
+        { pay_component_code: 'SALARY', gl_account_code: '90102', gl_account_name: 'BASIC SALARY', entry_type: 'debit' },
+        { pay_component_code: 'HEADQUARTERS', gl_account_code: '40401', gl_account_name: 'HEADQUARTERS', entry_type: 'debit' },
+        { pay_component_code: 'RESPONSIBILITY', gl_account_code: '90113', gl_account_name: 'RESPONSIBILITY ALLOW', entry_type: 'debit' },
+        { pay_component_code: 'MAID', gl_account_code: '90112', gl_account_name: 'MAID ALLOW', entry_type: 'debit' },
+        { pay_component_code: 'STAFF_WELFARE', gl_account_code: '90514', gl_account_name: 'STAFF WELFARE', entry_type: 'debit' },
+        { pay_component_code: 'TRANSPORT', gl_account_code: '90115', gl_account_name: 'TRANSPORT ALLOW(CAR MAINT)', entry_type: 'debit' },
+        { pay_component_code: 'COLA', gl_account_code: '90117', gl_account_name: 'COST OF LIVING ALLOW', entry_type: 'debit' },
+        { pay_component_code: 'RISK', gl_account_code: '90119', gl_account_name: 'RISK', entry_type: 'debit' },
+        { pay_component_code: 'ACTING', gl_account_code: '90111', gl_account_name: 'ACTING', entry_type: 'debit' },
+        { pay_component_code: 'PROFESSIONAL', gl_account_code: '90120', gl_account_name: 'PROFESSIONAL', entry_type: 'debit' },
+        { pay_component_code: 'ACADEMIC', gl_account_code: '90121', gl_account_name: 'ACADEMIC', entry_type: 'debit' },
+        { pay_component_code: 'INCOME_TAX', gl_account_code: '50109', gl_account_name: 'INCOME TAX', entry_type: 'credit' },
+        { pay_component_code: 'NASSIT_EMP', gl_account_code: '90106', gl_account_name: '5% NASSIT', entry_type: 'credit' },
+        { pay_component_code: 'PROVIDENT_EMP', gl_account_code: '90107', gl_account_name: '10% PROVIDENT FUND', entry_type: 'credit' },
+        { pay_component_code: 'RENT_DEDUCTION', gl_account_code: '80210', gl_account_name: 'RENT', entry_type: 'credit' },
+        { pay_component_code: 'DED2_SSA', gl_account_code: '50401', gl_account_name: 'SSA', entry_type: 'credit' },
+        { pay_component_code: 'DED2_JSA', gl_account_code: '50402', gl_account_name: 'JSA', entry_type: 'credit' },
+        { pay_component_code: 'SALARY_ADVANCE', gl_account_code: '20104', gl_account_name: 'SALARY ADVANCE', entry_type: 'credit' },
+        { pay_component_code: 'INTEREST_ON_ADVANCE', gl_account_code: '80202', gl_account_name: 'INTEREST ON ADVANCE', entry_type: 'credit' },
+        { pay_component_code: 'SALARY_WAGES', gl_account_code: '90103', gl_account_name: 'SALARY AND WAGES CONTROL', entry_type: 'credit' }
     ];
 }
 
 function normalizeMappings(mappingRows) {
     const mappingMap = new Map();
     mappingRows.forEach((row) => {
-        const key = `${row.pay_component_code}:${row.entry_type}`;
+        const code = String(row.pay_component_code || '').trim().toUpperCase();
+        const entryType = String(row.entry_type || '').trim().toLowerCase();
+        const key = `${code}:${entryType}`;
         mappingMap.set(key, {
             glAccountCode: row.gl_account_code,
             glAccountName: row.gl_account_name,
-            entryType: row.entry_type
+            entryType
         });
     });
     return mappingMap;
@@ -89,11 +311,15 @@ function normalizeMappings(mappingRows) {
 
 function groupPostingComponentsByGlAccount({ companyId, activityCode, postingDate, postingMonth, postingYear, components, mappingRows }) {
     const monthLabel = postingDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-    const mappingMap = normalizeMappings(mappingRows.length > 0 ? mappingRows : getDefaultSalaryMappings());
+    const mergedMappings = [
+        ...(mappingRows || []),
+        ...getDefaultSalaryMappings()
+    ];
+    const mappingMap = normalizeMappings(mergedMappings);
     const grouped = new Map();
 
     components.forEach((component) => {
-        const entryType = ['PAYE', 'NASSIT_EMPLOYEE', 'LOAN_DEDUCTION', 'NET_PAY'].includes(component.payComponentCode)
+        const entryType = ['INCOME_TAX', 'NASSIT_EMP', 'PROVIDENT_EMP', 'DED2_SSA', 'DED2_JSA', 'SALARY_ADVANCE', 'INTEREST_ON_ADVANCE', 'RENT_DEDUCTION', 'SALARY_WAGES'].includes(component.payComponentCode)
             ? 'credit'
             : 'debit';
         const mapping = mappingMap.get(`${component.payComponentCode}:${entryType}`);

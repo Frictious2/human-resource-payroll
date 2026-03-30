@@ -79,8 +79,8 @@
                                         <td><span class="badge text-bg-success text-capitalize"><%= batch.status %></span></td>
                                         <td class="no-print">
                                             <div class="btn-group btn-group-sm">
-                                                <a class="btn btn-outline-primary" href="/data-entry/payroll/post-to-accounts/history?batchId=<%= batch.id %>">View Lines</a>
-                                                <a class="btn btn-outline-secondary" href="/data-entry/payroll/post-to-accounts/history?batchId=<%= batch.id %>&print=1">Print</a>
+                                                <a class="btn btn-outline-primary" href="/data-entry/payroll/post-to-accounts/history/<%= batch.id %>">View Lines</a>
+                                                <a class="btn btn-outline-secondary" href="/data-entry/payroll/post-to-accounts/history/<%= batch.id %>?print=1">Print</a>
                                                 <button type="button" class="btn btn-outline-danger" disabled>Reverse</button>
                                             </div>
                                         </td>
@@ -177,7 +177,7 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <% if (printMode && selectedBatch) { %>
+    <% if (typeof printMode !== 'undefined' && printMode && selectedBatch) { %>
         <script>
             window.addEventListener('load', () => window.print());
         </script>

@@ -25,18 +25,17 @@ async function ensureInfrastructure(connection) {
     await connection.query(`
         CREATE TABLE IF NOT EXISTS payroll_gl_posting_batches (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            company_id BIGINT UNSIGNED NOT NULL,
-            activity_code VARCHAR(10) NOT NULL,
+            company_id INT NOT NULL,
+            activity_code VARCHAR(2) NOT NULL,
             posting_date DATE NOT NULL,
-            posting_month TINYINT NOT NULL,
+            posting_month SMALLINT NOT NULL,
             posting_year SMALLINT NOT NULL,
             status VARCHAR(20) NOT NULL DEFAULT 'posted',
             total_lines INT NOT NULL DEFAULT 0,
             total_amount DECIMAL(18,2) NOT NULL DEFAULT 0.00,
-            source_record_count INT NOT NULL DEFAULT 0,
-            posted_by BIGINT UNSIGNED NOT NULL,
+            posted_by VARCHAR(100) NOT NULL,
             posted_at DATETIME NOT NULL,
-            remarks TEXT NULL,
+            remarks VARCHAR(255) NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uq_payroll_gl_batch (company_id, activity_code, posting_month, posting_year)
@@ -47,16 +46,16 @@ async function ensureInfrastructure(connection) {
         CREATE TABLE IF NOT EXISTS payroll_gl_posting_lines (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             batch_id BIGINT UNSIGNED NOT NULL,
-            company_id BIGINT UNSIGNED NOT NULL,
-            activity_code VARCHAR(10) NOT NULL,
-            employee_id BIGINT UNSIGNED NULL,
+            company_id INT NOT NULL,
+            activity_code VARCHAR(2) NOT NULL,
+            employee_id VARCHAR(20) NULL,
             gl_account_code VARCHAR(50) NOT NULL,
             gl_account_name VARCHAR(255) NOT NULL,
-            entry_type ENUM('debit', 'credit') NOT NULL,
-            amount DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+            debit_amount DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+            credit_amount DECIMAL(18,2) NOT NULL DEFAULT 0.00,
             narration VARCHAR(255) NULL,
             source_table VARCHAR(100) NULL,
-            source_record_id BIGINT UNSIGNED NULL,
+            source_record_id VARCHAR(100) NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             KEY idx_pgpl_batch_id (batch_id),
             KEY idx_pgpl_company_activity (company_id, activity_code)
@@ -113,6 +112,7 @@ async function ensureInfrastructure(connection) {
             ADD COLUMN gl_posted_at DATETIME NULL
         `);
     }
+
 }
 
 async function getSupportedActivities(companyId) {
@@ -165,8 +165,23 @@ async function getApprovedMonthlyPayrollRows(connection, { companyId, activityCo
             p.PYear AS payroll_year,
             p.Approved AS approved,
             p.Level,
+            p.Dept,
             COALESCE(p.Salary, 0) AS basic_salary,
+            COALESCE(p.Allw03, 0) AS allw03,
+            COALESCE(p.Allw04, 0) AS allw04,
+            COALESCE(p.Allw05, 0) AS allw05,
+            COALESCE(p.Allw06, 0) AS allw06,
+            COALESCE(p.Allw07, 0) AS allw07,
+            COALESCE(p.Allw10, 0) AS allw10,
+            COALESCE(p.Allw11, 0) AS allw11,
+            COALESCE(p.Allw12, 0) AS allw12,
+            COALESCE(p.Allw14, 0) AS allw14,
+            COALESCE(p.Allw16, 0) AS allw16,
+            COALESCE(p.Allw17, 0) AS allw17,
+            COALESCE(p.Allw19, 0) AS allw19,
+            COALESCE(p.Allw20, 0) AS allw20,
             COALESCE(p.Allw03, 0) + COALESCE(p.Allw04, 0) + COALESCE(p.Allw05, 0) + COALESCE(p.Allw06, 0) +
+            COALESCE(p.Allw07, 0) +
             COALESCE(p.Allw10, 0) + COALESCE(p.Allw11, 0) + COALESCE(p.Allw12, 0) + COALESCE(p.Allw14, 0) +
             COALESCE(p.Allw16, 0) + COALESCE(p.Allw17, 0) + COALESCE(p.Allw19, 0) AS allowances_total,
             COALESCE(p.TotalIncome, 0) AS gross_pay,
@@ -176,14 +191,22 @@ async function getApprovedMonthlyPayrollRows(connection, { companyId, activityCo
             COALESCE(p.NetIncome, 0) AS net_pay,
             COALESCE(p.Tax, 0) AS paye,
             COALESCE(p.NassitEmp, 0) AS nassit_employee,
+            COALESCE(p.GratEmp, 0) AS gratuity_employee,
+            COALESCE(p.UnionDues, 0) AS union_dues,
+            COALESCE(p.Ded1, 0) AS ded1,
+            COALESCE(p.Ded2, 0) AS ded2,
+            COALESCE(p.Ded3, 0) AS ded3,
+            COALESCE(p.Ded4, 0) AS ded4,
+            COALESCE(p.Ded5, 0) AS ded5,
             COALESCE(p.Ded1, 0) + COALESCE(p.Ded3, 0) + COALESCE(p.Ded4, 0) + COALESCE(p.Ded5, 0) AS loan_deduction,
-            COALESCE(p.posted_to_gl, 0) AS posted_to_gl
+            COALESCE(p.posted_to_gl, 0) AS posted_to_gl,
+            'tblpayroll' AS source_table
         FROM tblpayroll p
         WHERE p.CompanyID = ?
           AND p.PType = ?
           AND p.PMonth = ?
           AND p.PYear = ?
-          AND p.Approved = 1
+          AND p.Approved IN (-1, 1)
           AND COALESCE(p.posted_to_gl, 0) = 0`,
         [companyId, activityCode, postingMonth, postingYear]
     );
@@ -194,8 +217,8 @@ async function getApprovedMonthlyPayrollRows(connection, { companyId, activityCo
 async function insertPostingBatch(connection, payload) {
     const [result] = await connection.query(
         `INSERT INTO payroll_gl_posting_batches
-        (company_id, activity_code, posting_date, posting_month, posting_year, status, total_lines, total_amount, source_record_count, posted_by, posted_at, remarks, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, NOW(), NOW())`,
+        (company_id, activity_code, posting_date, posting_month, posting_year, status, total_lines, total_amount, posted_by, posted_at, remarks, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, NOW(), NOW())`,
         [
             payload.companyId,
             payload.activityCode,
@@ -205,7 +228,6 @@ async function insertPostingBatch(connection, payload) {
             payload.status,
             payload.totalLines,
             payload.totalAmount,
-            payload.sourceRecordCount,
             payload.postedBy,
             payload.remarks
         ]
@@ -226,8 +248,8 @@ async function insertPostingLines(connection, lines) {
         line.employeeId || null,
         line.glAccountCode,
         line.glAccountName,
-        line.entryType,
-        line.amount,
+        line.entryType === 'debit' ? line.amount : 0,
+        line.entryType === 'credit' ? line.amount : 0,
         line.narration || null,
         line.sourceTable || null,
         line.sourceRecordId || null
@@ -235,7 +257,7 @@ async function insertPostingLines(connection, lines) {
 
     await connection.query(
         `INSERT INTO payroll_gl_posting_lines
-        (batch_id, company_id, activity_code, employee_id, gl_account_code, gl_account_name, entry_type, amount, narration, source_table, source_record_id, created_at)
+        (batch_id, company_id, activity_code, employee_id, gl_account_code, gl_account_name, debit_amount, credit_amount, narration, source_table, source_record_id, created_at)
         VALUES ?`,
         [values.map((row) => [...row, new Date()])]
     );
@@ -251,7 +273,7 @@ async function markPayrollRowsPosted(connection, { batchId, companyId, activityC
            AND PType = ?
            AND PMonth = ?
            AND PYear = ?
-           AND Approved = 1`,
+           AND Approved IN (-1, 1)`,
         [batchId, companyId, activityCode, postingMonth, postingYear]
     );
 }
@@ -318,7 +340,7 @@ async function getPostingHistory({ companyId, activityCode, month, year, status,
             status,
             posted_by,
             posted_at,
-            source_record_count
+            NULL AS source_record_count
          FROM payroll_gl_posting_batches
          WHERE ${whereClause}
          ORDER BY posted_at DESC, id DESC
@@ -348,7 +370,7 @@ async function getPostingBatchDetail({ companyId, batchId }) {
             status,
             total_lines,
             total_amount,
-            source_record_count,
+            NULL AS source_record_count,
             posted_by,
             posted_at,
             remarks
@@ -372,8 +394,14 @@ async function getPostingBatchDetail({ companyId, batchId }) {
             employee_id,
             gl_account_code,
             gl_account_name,
-            entry_type,
-            amount,
+            CASE
+                WHEN COALESCE(debit_amount, 0) > 0 THEN 'debit'
+                ELSE 'credit'
+            END AS entry_type,
+            CASE
+                WHEN COALESCE(debit_amount, 0) > 0 THEN debit_amount
+                ELSE credit_amount
+            END AS amount,
             narration,
             source_table,
             source_record_id,

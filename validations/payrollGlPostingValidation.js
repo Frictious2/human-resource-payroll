@@ -1,6 +1,12 @@
 const ALLOWED_ACTIVITY_CODES = new Set(['01', '02', '05', '08', '09', '13', '15']);
 const ALLOWED_ROLES = new Set([
     'payroll admin',
+    'data-entry',
+    'data entry',
+    'data_entry',
+    'data-entry officer',
+    'data entry officer',
+    'data_entry_officer',
     'accountant manager',
     'hr/payroll super admin',
     'payroll_admin',
@@ -9,9 +15,15 @@ const ALLOWED_ROLES = new Set([
 ]);
 
 function normalizeRole(role) {
-    return String(role || '')
+    const normalized = String(role || '')
         .trim()
         .toLowerCase();
+
+    if (['data-entry', 'data entry', 'data_entry', 'data-entry officer', 'data entry officer', 'data_entry_officer'].includes(normalized)) {
+        return 'data-entry';
+    }
+
+    return normalized;
 }
 
 function parsePositiveInteger(value) {

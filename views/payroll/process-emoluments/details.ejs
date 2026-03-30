@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · Data Entry</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../../data_entry/partials/topbar', { user }) %>
+    <%- include('../../data_entry/partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid py-3">
+            <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
+                <div>
+                    <h2 class="mb-1"><%= title %></h2>
+                    <p class="text-muted mb-0">Batch #<%= batch.id %> for <%= batch.activity_code %> - <%= batch.activity_name %>.</p>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mt-2 mb-0">
+                            <li class="breadcrumb-item"><a class="text-decoration-none" href="/data-entry/dashboard">Home</a></li>
+                            <li class="breadcrumb-item">Payroll</li>
+                            <li class="breadcrumb-item"><a class="text-decoration-none" href="/data-entry/payroll/process-emoluments">Process Emoluments</a></li>
+                            <li class="breadcrumb-item"><a class="text-decoration-none" href="<%= historyUrl %>">History</a></li>
+                            <li class="breadcrumb-item active" aria-current="page">Batch #<%= batch.id %></li>
+                        </ol>
+                    </nav>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="<%= historyUrl %>" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to History
+                    </a>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <div class="text-muted small">Payroll Date</div>
+                            <div class="fw-semibold"><%= batch.payroll_date ? new Date(batch.payroll_date).toISOString().slice(0, 10) : '' %></div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-muted small">Payroll Period</div>
+                            <div class="fw-semibold"><%= String(batch.payroll_month).padStart(2, '0') %>/<%= batch.payroll_year %></div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-muted small">Processed By</div>
+                            <div class="fw-semibold"><%= batch.processed_by_name %></div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-muted small">Processed At</div>
+                            <div class="fw-semibold"><%= batch.processed_at ? new Date(batch.processed_at).toISOString().replace('T', ' ').slice(0, 16) : '' %></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Total Staff</div>
+                            <div class="display-6 mb-0"><%= batch.total_staff %></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Gross</div>
+                            <div class="fw-semibold fs-4"><%= Number(totals.totalGross || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Tax</div>
+                            <div class="fw-semibold fs-4"><%= Number(totals.totalTax || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted small">Net</div>
+                            <div class="fw-semibold fs-4"><%= Number(totals.totalNet || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>PF No</th>
+                                    <th>Staff Name</th>
+                                    <th>Department</th>
+                                    <th>Grade</th>
+                                    <th>Job Title</th>
+                                    <th>Pay Status</th>
+                                    <th>Basic</th>
+                                    <th>Allowances</th>
+                                    <th>Gross</th>
+                                    <th>Tax</th>
+                                    <th>Deductions</th>
+                                    <th>Net</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% if (!items.length) { %>
+                                    <tr>
+                                        <td colspan="12" class="text-center py-4 text-muted">No payroll result rows were found for this batch.</td>
+                                    </tr>
+                                <% } %>
+                                <% items.forEach(item => { %>
+                                    <tr>
+                                        <td><%= item.pfno %></td>
+                                        <td><%= item.SName || '' %></td>
+                                        <td><%= item.dept_name || item.dept_code || '' %></td>
+                                        <td><%= item.grade_name || item.grade_code || '' %></td>
+                                        <td><%= item.job_title || '' %></td>
+                                        <td>
+                                            <% if (item.full_pay) { %>
+                                                <span class="badge text-bg-success">Full Pay</span>
+                                            <% } else if (item.half_pay) { %>
+                                                <span class="badge text-bg-warning">Half Pay</span>
+                                            <% } else if (item.without_pay) { %>
+                                                <span class="badge text-bg-secondary">Without Pay</span>
+                                            <% } else { %>
+                                                <span class="badge text-bg-light">N/A</span>
+                                            <% } %>
+                                        </td>
+                                        <td><%= Number(item.basic_salary || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td><%= Number(item.allowances_total || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td><%= Number(item.gross_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td><%= Number(item.tax_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td><%= Number(item.deductions_total || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td><%= Number(item.net_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="mt-4 py-3 text-center text-muted border-top">
+                <%- include('../../data_entry/partials/footer') %>
+            </footer>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

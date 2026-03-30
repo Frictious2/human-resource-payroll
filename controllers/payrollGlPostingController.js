@@ -115,6 +115,12 @@ module.exports = {
             const user = payrollGlPostingValidation.resolveAuthenticatedUser(req);
             const filters = payrollGlPostingValidation.validateHistoryQuery(req.query);
 
+            if (req.query.batchId) {
+                const batchId = payrollGlPostingValidation.validateBatchId(req.query.batchId);
+                const printSuffix = req.query.print ? '?print=1' : '';
+                return res.redirect(`/data-entry/payroll/post-to-accounts/history/${batchId}${printSuffix}`);
+            }
+
             if (!filters.companyId) {
                 const companyId = Number(user && (user.company_id || user.companyId || user.CompanyID));
                 filters.companyId = companyId;
@@ -183,6 +189,7 @@ module.exports = {
                     selectedLines: detail.lines,
                     debitTotal: detail.debitTotal,
                     creditTotal: detail.creditTotal,
+                    printMode: req.query.print === '1',
                     historyBaseUrl: '/data-entry/payroll/post-to-accounts/history',
                     formUrl: '/data-entry/payroll/post-to-accounts'
                 });
