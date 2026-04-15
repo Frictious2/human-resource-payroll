@@ -6,7 +6,7 @@ const {
 } = require('../validations/processEmolumentsValidation');
 const payrollValidationService = require('./payrollValidationService');
 const staffStatusService = require('./staffStatusService');
-const incrementProcessingService = require('./incrementProcessingService');
+const incrementPayrollService = require('./incrementPayrollService');
 
 const ALLOWED_ROLES = new Set(['data-entry', 'admin', 'manager', 'developer']);
 
@@ -105,35 +105,90 @@ async function getCompanyPaymentSetup(connection, companyId) {
     return fallbackRows[0] || { CompanyID: companyId, AccNo: '', PayingBank: '' };
 }
 
-async function insertFullPaySalaryRows(connection, {
+const PAYROLL_INSERT_COLUMNS = [
+    'SalDate', 'PDate', 'PFNo', 'Dept', 'Grade', 'JobTitle', 'PayThrough', 'Bank', 'Branch', 'PayingBBAN', 'PayingBank', 'AccountNo', 'Level',
+    'EmpType', 'PayCurrency', 'ExchRate', 'Salary', 'Allw02', 'Allw03', 'Allw04', 'Allw05', 'Allw06', 'Allw07', 'Allw08', 'Allw09', 'Allw10',
+    'Allw11', 'Allw12', 'Allw13', 'Allw14', 'Allw15', 'Allw16', 'Allw17', 'Allw18', 'Allw19', 'Allw20', 'TotalIncome', 'Taxable', 'Tax',
+    'NassitEmp', 'NassitInst', 'UnionDues', 'GratEmp', 'GratInst', 'NetIncome', 'LoanCounter', 'LoanRescheduled', 'Ded1', 'Ded2', 'Ded3',
+    'Ded4', 'Ded5', 'Ded6', 'Ded7', 'MReaction', 'PMonth', 'PYear', 'PType', 'Paid', 'DatePaid', 'FullPay', 'HalfPay', 'PDays', 'WithoutPay',
+    'Operator', 'DateKeyed', 'TimeKeyed', 'Approved', 'ApprovedBy', 'DateApproved', 'TimeApproved', 'CompanyID'
+];
+
+function buildInsertPlaceholders(rowCount, columnCount) {
+    return Array.from({ length: rowCount }, () => `(${Array.from({ length: columnCount }, () => '?').join(', ')})`).join(',\n');
+}
+
+async function insertPayrollRows(connection, rows) {
+    if (!rows.length) {
+        return 0;
+    }
+
+    const placeholders = buildInsertPlaceholders(rows.length, PAYROLL_INSERT_COLUMNS.length);
+    const values = rows.flatMap((row) => PAYROLL_INSERT_COLUMNS.map((column) => row[column]));
+
+    await connection.query(
+        `INSERT INTO tblpayroll (${PAYROLL_INSERT_COLUMNS.join(', ')}) VALUES ${placeholders}`,
+        values
+    );
+
+    return rows.length;
+}
+
+async function fetchSalarySourceRows(connection, {
+    mode,
     payrollDate,
-    payrollMonth,
-    payrollYear,
     companyId,
     payingBBAN,
-    payingBank,
-    operatorName
+    payingBank
 }) {
-    // tblSalary is the monthly payroll-ready source. For full-pay rows we copy the
-    // approved source values into tblPayroll without rebuilding salary logic.
-    const [result] = await connection.query(
+    const conditions = [
+        '(s.CompanyID = ? OR s.CompanyID IS NULL)',
+        '(s.DOE IS NULL OR DATE(s.DOE) <= ?)',
+        staffStatusService.getPayrollEligibilityClause({ staffAlias: 's', payrollDateExpression: "STR_TO_DATE(?, '%Y-%m-%d')" })
+    ];
+
+    if (mode === 'full') {
+        conditions.unshift(
+            'sal.TotalIncome > 0',
+            isLegacyYesSql('sal.FullPay'),
+            'COALESCE(sal.HalfPay, 0) = 0',
+            'COALESCE(sal.WithoutPay, 0) = 0',
+            'COALESCE(sal.Posted, 0) = 0'
+        );
+    } else if (mode === 'half') {
+        conditions.unshift(
+            isLegacyYesSql('sal.HalfPay'),
+            'COALESCE(sal.WithoutPay, 0) = 0'
+        );
+    } else if (mode === 'without') {
+        conditions.unshift(isLegacyYesSql('sal.WithoutPay'));
+    }
+
+    const [rows] = await connection.query(
         `
-            INSERT INTO tblpayroll (
-                SalDate, PDate, PFNo, Dept, Grade, JobTitle, PayThrough, Bank, Branch, PayingBBAN, PayingBank, AccountNo, Level,
-                EmpType, PayCurrency, ExchRate, Salary, Allw02, Allw03, Allw04, Allw05, Allw06, Allw07, Allw08, Allw09, Allw10,
-                Allw11, Allw12, Allw13, Allw14, Allw15, Allw16, Allw17, Allw18, Allw19, Allw20, TotalIncome, Taxable, Tax,
-                NassitEmp, NassitInst, UnionDues, GratEmp, GratInst, NetIncome, LoanCounter, LoanRescheduled, Ded1, Ded2, Ded3,
-                Ded4, Ded5, Ded6, Ded7, MReaction, PMonth, PYear, PType, Paid, DatePaid, FullPay, HalfPay, PDays, WithoutPay,
-                Operator, DateKeyed, TimeKeyed, Approved, ApprovedBy, DateApproved, TimeApproved, CompanyID
-            )
             SELECT
-                ?, ?, s.PFNo, s.CDept, s.CGrade, s.JobTitle,
-                COALESCE(e.PayThrough, sal.PayThrough), COALESCE(e.Bank, sal.Bank), sal.Branch, ?, ?, COALESCE(e.AccountNo, s.AccountNo, sal.AccountNo), s.Level,
-                s.EmpType, s.PayCurrency, sal.ExchRate, sal.Salary, sal.Allw02, sal.Allw03, sal.Allw04, sal.Allw05, sal.Allw06, sal.Allw07, sal.Allw08, sal.Allw09, sal.Allw10,
-                sal.Allw11, sal.Allw12, sal.Allw13, sal.Allw14, sal.Allw15, sal.Allw16, sal.Allw17, sal.Allw18, sal.Allw19, sal.Allw20, sal.TotalIncome, sal.Taxable, sal.Tax,
-                sal.NassitEmp, sal.NassitInst, sal.UnionDues, sal.GratEmp, sal.GratInst, sal.NetIncome, sal.LoanCounter, sal.LoanRescheduled, sal.Ded1, 0, sal.Ded3,
-                sal.Ded4, sal.Ded5, 0, 0, sal.MReaction, ?, ?, '01', 0, NULL, sal.FullPay, sal.HalfPay, sal.Days, sal.WithoutPay,
-                ?, NOW(), NOW(), sal.Approved, sal.ApprovedBy, sal.DateApproved, sal.TimeApproved, COALESCE(s.CompanyID, sal.CompanyID, ?)
+                ? AS SalDate,
+                ? AS PDate,
+                s.PFNo,
+                s.CDept AS Dept,
+                s.CGrade AS Grade,
+                s.JobTitle,
+                COALESCE(e.PayThrough, sal.PayThrough) AS PayThrough,
+                COALESCE(e.Bank, sal.Bank) AS Bank,
+                sal.Branch,
+                ${mode === 'without' ? 'COALESCE(e.PayingBBAN, sal.PayingBBAN)' : '?'} AS PayingBBAN,
+                ${mode === 'without' ? 'COALESCE(e.Bank, sal.PayingBank)' : '?'} AS PayingBank,
+                COALESCE(e.AccountNo, s.AccountNo, sal.AccountNo) AS AccountNo,
+                s.Level,
+                s.EmpType,
+                s.PayCurrency,
+                sal.ExchRate,
+                sal.Salary,
+                sal.Allw02, sal.Allw03, sal.Allw04, sal.Allw05, sal.Allw06, sal.Allw07, sal.Allw08, sal.Allw09, sal.Allw10,
+                sal.Allw11, sal.Allw12, sal.Allw13, sal.Allw14, sal.Allw15, sal.Allw16, sal.Allw17, sal.Allw18, sal.Allw19, sal.Allw20,
+                sal.TotalIncome, sal.Taxable, sal.Tax, sal.NassitEmp, sal.NassitInst, sal.UnionDues, sal.GratEmp, sal.GratInst, sal.NetIncome,
+                sal.LoanCounter, sal.LoanRescheduled, sal.Ded1, sal.Ded3, sal.Ded4, sal.Ded5, sal.MReaction, sal.FullPay, sal.HalfPay, sal.Days AS PDays,
+                sal.WithoutPay, sal.Approved, sal.ApprovedBy, sal.DateApproved, sal.TimeApproved, COALESCE(s.CompanyID, sal.CompanyID, ?) AS CompanyID
             FROM tblstaff s
             ${staffStatusService.getPayrollStatusJoins({ staffAlias: 's' })}
             INNER JOIN tblsalary sal
@@ -144,26 +199,16 @@ async function insertFullPaySalaryRows(connection, {
                 GROUP BY PFNo
             ) latest
                 ON latest.PFNo = sal.PFNo
-                AND latest.latest_pdate = sal.PDate
+               AND latest.latest_pdate = sal.PDate
             LEFT JOIN tblentitle e
                 ON e.PFNo = s.PFNo
-            WHERE sal.TotalIncome > 0
-              AND ${isLegacyYesSql('sal.FullPay')}
-              AND COALESCE(sal.HalfPay, 0) = 0
-              AND COALESCE(sal.WithoutPay, 0) = 0
-              AND COALESCE(sal.Posted, 0) = 0
-              AND (s.CompanyID = ? OR s.CompanyID IS NULL)
-              AND (s.DOE IS NULL OR DATE(s.DOE) <= ?)
-              AND ${staffStatusService.getPayrollEligibilityClause({ staffAlias: 's', payrollDateExpression: "STR_TO_DATE(?, '%Y-%m-%d')" })}
+            WHERE ${conditions.join('\n              AND ')}
+            ORDER BY s.CDept, s.CGrade, s.PFNo
         `,
         [
             payrollDate,
             payrollDate,
-            payingBBAN,
-            payingBank,
-            payrollMonth,
-            payrollYear,
-            operatorName,
+            ...(mode === 'without' ? [] : [payingBBAN, payingBank]),
             companyId,
             companyId,
             companyId,
@@ -174,7 +219,210 @@ async function insertFullPaySalaryRows(connection, {
         ]
     );
 
-    return result.affectedRows || 0;
+    return rows;
+}
+
+function buildPayrollInsertRow({
+    baseRow,
+    adjusted,
+    payrollMonth,
+    payrollYear,
+    operatorName,
+    mode,
+    now
+}) {
+    const row = {
+        SalDate: baseRow.SalDate,
+        PDate: baseRow.PDate,
+        PFNo: baseRow.PFNo,
+        Dept: baseRow.Dept,
+        Grade: baseRow.Grade,
+        JobTitle: baseRow.JobTitle,
+        PayThrough: baseRow.PayThrough,
+        Bank: baseRow.Bank,
+        Branch: baseRow.Branch,
+        PayingBBAN: baseRow.PayingBBAN,
+        PayingBank: baseRow.PayingBank,
+        AccountNo: baseRow.AccountNo,
+        Level: baseRow.Level,
+        EmpType: baseRow.EmpType,
+        PayCurrency: baseRow.PayCurrency,
+        ExchRate: baseRow.ExchRate,
+        Salary: 0,
+        Allw02: 0,
+        Allw03: 0,
+        Allw04: 0,
+        Allw05: 0,
+        Allw06: 0,
+        Allw07: 0,
+        Allw08: 0,
+        Allw09: 0,
+        Allw10: 0,
+        Allw11: 0,
+        Allw12: 0,
+        Allw13: 0,
+        Allw14: 0,
+        Allw15: 0,
+        Allw16: 0,
+        Allw17: 0,
+        Allw18: 0,
+        Allw19: 0,
+        Allw20: 0,
+        TotalIncome: 0,
+        Taxable: 0,
+        Tax: 0,
+        NassitEmp: 0,
+        NassitInst: 0,
+        UnionDues: 0,
+        GratEmp: 0,
+        GratInst: 0,
+        NetIncome: 0,
+        LoanCounter: baseRow.LoanCounter,
+        LoanRescheduled: baseRow.LoanRescheduled,
+        Ded1: 0,
+        Ded2: 0,
+        Ded3: 0,
+        Ded4: 0,
+        Ded5: 0,
+        Ded6: 0,
+        Ded7: 0,
+        MReaction: baseRow.MReaction,
+        PMonth: payrollMonth,
+        PYear: payrollYear,
+        PType: '01',
+        Paid: 0,
+        DatePaid: null,
+        FullPay: 0,
+        HalfPay: 0,
+        PDays: baseRow.PDays,
+        WithoutPay: 0,
+        Operator: operatorName,
+        DateKeyed: now,
+        TimeKeyed: now,
+        Approved: baseRow.Approved,
+        ApprovedBy: baseRow.ApprovedBy,
+        DateApproved: baseRow.DateApproved,
+        TimeApproved: baseRow.TimeApproved,
+        CompanyID: baseRow.CompanyID
+    };
+
+    if (mode === 'full') {
+        Object.assign(row, {
+            Salary: adjusted.Salary,
+            Allw02: adjusted.Allw02,
+            Allw03: adjusted.Allw03,
+            Allw04: adjusted.Allw04,
+            Allw05: adjusted.Allw05,
+            Allw06: adjusted.Allw06,
+            Allw07: adjusted.Allw07,
+            Allw08: adjusted.Allw08,
+            Allw09: adjusted.Allw09,
+            Allw10: adjusted.Allw10,
+            Allw11: adjusted.Allw11,
+            Allw12: adjusted.Allw12,
+            Allw13: adjusted.Allw13,
+            Allw14: adjusted.Allw14,
+            Allw15: adjusted.Allw15,
+            Allw16: adjusted.Allw16,
+            Allw17: adjusted.Allw17,
+            Allw18: adjusted.Allw18,
+            Allw19: adjusted.Allw19,
+            Allw20: adjusted.Allw20,
+            TotalIncome: adjusted.TotalIncome,
+            Taxable: adjusted.Taxable,
+            Tax: adjusted.Tax,
+            NassitEmp: adjusted.NassitEmp,
+            NassitInst: adjusted.NassitInst,
+            UnionDues: roundAmount(baseRow.UnionDues),
+            GratEmp: adjusted.GratEmp,
+            GratInst: adjusted.GratInst,
+            NetIncome: adjusted.NetIncome,
+            Ded1: roundAmount(baseRow.Ded1),
+            Ded3: roundAmount(baseRow.Ded3),
+            Ded4: roundAmount(baseRow.Ded4),
+            Ded5: roundAmount(baseRow.Ded5),
+            FullPay: baseRow.FullPay,
+            HalfPay: baseRow.HalfPay,
+            WithoutPay: baseRow.WithoutPay
+        });
+    } else if (mode === 'half') {
+        Object.assign(row, {
+            Salary: roundAmount(adjusted.Salary / 2),
+            Allw02: adjusted.Allw02,
+            Allw03: roundAmount(adjusted.Allw03 / 2),
+            Allw04: roundAmount(adjusted.Allw04 / 2),
+            Allw05: roundAmount(adjusted.Allw05 / 2),
+            Allw06: roundAmount(adjusted.Allw06 / 2),
+            Allw07: roundAmount(adjusted.Allw07 / 2),
+            Allw08: roundAmount(adjusted.Allw08 / 2),
+            Allw09: roundAmount(adjusted.Allw09 / 2),
+            Allw10: roundAmount(adjusted.Allw10 / 2),
+            Allw11: roundAmount(adjusted.Allw11 / 2),
+            Allw12: roundAmount(adjusted.Allw12 / 2),
+            Allw13: adjusted.Allw13,
+            Allw14: 0,
+            Allw15: roundAmount(adjusted.Allw15 / 2),
+            Allw16: roundAmount(adjusted.Allw16 / 2),
+            Allw17: roundAmount(adjusted.Allw17 / 2),
+            Allw18: roundAmount(adjusted.Allw18 / 2),
+            Allw19: roundAmount(adjusted.Allw19 / 2),
+            Allw20: roundAmount(adjusted.Allw20 / 2),
+            TotalIncome: roundAmount((adjusted.TotalIncome / 2) + (adjusted.Allw02 / 2) + (adjusted.Allw13 / 2)),
+            Taxable: roundAmount((adjusted.Taxable / 2) + (adjusted.Allw02 / 2) + (adjusted.Allw13 / 2)),
+            Tax: roundAmount(adjusted.Tax / 2),
+            NassitEmp: roundAmount(adjusted.NassitEmp / 2),
+            NassitInst: roundAmount(adjusted.NassitInst / 2),
+            UnionDues: roundAmount(baseRow.UnionDues),
+            GratEmp: roundAmount(adjusted.GratEmp / 2),
+            GratInst: roundAmount(adjusted.GratInst / 2),
+            NetIncome: roundAmount((adjusted.NetIncome / 2) + (adjusted.Allw02 / 2) + (adjusted.Allw13 / 2)),
+            Ded1: roundAmount(baseRow.Ded1),
+            Ded3: roundAmount(baseRow.Ded3),
+            Ded4: roundAmount(baseRow.Ded4),
+            Ded5: roundAmount(baseRow.Ded5),
+            FullPay: baseRow.FullPay,
+            HalfPay: baseRow.HalfPay,
+            WithoutPay: baseRow.WithoutPay
+        });
+    } else {
+        Object.assign(row, {
+            LoanCounter: baseRow.LoanCounter,
+            LoanRescheduled: baseRow.LoanRescheduled,
+            PDays: baseRow.PDays,
+            WithoutPay: 1
+        });
+    }
+
+    return row;
+}
+
+async function insertFullPaySalaryRows(connection, {
+    payrollDate,
+    payrollMonth,
+    payrollYear,
+    companyId,
+    payingBBAN,
+    payingBank,
+    operatorName,
+    incrementContext,
+    appliedIncrementRows
+}) {
+    const sourceRows = await fetchSalarySourceRows(connection, {
+        mode: 'full',
+        payrollDate,
+        companyId,
+        payingBBAN,
+        payingBank
+    });
+    const now = new Date();
+    const rows = sourceRows.map((baseRow) => {
+        const incrementRows = incrementContext.get(baseRow.PFNo) || [];
+        incrementRows.filter((row) => Number(row.EPassed || 0) === 0).forEach((row) => appliedIncrementRows.add(`${row.PFNo}|${row.IncDate}`));
+        const adjusted = incrementPayrollService.computeAdjustedCompensation(baseRow, incrementRows);
+        return buildPayrollInsertRow({ baseRow, adjusted, payrollMonth, payrollYear, operatorName, mode: 'full', now });
+    });
+
+    return insertPayrollRows(connection, rows);
 }
 
 async function insertHalfPaySalaryRows(connection, {
@@ -184,73 +432,26 @@ async function insertHalfPaySalaryRows(connection, {
     companyId,
     payingBBAN,
     payingBank,
-    operatorName
+    operatorName,
+    incrementContext,
+    appliedIncrementRows
 }) {
-    // Half pay is a narrow legacy exception. The row still comes from tblSalary,
-    // but specific stored source values are adjusted during the move to tblPayroll.
-    const [result] = await connection.query(
-        `
-            INSERT INTO tblpayroll (
-                SalDate, PDate, PFNo, Dept, Grade, JobTitle, PayThrough, Bank, Branch, PayingBBAN, PayingBank, AccountNo, Level,
-                EmpType, PayCurrency, ExchRate, Salary, Allw02, Allw03, Allw04, Allw05, Allw06, Allw07, Allw08, Allw09, Allw10,
-                Allw11, Allw12, Allw13, Allw14, Allw15, Allw16, Allw17, Allw18, Allw19, Allw20, TotalIncome, Taxable, Tax,
-                NassitEmp, NassitInst, UnionDues, GratEmp, GratInst, NetIncome, LoanCounter, LoanRescheduled, Ded1, Ded2, Ded3,
-                Ded4, Ded5, Ded6, Ded7, MReaction, PMonth, PYear, PType, Paid, DatePaid, FullPay, HalfPay, PDays, WithoutPay,
-                Operator, DateKeyed, TimeKeyed, Approved, ApprovedBy, DateApproved, TimeApproved, CompanyID
-            )
-            SELECT
-                ?, ?, s.PFNo, s.CDept, s.CGrade, s.JobTitle,
-                COALESCE(e.PayThrough, sal.PayThrough), COALESCE(e.Bank, sal.Bank), sal.Branch, ?, ?, COALESCE(e.AccountNo, s.AccountNo, sal.AccountNo), s.Level,
-                s.EmpType, s.PayCurrency, sal.ExchRate,
-                sal.Salary / 2,
-                sal.Allw02,
-                sal.Allw03 / 2, sal.Allw04 / 2, sal.Allw05 / 2, sal.Allw06 / 2, sal.Allw07 / 2, sal.Allw08 / 2, sal.Allw09 / 2, sal.Allw10 / 2,
-                sal.Allw11 / 2, sal.Allw12 / 2, sal.Allw13, 0, sal.Allw15 / 2, sal.Allw16 / 2, sal.Allw17 / 2, sal.Allw18 / 2, sal.Allw19 / 2, sal.Allw20 / 2,
-                (sal.TotalIncome / 2) + (sal.Allw02 / 2) + (sal.Allw13 / 2),
-                (sal.Taxable / 2) + (sal.Allw02 / 2) + (sal.Allw13 / 2),
-                sal.Tax / 2,
-                sal.NassitEmp / 2, sal.NassitInst / 2, sal.UnionDues, sal.GratEmp / 2, sal.GratInst / 2,
-                (sal.NetIncome / 2) + (sal.Allw02 / 2) + (sal.Allw13 / 2),
-                sal.LoanCounter, sal.LoanRescheduled, sal.Ded1, 0, sal.Ded3, sal.Ded4, sal.Ded5, 0, 0, sal.MReaction, ?, ?, '01', 0, NULL,
-                sal.FullPay, sal.HalfPay, sal.Days, sal.WithoutPay, ?, NOW(), NOW(), sal.Approved, sal.ApprovedBy, sal.DateApproved, sal.TimeApproved, COALESCE(s.CompanyID, sal.CompanyID, ?)
-            FROM tblstaff s
-            ${staffStatusService.getPayrollStatusJoins({ staffAlias: 's' })}
-            INNER JOIN tblsalary sal
-                ON s.PFNo = sal.PFNo
-            INNER JOIN (
-                SELECT PFNo, MAX(PDate) AS latest_pdate
-                FROM tblsalary
-                GROUP BY PFNo
-            ) latest
-                ON latest.PFNo = sal.PFNo
-                AND latest.latest_pdate = sal.PDate
-            LEFT JOIN tblentitle e
-                ON e.PFNo = s.PFNo
-            WHERE ${isLegacyYesSql('sal.HalfPay')}
-              AND COALESCE(sal.WithoutPay, 0) = 0
-              AND (s.CompanyID = ? OR s.CompanyID IS NULL)
-              AND (s.DOE IS NULL OR DATE(s.DOE) <= ?)
-              AND ${staffStatusService.getPayrollEligibilityClause({ staffAlias: 's', payrollDateExpression: "STR_TO_DATE(?, '%Y-%m-%d')" })}
-        `,
-        [
-            payrollDate,
-            payrollDate,
-            payingBBAN,
-            payingBank,
-            payrollMonth,
-            payrollYear,
-            operatorName,
-            companyId,
-            companyId,
-            companyId,
-            payrollDate,
-            payrollDate,
-            payrollDate,
-            payrollDate
-        ]
-    );
+    const sourceRows = await fetchSalarySourceRows(connection, {
+        mode: 'half',
+        payrollDate,
+        companyId,
+        payingBBAN,
+        payingBank
+    });
+    const now = new Date();
+    const rows = sourceRows.map((baseRow) => {
+        const incrementRows = incrementContext.get(baseRow.PFNo) || [];
+        incrementRows.filter((row) => Number(row.EPassed || 0) === 0).forEach((row) => appliedIncrementRows.add(`${row.PFNo}|${row.IncDate}`));
+        const adjusted = incrementPayrollService.computeAdjustedCompensation(baseRow, incrementRows);
+        return buildPayrollInsertRow({ baseRow, adjusted, payrollMonth, payrollYear, operatorName, mode: 'half', now });
+    });
 
-    return result.affectedRows || 0;
+    return insertPayrollRows(connection, rows);
 }
 
 async function insertWithoutPaySalaryRows(connection, {
@@ -258,66 +459,26 @@ async function insertWithoutPaySalaryRows(connection, {
     payrollMonth,
     payrollYear,
     companyId,
-    operatorName
+    operatorName,
+    incrementContext,
+    appliedIncrementRows
 }) {
-    const [result] = await connection.query(
-        `
-            INSERT INTO tblpayroll (
-                SalDate, PDate, PFNo, Dept, Grade, JobTitle, PayThrough, Bank, Branch, PayingBBAN, PayingBank, AccountNo, Level,
-                EmpType, PayCurrency, ExchRate, Salary, Allw02, Allw03, Allw04, Allw05, Allw06, Allw07, Allw08, Allw09, Allw10,
-                Allw11, Allw12, Allw13, Allw14, Allw15, Allw16, Allw17, Allw18, Allw19, Allw20, TotalIncome, Taxable, Tax,
-                NassitEmp, NassitInst, UnionDues, GratEmp, GratInst, NetIncome, LoanCounter, LoanRescheduled, Ded1, Ded2, Ded3,
-                Ded4, Ded5, Ded6, Ded7, MReaction, PMonth, PYear, PType, Paid, DatePaid, FullPay, HalfPay, PDays, WithoutPay,
-                Operator, DateKeyed, TimeKeyed, Approved, ApprovedBy, DateApproved, TimeApproved, CompanyID
-            )
-            SELECT
-                ?, ?, s.PFNo, s.CDept, s.CGrade, s.JobTitle,
-                COALESCE(e.PayThrough, sal.PayThrough), COALESCE(e.Bank, sal.Bank), sal.Branch, COALESCE(e.PayingBBAN, sal.PayingBBAN), COALESCE(e.Bank, sal.PayingBank), COALESCE(e.AccountNo, s.AccountNo, sal.AccountNo), s.Level,
-                s.EmpType, s.PayCurrency, sal.ExchRate,
-                0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0,
-                0, 0, 0, 0, 0,
-                0,
-                sal.LoanCounter, sal.LoanRescheduled,
-                0, 0, 0, 0, 0, 0, 0,
-                sal.MReaction, ?, ?, '01', 0, NULL, 0, 0, sal.Days, 1,
-                ?, NOW(), NOW(), sal.Approved, sal.ApprovedBy, sal.DateApproved, sal.TimeApproved, COALESCE(s.CompanyID, sal.CompanyID, ?)
-            FROM tblstaff s
-            ${staffStatusService.getPayrollStatusJoins({ staffAlias: 's' })}
-            INNER JOIN tblsalary sal
-                ON s.PFNo = sal.PFNo
-            INNER JOIN (
-                SELECT PFNo, MAX(PDate) AS latest_pdate
-                FROM tblsalary
-                GROUP BY PFNo
-            ) latest
-                ON latest.PFNo = sal.PFNo
-                AND latest.latest_pdate = sal.PDate
-            LEFT JOIN tblentitle e
-                ON e.PFNo = s.PFNo
-            WHERE ${isLegacyYesSql('sal.WithoutPay')}
-              AND (s.CompanyID = ? OR s.CompanyID IS NULL)
-              AND (s.DOE IS NULL OR DATE(s.DOE) <= ?)
-              AND ${staffStatusService.getPayrollEligibilityClause({ staffAlias: 's', payrollDateExpression: "STR_TO_DATE(?, '%Y-%m-%d')" })}
-        `,
-        [
-            payrollDate,
-            payrollDate,
-            payrollMonth,
-            payrollYear,
-            operatorName,
-            companyId,
-            companyId,
-            companyId,
-            payrollDate,
-            payrollDate,
-            payrollDate,
-            payrollDate
-        ]
-    );
+    const sourceRows = await fetchSalarySourceRows(connection, {
+        mode: 'without',
+        payrollDate,
+        companyId,
+        payingBBAN: '',
+        payingBank: ''
+    });
+    const now = new Date();
+    const rows = sourceRows.map((baseRow) => {
+        const incrementRows = incrementContext.get(baseRow.PFNo) || [];
+        incrementRows.filter((row) => Number(row.EPassed || 0) === 0).forEach((row) => appliedIncrementRows.add(`${row.PFNo}|${row.IncDate}`));
+        const adjusted = incrementPayrollService.computeAdjustedCompensation(baseRow, incrementRows);
+        return buildPayrollInsertRow({ baseRow, adjusted, payrollMonth, payrollYear, operatorName, mode: 'without', now });
+    });
 
-    return result.affectedRows || 0;
+    return insertPayrollRows(connection, rows);
 }
 
 async function applySalaryQueryAdjustments(connection, { companyId, payrollMonth, payrollYear, payrollDate }) {
@@ -880,16 +1041,16 @@ class ProcessEmolumentsService {
                 payrollYear
             });
 
-            await incrementProcessingService.applyApprovedIncrementsBeforePayroll(connection, {
-                companyId: validatedCompanyId,
-                payrollDate: sqlDate,
-                processedBy: processedByName || 'System'
-            });
-
             const companySetup = await getCompanyPaymentSetup(connection, validatedCompanyId);
+            const incrementRows = await incrementPayrollService.getApplicableIncrements(connection, {
+                companyId: validatedCompanyId,
+                payrollDate: sqlDate
+            });
+            const incrementContext = incrementPayrollService.buildIncrementContext(incrementRows);
+            const appliedIncrementRows = new Set();
             // Activity 01 is a posting step from tblSalary into tblPayroll. We read
-            // the approved source values from tblSalary and only apply limited
-            // legacy exceptions such as half-pay adjustments during the insert.
+            // the base source values from tblSalary, then layer approved legacy
+            // increment rows in memory before writing the adjusted payroll row.
             const fullPayCount = await insertFullPaySalaryRows(connection, {
                 payrollDate: sqlDate,
                 payrollMonth,
@@ -897,7 +1058,9 @@ class ProcessEmolumentsService {
                 companyId: validatedCompanyId,
                 payingBBAN: companySetup.AccNo || '',
                 payingBank: companySetup.PayingBank || '',
-                operatorName: processedByName || 'System'
+                operatorName: processedByName || 'System',
+                incrementContext,
+                appliedIncrementRows
             });
             const halfPayCount = await insertHalfPaySalaryRows(connection, {
                 payrollDate: sqlDate,
@@ -906,14 +1069,18 @@ class ProcessEmolumentsService {
                 companyId: validatedCompanyId,
                 payingBBAN: companySetup.AccNo || '',
                 payingBank: companySetup.PayingBank || '',
-                operatorName: processedByName || 'System'
+                operatorName: processedByName || 'System',
+                incrementContext,
+                appliedIncrementRows
             });
             const withoutPayCount = await insertWithoutPaySalaryRows(connection, {
                 payrollDate: sqlDate,
                 payrollMonth,
                 payrollYear,
                 companyId: validatedCompanyId,
-                operatorName: processedByName || 'System'
+                operatorName: processedByName || 'System',
+                incrementContext,
+                appliedIncrementRows
             });
 
             await applySalaryQueryAdjustments(connection, {
@@ -956,6 +1123,12 @@ class ProcessEmolumentsService {
                 error.statusCode = 404;
                 throw error;
             }
+
+            const incrementRowsToMark = Array.from(appliedIncrementRows).map((entry) => {
+                const [PFNo, IncDate] = entry.split('|');
+                return { PFNo, IncDate };
+            });
+            await incrementPayrollService.markAppliedIncrements(connection, incrementRowsToMark);
 
             await runSalarySideEffects(connection, {
                 payrollDate: sqlDate,

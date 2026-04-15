@@ -12,10 +12,10 @@ router.get('/pending-approvals', managerController.getPendingApprovals);
 // Enquiry
 router.get('/enquiry/staff', managerController.getStaffEnquiry);
 router.get('/enquiry/staff/general-info', managerController.getStaffGeneralInfo);
-router.get('/enquiry/transfer-prom', managerController.getComingSoon);
+router.get('/enquiry/transfer-prom', managerController.getTransferPromotionEnquiry);
 router.get('/enquiry/warning', managerController.getComingSoon);
-router.get('/enquiry/training', managerController.getComingSoon);
-router.get('/enquiry/on-leave', managerController.getComingSoon);
+router.get('/enquiry/training', managerController.getTrainingEnquiryPage);
+router.get('/enquiry/on-leave', managerController.getOnLeaveEnquiryPage);
 router.get('/enquiry/medical', managerController.getComingSoon);
 
 // Activity
@@ -103,7 +103,7 @@ router.get('/reports/medical', dataEntryController.getMedicalReports);
 router.get('/reports/bio-data', managerController.getComingSoon);
 router.get('/reports/loan', managerController.getComingSoon);
 router.get('/reports/long-service', managerController.getComingSoon);
-router.get('/reports/leave', managerController.getComingSoon);
+router.get('/reports/leave', managerController.getLeaveReportPage);
 router.get('/reports/guarantees', managerController.getComingSoon);
 router.get('/reports/acting-allowance', managerController.getComingSoon);
 router.get('/reports/attendance', managerController.getComingSoon);

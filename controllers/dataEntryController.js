@@ -4,6 +4,8 @@ const controllerAuditHelper = require('../services/controllerAuditHelper');
 const payrollGlPostingService = require('../services/payrollGlPostingService');
 const payrollAuditService = require('../services/payrollAuditService');
 const payrollPagesService = require('../services/payrollPagesService');
+const leavePagesService = require('../services/leavePagesService');
+const staffTransfersPagesService = require('../services/staffTransfersPagesService');
 const staffStatusService = require('../services/staffStatusService');
 
 function roundCurrency(value) {
@@ -1673,6 +1675,129 @@ const dataEntryController = {
         }
     },
 
+    getStaffAttendance: async (req, res) => {
+        try {
+            const pageData = await staffTransfersPagesService.getAttendancePageData({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                filters: req.query
+            });
+
+            res.render('data_entry/staff/attendance', {
+                title: 'Attendance',
+                group: 'Staff',
+                path: '/data-entry/staff/attendance',
+                user: req.session.user || { name: 'Data Entry Clerk' },
+                company: pageData.company,
+                staffList: pageData.staffList,
+                statusOptions: pageData.statusOptions,
+                rows: pageData.rows,
+                filters: pageData.filters,
+                success: req.query.success || '',
+                error: req.query.error || ''
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    postStaffAttendance: async (req, res) => {
+        try {
+            await staffTransfersPagesService.saveAttendanceRecord({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                keyedInBy: req.session.user?.name || 'Data Entry Clerk',
+                pfNo: req.body.pfNo,
+                workDay: req.body.workDay,
+                workStatus: req.body.workStatus,
+                timeIn: req.body.timeIn,
+                timeOut: req.body.timeOut
+            });
+
+            res.redirect('/data-entry/staff/attendance?success=Attendance record saved successfully.');
+        } catch (error) {
+            console.error(error);
+            res.redirect(`/data-entry/staff/attendance?error=${encodeURIComponent(error.message || 'Failed to save attendance record.')}`);
+        }
+    },
+
+    getEnquiryTransferPromotion: async (req, res) => {
+        try {
+            const pageData = await staffTransfersPagesService.getTransferPromotionEnquiryData({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                filters: req.query,
+                useActiveOnly: true
+            });
+
+            res.render('data_entry/enquiry/transfer_promotion', {
+                title: 'Transfer / Promotion Enquiry',
+                group: 'Enquiry',
+                path: '/data-entry/enquiry/transfer-promotion',
+                user: req.session.user || { name: 'Data Entry Clerk' },
+                company: pageData.company,
+                departments: pageData.departments,
+                rows: pageData.rows,
+                filters: pageData.filters
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getPayrollVehicleInsurance: async (req, res) => {
+        try {
+            const pageData = await staffTransfersPagesService.getVehicleInsurancePageData({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                filters: req.query
+            });
+
+            res.render('data_entry/payroll/vehicle_insurance', {
+                title: 'Vehicle Insurance',
+                group: 'Payroll',
+                path: '/data-entry/payroll/vehicle-insurance',
+                user: req.session.user || { name: 'Data Entry Clerk' },
+                company: pageData.company,
+                staffList: pageData.staffList,
+                insuranceTypes: pageData.insuranceTypes,
+                insurers: pageData.insurers,
+                rows: pageData.rows,
+                filters: pageData.filters,
+                success: req.query.success || '',
+                error: req.query.error || ''
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    postPayrollVehicleInsurance: async (req, res) => {
+        try {
+            await staffTransfersPagesService.saveVehicleInsuranceRecord({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                operatorName: req.session.user?.name || 'Data Entry Clerk',
+                pfNo: req.body.pfNo,
+                insType: req.body.insType,
+                insurer: req.body.insurer,
+                policyNo: req.body.policyNo,
+                loanGranted: req.body.loanGranted,
+                loanLife: req.body.loanLife,
+                insAmount: req.body.insAmount,
+                premium: req.body.premium,
+                premSequence: req.body.premSequence,
+                dateExp: req.body.dateExp,
+                noOfPayments: req.body.noOfPayments,
+                renewed: req.body.renewed === '1' || req.body.renewed === 'on',
+                dateRenewed: req.body.dateRenewed
+            });
+
+            res.redirect('/data-entry/payroll/vehicle-insurance?success=Vehicle insurance record saved successfully.');
+        } catch (error) {
+            console.error(error);
+            res.redirect(`/data-entry/payroll/vehicle-insurance?error=${encodeURIComponent(error.message || 'Failed to save vehicle insurance record.')}`);
+        }
+    },
+
     getReportsMasterPaySheet: async (req, res) => {
         try {
             const pageData = await payrollPagesService.getMasterPaySheetData({
@@ -1690,6 +1815,32 @@ const dataEntryController = {
                 departments: pageData.departments,
                 rows: pageData.rows,
                 totals: pageData.totals,
+                filters: pageData.filters
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getLeaveReport: async (req, res) => {
+        try {
+            const pageData = await leavePagesService.getLeaveReportData({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                filters: req.query,
+                currentOnly: false
+            });
+
+            res.render('data_entry/reports/leave', {
+                title: 'Leave Report',
+                group: 'Reports',
+                path: '/data-entry/reports/leave',
+                user: req.session.user || { name: 'Data Entry Clerk' },
+                company: pageData.company,
+                departments: pageData.departments,
+                leaveTypes: pageData.leaveTypes,
+                staffList: pageData.staffList,
+                rows: pageData.rows,
                 filters: pageData.filters
             });
         } catch (error) {

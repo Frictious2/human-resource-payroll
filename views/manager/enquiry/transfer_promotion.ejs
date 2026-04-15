@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid py-3">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <div>
+                    <h2 class="mb-0"><%= title %></h2>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mt-2 mb-0">
+                            <li class="breadcrumb-item"><a href="/manager/dashboard" class="text-decoration-none">Home</a></li>
+                            <li class="breadcrumb-item">Enquiry</li>
+                            <li class="breadcrumb-item active">Transfer / Promotion</li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+
+            <div class="card mb-4 shadow-sm">
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-2">
+                            <label for="pfNo" class="form-label">PFNo</label>
+                            <input type="text" class="form-control" id="pfNo" name="pfNo" value="<%= filters.pfNo %>">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="staffName" class="form-label">Staff Name</label>
+                            <input type="text" class="form-control" id="staffName" name="staffName" value="<%= filters.staffName %>">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="department" class="form-label">Department</label>
+                            <select class="form-select" id="department" name="department">
+                                <option value="">All</option>
+                                <% departments.forEach((dept) => { %>
+                                    <option value="<%= dept.Code %>" <%= filters.department === dept.Code ? 'selected' : '' %>><%= dept.Dept %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="status" class="form-label">Status</label>
+                            <select class="form-select" id="status" name="status">
+                                <option value="">All</option>
+                                <option value="pending" <%= filters.status === 'pending' ? 'selected' : '' %>>Pending</option>
+                                <option value="approved" <%= filters.status === 'approved' ? 'selected' : '' %>>Approved</option>
+                                <option value="rejected" <%= filters.status === 'rejected' ? 'selected' : '' %>>Rejected</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="dateFrom" class="form-label">From Date</label>
+                            <input type="date" class="form-control" id="dateFrom" name="dateFrom" value="<%= filters.dateFrom %>">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="dateTo" class="form-label">To Date</label>
+                            <input type="date" class="form-control" id="dateTo" name="dateTo" value="<%= filters.dateTo %>">
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end gap-2">
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-filter"></i> Filter</button>
+                            <a href="/manager/enquiry/transfer-prom" class="btn btn-secondary"><i class="bi bi-arrow-counterclockwise"></i> Reset</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end mb-3 d-print-none">
+                <div class="btn-group">
+                    <button type="button" class="btn btn-success" onclick="exportExcel()"><i class="bi bi-file-earmark-excel"></i> Export to Excel</button>
+                    <button type="button" class="btn btn-danger" onclick="exportPDF()"><i class="bi bi-file-earmark-pdf"></i> Export to PDF</button>
+                    <button type="button" class="btn btn-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+                </div>
+            </div>
+
+            <div class="card shadow-sm" id="printableArea">
+                <div class="card-body">
+                    <div class="d-none d-print-block text-center mb-4">
+                        <h2 class="fw-bold"><%= company.Com_Name %></h2>
+                        <h4 class="text-decoration-underline">Transfer / Promotion Enquiry</h4>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover" id="dataTable">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Effective Date</th>
+                                    <th>PFNo</th>
+                                    <th>Name</th>
+                                    <th>Previous</th>
+                                    <th>New</th>
+                                    <th>Job Title</th>
+                                    <th>Status</th>
+                                    <th>Approved By</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% if (!rows.length) { %>
+                                    <tr><td colspan="9" class="text-center">No records found.</td></tr>
+                                <% } %>
+                                <% rows.forEach((row) => { %>
+                                    <tr>
+                                        <td><%= row.RecordType %></td>
+                                        <td><%= row.EffectiveDate ? new Date(row.EffectiveDate).toLocaleDateString() : '-' %></td>
+                                        <td><%= row.PFNo %></td>
+                                        <td><%= row.SName || '-' %></td>
+                                        <td><%= row.PreviousValue || '-' %></td>
+                                        <td><%= row.NewValue || '-' %></td>
+                                        <td><%= row.NewJobTitle || '-' %></td>
+                                        <td>
+                                            <% if (Number(row.Approved || 0) === 0) { %>Pending
+                                            <% } else if (Number(row.Approved || 0) === 2) { %>Rejected
+                                            <% } else { %>Approved<% } %>
+                                        </td>
+                                        <td><%= row.ApprovedBy || '-' %></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/vendor/bootstrap.bundle.min.js"></script>
+    <script src="/js/dashboard.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+    <script>
+        function exportPDF() {
+            const element = document.getElementById('printableArea');
+            const header = element.querySelector('.d-print-block');
+            const wasHidden = header && header.classList.contains('d-none');
+            if (wasHidden) header.classList.remove('d-none');
+            html2pdf().set({
+                margin: 10,
+                filename: 'manager_transfer_promotion_enquiry.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            }).from(element).save().then(() => {
+                if (wasHidden) header.classList.add('d-none');
+            });
+        }
+
+        function exportExcel() {
+            const table = document.getElementById('dataTable');
+            const wb = XLSX.utils.table_to_book(table, { sheet: 'Transfer Promotion' });
+            XLSX.writeFile(wb, 'manager_transfer_promotion_enquiry.xlsx');
+        }
+    </script>
+</body>
+</html>

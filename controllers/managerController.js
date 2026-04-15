@@ -5,6 +5,8 @@ const path = require('path');
 const controllerAuditHelper = require('../services/controllerAuditHelper');
 const staffStatusService = require('../services/staffStatusService');
 const payrollPagesService = require('../services/payrollPagesService');
+const leavePagesService = require('../services/leavePagesService');
+const staffTransfersPagesService = require('../services/staffTransfersPagesService');
 
 const managerController = {
     getDashboard: async (req, res) => {
@@ -1482,6 +1484,109 @@ const managerController = {
               departments: pageData.departments,
               rows: pageData.rows,
               totals: pageData.totals,
+              filters: pageData.filters
+          });
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+    },
+
+    getTransferPromotionEnquiry: async (req, res) => {
+      try {
+          const pageData = await staffTransfersPagesService.getTransferPromotionEnquiryData({
+              companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+              filters: req.query,
+              useActiveOnly: true
+          });
+
+          res.render('manager/enquiry/transfer_promotion', {
+              title: 'Transfer / Promotion Enquiry',
+              path: '/manager/enquiry/transfer-prom',
+              user: req.session.user || { name: 'Manager' },
+              role: 'manager',
+              company: pageData.company,
+              departments: pageData.departments,
+              rows: pageData.rows,
+              filters: pageData.filters
+          });
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+    },
+
+    getTrainingEnquiryPage: async (req, res) => {
+      try {
+          const pageData = await staffTransfersPagesService.getTrainingEnquiryData({
+              companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+              filters: req.query,
+              useActiveOnly: true
+          });
+
+          res.render('manager/enquiry/training', {
+              title: 'Training Enquiry',
+              path: '/manager/enquiry/training',
+              user: req.session.user || { name: 'Manager' },
+              role: 'manager',
+              company: pageData.company,
+              departments: pageData.departments,
+              levels: pageData.levels,
+              types: pageData.types,
+              sponsors: pageData.sponsors,
+              rows: pageData.rows,
+              filters: pageData.filters
+          });
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+    },
+
+    getOnLeaveEnquiryPage: async (req, res) => {
+      try {
+          const pageData = await leavePagesService.getLeaveReportData({
+              companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+              filters: req.query,
+              currentOnly: true
+          });
+
+          res.render('manager/enquiry/on_leave', {
+              title: 'On Leave Enquiry',
+              path: '/manager/enquiry/on-leave',
+              user: req.session.user || { name: 'Manager' },
+              role: 'manager',
+              company: pageData.company,
+              departments: pageData.departments,
+              leaveTypes: pageData.leaveTypes,
+              staffList: pageData.staffList,
+              rows: pageData.rows,
+              filters: pageData.filters
+          });
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+    },
+
+    getLeaveReportPage: async (req, res) => {
+      try {
+          const pageData = await leavePagesService.getLeaveReportData({
+              companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+              filters: req.query,
+              currentOnly: false
+          });
+
+          res.render('manager/reports/leave', {
+              title: 'Leave Report',
+              path: '/manager/reports/leave',
+              user: req.session.user || { name: 'Manager' },
+              role: 'manager',
+              company: pageData.company,
+              departments: pageData.departments,
+              leaveTypes: pageData.leaveTypes,
+              staffList: pageData.staffList,
+              rows: pageData.rows,
               filters: pageData.filters
           });
       } catch (error) {
