@@ -73,6 +73,7 @@
                                     <div class="col-md-3">
                                         <label for="c_grade" class="form-label">Current Grade</label>
                                         <input type="text" class="form-control" id="c_grade" name="c_grade" readonly>
+                                        <input type="hidden" id="c_grade_code" name="c_grade_code">
                                     </div>
 
                                     <div class="col-md-3">
@@ -171,21 +172,21 @@
             if (selectedOption.value) {
                 document.getElementById('staffName').value = selectedOption.dataset.name;
                 document.getElementById('c_grade').value = selectedOption.dataset.gradeName;
+                document.getElementById('c_grade_code').value = selectedOption.dataset.grade;
                 document.getElementById('jobTitle').value = selectedOption.dataset.jobtitleName;
             } else {
                 document.getElementById('staffName').value = '';
                 document.getElementById('c_grade').value = '';
+                document.getElementById('c_grade_code').value = '';
                 document.getElementById('jobTitle').value = '';
             }
         }
 
         function calculatePoint() {
-            const currentGrade = document.getElementById('c_grade').value;
+            const currentGrade = document.getElementById('c_grade_code').value;
             const actingGrade = document.getElementById('a_grade').value;
-            const currentSalary = parseFloat(document.getElementById('cGrade_salary').value) || 0;
             
             if (currentGrade && actingGrade) {
-                // Extract grade numbers (assuming format like "G1", "G2", etc.)
                 const currentGradeNum = parseInt(currentGrade.replace(/\D/g, '')) || 0;
                 const actingGradeNum = parseInt(actingGrade.replace(/\D/g, '')) || 0;
                 
@@ -228,25 +229,24 @@
         }
 
         async function searchActingRecord() {
-            const pfno = document.getElementById('searchPfno').value;
+            const pfno = document.getElementById('searchPfno').value.trim();
             if (!pfno) {
                 alert('Please enter a PFNo to search');
                 return;
             }
 
             try {
-                const response = await fetch(`/api/payroll/acting-allowance/search?pfno=${pfno}`);
+                const response = await fetch(`/data-entry/api/payroll/acting-allowance/search?pfno=${encodeURIComponent(pfno)}`);
                 const data = await response.json();
 
                 if (data.found) {
                     if (confirm('Found existing unapproved record. Load it for editing?')) {
                         loadExistingRecord(data.record);
                     }
+                } else if (data.staffFound && data.staff) {
+                    populateStaffFromSearch(data.staff);
                 } else {
-                    alert('No unapproved acting allowance record found for this staff');
-                    // Set the PFNo in the form
-                    document.getElementById('pfno').value = pfno;
-                    loadStaffDetails();
+                    alert('No staff record was found for this PFNo');
                 }
             } catch (error) {
                 console.error('Search error:', error);
@@ -254,12 +254,25 @@
             }
         }
 
+        function populateStaffFromSearch(staff) {
+            document.getElementById('pfno').value = staff.PFNo;
+            document.getElementById('staffName').value = staff.SName || '';
+            document.getElementById('c_grade').value = staff.CurrentGradeName || '';
+            document.getElementById('c_grade_code').value = staff.CGrade || '';
+            document.getElementById('jobTitle').value = staff.CurrentJobTitleName || '';
+            document.getElementById('cGrade_salary').value = Number(staff.CurrentSalary || 0).toFixed(2);
+            document.getElementById('searchPfno').value = staff.PFNo || '';
+            calculatePoint();
+            calculateAllowance();
+        }
+
         function loadExistingRecord(record) {
             // Populate form with existing data
             document.getElementById('pfno').value = record.PFNo;
             document.getElementById('entryDate').value = new Date(record.EntryDate).toISOString().split('T')[0];
-            document.getElementById('c_grade').value = record.C_Grade;
-            document.getElementById('jobTitle').value = record.JobTitle;
+            document.getElementById('c_grade').value = record.CurrentGradeName || record.C_Grade;
+            document.getElementById('c_grade_code').value = record.C_Grade || '';
+            document.getElementById('jobTitle').value = record.CurrentJobTitleName || record.JobTitle;
             document.getElementById('cGrade_salary').value = record.CGrade_Salary;
             document.getElementById('gradeDifference').value = record.GradeDifference;
             document.getElementById('a_dept').value = record.A_dept;
@@ -269,6 +282,7 @@
             document.getElementById('sDate').value = new Date(record.SDate).toISOString().split('T')[0];
             document.getElementById('eDate').value = record.EDate ? new Date(record.EDate).toISOString().split('T')[0] : '';
             document.getElementById('a_salary').value = record.A_Salary;
+            document.getElementById('searchPfno').value = record.PFNo || '';
             
             loadStaffDetails();
         }
@@ -297,10 +311,12 @@
                     // Reset readonly fields
                     document.getElementById('staffName').value = '';
                     document.getElementById('c_grade').value = '';
+                    document.getElementById('c_grade_code').value = '';
                     document.getElementById('jobTitle').value = '';
                     document.getElementById('gradeDifference').value = '';
                     document.getElementById('eDate').value = '';
                     document.getElementById('a_salary').value = '';
+                    document.getElementById('searchPfno').value = '';
                 } else {
                     alert('Error: ' + result.error);
                 }

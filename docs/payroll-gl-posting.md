@@ -3,7 +3,7 @@
 ## How posting works
 - `POST /data-entry/payroll/gl-posting` accepts `companyId`, `activityCode`, and `postingDate`.
 - The controller validates the payload and user role, then calls `postMonthlyPayrollToGL`.
-- The service derives `postingMonth` and `postingYear`, checks for duplicates, loads approved payroll rows, loads GL mappings, groups posting components into GL lines, inserts a posting batch, inserts posting lines, marks source payroll rows as posted, writes an audit log, and commits.
+- The service derives `postingMonth` and `postingYear`, validates that payroll exists, validates that payroll is approved, validates that the month has not already been posted to accounts, loads approved payroll rows, loads GL mappings, groups posting components into GL lines, inserts a posting batch, inserts posting lines, marks source payroll rows as posted, writes an audit log, and commits.
 - If any step fails, the transaction is rolled back and a failed audit entry is written.
 
 ## Duplicate prevention
@@ -15,6 +15,7 @@
 - The current code uses `tblpayroll` as the monthly payroll results source because it already contains month/year, approval state, earnings, deductions, and net pay.
 - The service treats `tblpayroll` as the preferred source over master setup tables.
 - A lightweight `posted_to_gl` flag plus `gl_posted_batch_id` and `gl_posted_at` fields are added to `tblpayroll` if they are missing.
+- GL posting does not recalculate salary-side deductions. It posts the payroll result rows as already prepared in `tblPayroll`, including any effects previously applied from `tblquery`, `tblloan`, `tblmedical`, and `tblsurcharge`.
 - Salary posting groups records into these components:
   - `BASIC_SALARY`
   - `ALLOWANCES`

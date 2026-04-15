@@ -129,7 +129,8 @@ router.post('/payroll/view-payroll/preview', dataEntryController.postPayrollView
 router.use('/payroll/process-emoluments', processEmolumentsRoutes);
 router.use('/payroll/post-to-accounts', payrollGlPostingRoutes);
 router.use('/payroll/gl-posting', payrollGlPostingRoutes);
-router.get('/payroll/yearly-payments', dataEntryController.getComingSoon);
+router.get('/payroll/yearly-payments', dataEntryController.getPayrollYearlyPayments);
+router.post('/payroll/yearly-payments', dataEntryController.postPayrollYearlyPayments);
 router.get('/payroll/increments-pay-cut-backlog', dataEntryController.getIncrementsPayCutBacklog);
 router.post('/payroll/increments-pay-cut-backlog', dataEntryController.postIncrementsPayCutBacklog);
 router.get('/payroll/acting-allowance', dataEntryController.getActingAllowance);
@@ -140,7 +141,8 @@ router.get('/api/payroll/bonus-awards/pending', dataEntryController.getBonusAwar
 router.get('/api/payroll/bonus-awards/:id', dataEntryController.getBonusAwardById);
 router.post('/api/payroll/bonus-awards', dataEntryController.postBonusAward);
 router.get('/payroll/liabilities', dataEntryController.getComingSoon);
-router.get('/payroll/salary-reviews', dataEntryController.getComingSoon);
+router.get('/payroll/salary-reviews', dataEntryController.getPayrollSalaryReviews);
+router.post('/payroll/salary-reviews', dataEntryController.postPayrollSalaryReviews);
 router.get('/payroll/vehicle-insurance', dataEntryController.getComingSoon);
 
 // 4. Welfare
@@ -162,6 +164,7 @@ router.get('/welfare/redundancy', dataEntryController.getWelfareRedundancy);
 
 // 5. Reports
 router.get('/reports/payroll', dataEntryController.getPayrollReports);
+router.get('/reports/payroll/non-active-status-audit', dataEntryController.getPayrollNonActiveStatusAudit);
 router.get('/reports/payroll/bonus-backlog/preview', dataEntryController.getBonusBacklogPreview);
 router.get('/api/staff/:pfno/name', dataEntryController.getStaffName);
 router.get('/api/welfare/redundancy', dataEntryController.getRedundancySheetData);
@@ -187,6 +190,6 @@ router.get('/reports/benefit-status', benefitController.getBenefitStatusReport);
 router.post('/api/reports/benefit-status/calculate', benefitController.calculateBenefits);
 router.get('/reports/travel', dataEntryController.getComingSoon);
 router.get('/reports/redundancy', dataEntryController.getReportsRedundancy);
-router.get('/reports/master-pay-sheet', dataEntryController.getComingSoon);
+router.get('/reports/master-pay-sheet', dataEntryController.getReportsMasterPaySheet);
 
 module.exports = router;

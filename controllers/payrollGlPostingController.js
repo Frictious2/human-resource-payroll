@@ -89,7 +89,7 @@ module.exports = {
     postPayrollToGl: async (req, res) => {
         try {
             const user = payrollGlPostingValidation.resolveAuthenticatedUser(req);
-            const payload = payrollGlPostingValidation.validatePostingPayload(req.body);
+            const payload = payrollGlPostingValidation.validatePayrollBeforePosting(req.body);
             payrollGlPostingValidation.assertAuthorizedUser(user, payload.companyId);
             const postedBy = payrollGlPostingValidation.resolveUserId(user);
 

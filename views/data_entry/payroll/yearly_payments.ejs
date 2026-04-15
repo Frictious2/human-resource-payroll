@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · Data Entry</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid py-3">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <div>
+                    <h2 class="mb-0"><%= title %></h2>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mt-2 mb-0">
+                            <li class="breadcrumb-item"><a href="/data-entry/dashboard" class="text-decoration-none">Home</a></li>
+                            <li class="breadcrumb-item">Payroll</li>
+                            <li class="breadcrumb-item active">Yearly Payments</li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+
+            <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+            <% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Add / Update Yearly Payment</h5>
+                    <form method="POST" action="/data-entry/payroll/yearly-payments" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="pDate" class="form-label">Entry Date</label>
+                            <input type="date" class="form-control" id="pDate" name="pDate" required value="<%= new Date().toISOString().slice(0, 10) %>">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="pfNo" class="form-label">Staff PFNo</label>
+                            <input type="text" class="form-control" id="pfNo" name="pfNo" list="yearlyStaffList" required>
+                            <datalist id="yearlyStaffList">
+                                <% staffList.forEach((staff) => { %>
+                                    <option value="<%= staff.PFNo %>" data-name="<%= staff.SName %>"><%= staff.SName %></option>
+                                <% }) %>
+                            </datalist>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="staffName" class="form-label">Staff Name</label>
+                            <input type="text" class="form-control" id="staffName" readonly>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="payType" class="form-label">Payment Type</label>
+                            <select class="form-select" id="payType" name="payType" required>
+                                <option value="">Select type</option>
+                                <% payTypes.forEach((type) => { %>
+                                    <option value="<%= type.Code %>"><%= type.Code %> - <%= type.PayType %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="monthly" class="form-label">Monthly Amount</label>
+                            <input type="number" step="0.01" class="form-control" id="monthly" name="monthly" value="0">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="totalIncome" class="form-label">Total Income</label>
+                            <input type="number" step="0.01" class="form-control" id="totalIncome" name="totalIncome" value="0" required>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="taxable" class="form-label">Taxable</label>
+                            <input type="number" step="0.01" class="form-control" id="taxable" name="taxable" value="0">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="tax" class="form-label">Tax</label>
+                            <input type="number" step="0.01" class="form-control" id="tax" name="tax" value="0">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="netIncome" class="form-label">Net Income</label>
+                            <input type="number" step="0.01" class="form-control" id="netIncome" name="netIncome" value="0">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="served" class="form-label">Served</label>
+                            <input type="number" min="0" class="form-control" id="served" name="served" value="0">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label d-block">Fixed</label>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="fixed" name="fixed" value="1">
+                                <label class="form-check-label" for="fixed">Yes</label>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label d-block">Selected</label>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="selected" name="selected" value="1">
+                                <label class="form-check-label" for="selected">Yes</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end justify-content-end">
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save Yearly Payment</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+                        <h5 class="card-title mb-0">Existing Yearly Payments</h5>
+                        <form method="GET" action="/data-entry/payroll/yearly-payments" class="row g-2">
+                            <div class="col-auto"><input type="text" class="form-control" name="pfNo" placeholder="PFNo" value="<%= filters.pfNo %>"></div>
+                            <div class="col-auto">
+                                <select class="form-select" name="payType">
+                                    <option value="">All Types</option>
+                                    <% payTypes.forEach((type) => { %>
+                                        <option value="<%= type.Code %>" <%= filters.payType === type.Code ? 'selected' : '' %>><%= type.Code %></option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                            <div class="col-auto"><input type="number" class="form-control" name="month" min="1" max="12" placeholder="Month" value="<%= filters.month %>"></div>
+                            <div class="col-auto"><input type="number" class="form-control" name="year" min="2000" max="2100" placeholder="Year" value="<%= filters.year %>"></div>
+                            <div class="col-auto">
+                                <select class="form-select" name="status">
+                                    <option value="">All Status</option>
+                                    <option value="pending" <%= filters.status === 'pending' ? 'selected' : '' %>>Pending</option>
+                                    <option value="approved" <%= filters.status === 'approved' ? 'selected' : '' %>>Approved</option>
+                                    <option value="rejected" <%= filters.status === 'rejected' ? 'selected' : '' %>>Rejected</option>
+                                </select>
+                            </div>
+                            <div class="col-auto"><button type="submit" class="btn btn-outline-primary">Filter</button></div>
+                        </form>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover table-bordered align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th><th>PFNo</th><th>Name</th><th>Type</th><th>Dept</th><th>Grade</th>
+                                    <th class="text-end">Total</th><th class="text-end">Tax</th><th class="text-end">Net</th><th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% if (!records.length) { %>
+                                    <tr><td colspan="10" class="text-center text-muted py-4">No yearly payment records found.</td></tr>
+                                <% } %>
+                                <% records.forEach((record) => { %>
+                                    <tr>
+                                        <td><%= record.PDate ? new Date(record.PDate).toLocaleDateString() : '-' %></td>
+                                        <td><%= record.PFNo %></td>
+                                        <td><%= record.SName %></td>
+                                        <td><%= record.PayTypeName %></td>
+                                        <td><%= record.DeptName || record.Dept %></td>
+                                        <td><%= record.GradeName || record.Grade %></td>
+                                        <td class="text-end"><%= Number(record.TotalIncome || 0).toLocaleString() %></td>
+                                        <td class="text-end"><%= Number(record.Tax || 0).toLocaleString() %></td>
+                                        <td class="text-end"><%= Number(record.NetIncome || 0).toLocaleString() %></td>
+                                        <td>
+                                            <% if (Number(record.Approved || 0) === 0) { %><span class="badge bg-warning text-dark">Pending</span>
+                                            <% } else if (Number(record.Approved || 0) === 2) { %><span class="badge bg-danger">Rejected</span>
+                                            <% } else { %><span class="badge bg-success">Approved</span><% } %>
+                                        </td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="mt-4 py-3 text-center text-muted border-top"><%- include('../partials/footer') %></footer>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const pfNoInput = document.getElementById('pfNo');
+            const staffNameInput = document.getElementById('staffName');
+            const totalIncomeInput = document.getElementById('totalIncome');
+            const taxInput = document.getElementById('tax');
+            const taxableInput = document.getElementById('taxable');
+            const netIncomeInput = document.getElementById('netIncome');
+
+            function syncStaffName() {
+                const selectedOption = Array.from(document.querySelectorAll('#yearlyStaffList option')).find((option) => option.value === pfNoInput.value);
+                staffNameInput.value = selectedOption ? selectedOption.dataset.name : '';
+            }
+
+            function syncNetIncome() {
+                const total = Number(totalIncomeInput.value) || 0;
+                const tax = Number(taxInput.value) || 0;
+                if (!taxableInput.value) taxableInput.value = total.toFixed(2);
+                netIncomeInput.value = (total - tax).toFixed(2);
+            }
+
+            pfNoInput.addEventListener('change', syncStaffName);
+            totalIncomeInput.addEventListener('input', syncNetIncome);
+            taxInput.addEventListener('input', syncNetIncome);
+            syncStaffName();
+            syncNetIncome();
+        });
+    </script>
+</body>
+</html>

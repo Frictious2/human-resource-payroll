@@ -40,9 +40,9 @@ function resolveUserId(user) {
         user && (user.id || user.user_id || user.UserID || user.PFNo)
     );
     if (!userId) {
-        // Temporary compatibility fallback for the current session stub,
-        // which often contains only name/email until full auth is wired.
-        return 1;
+        const error = new Error('Authenticated user ID is required.');
+        error.statusCode = 401;
+        throw error;
     }
 
     return userId;
@@ -115,6 +115,10 @@ function validatePostingPayload(payload) {
     };
 }
 
+function validatePayrollBeforePosting(payload) {
+    return validatePostingPayload(payload);
+}
+
 function validateHistoryQuery(query) {
     return {
         companyId: parsePositiveInteger(query.companyId),
@@ -144,5 +148,6 @@ module.exports = {
     resolveUserId,
     validateBatchId,
     validateHistoryQuery,
+    validatePayrollBeforePosting,
     validatePostingPayload
 };

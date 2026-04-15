@@ -1,15 +1,21 @@
 const pool = require('../config/db');
-const { ACTIVITY_DEFINITIONS, parsePayrollDate, validateProcessRequest } = require('../validations/processEmolumentsValidation');
+const {
+    ACTIVITY_DEFINITIONS,
+    parsePayrollDate,
+    validateProcessEmoluments: validateProcessEmolumentsInput
+} = require('../validations/processEmolumentsValidation');
+const payrollValidationService = require('./payrollValidationService');
+const staffStatusService = require('./staffStatusService');
+const incrementProcessingService = require('./incrementProcessingService');
 
 const ALLOWED_ROLES = new Set(['data-entry', 'admin', 'manager', 'developer']);
-const APPROVED_STATUSES = [-1, 1];
 
 function roundAmount(value) {
     return Math.round((Number(value) || 0) * 100) / 100;
 }
 
 function derivePayrollPeriod(payrollDate) {
-    const parsedDate = parsePayrollDate(payrollDate);
+    const parsedDate = payrollDate instanceof Date ? payrollDate : parsePayrollDate(payrollDate);
     return {
         parsedDate,
         payrollMonth: parsedDate.getMonth() + 1,
@@ -99,67 +105,6 @@ async function getCompanyPaymentSetup(connection, companyId) {
     return fallbackRows[0] || { CompanyID: companyId, AccNo: '', PayingBank: '' };
 }
 
-async function ensureSalarySourceApproved(connection, { companyId, payrollDate }) {
-    const [pendingSalaryRows] = await connection.query(
-        `
-            SELECT COUNT(*) AS count
-            FROM tblsalary sal
-            INNER JOIN (
-                SELECT PFNo, MAX(PDate) AS latest_pdate
-                FROM tblsalary
-                GROUP BY PFNo
-            ) latest
-                ON latest.PFNo = sal.PFNo
-                AND latest.latest_pdate = sal.PDate
-            INNER JOIN tblstaff s
-                ON s.PFNo = sal.PFNo
-            WHERE (s.CompanyID = ? OR s.CompanyID IS NULL)
-              AND (s.DOE IS NULL OR DATE(s.DOE) <= ?)
-              AND COALESCE(s.Redundant, 0) = 0
-              AND COALESCE(s.EmpStatus, '01') <> '04'
-              AND COALESCE(sal.Approved, 0) = 0
-        `,
-        [companyId, payrollDate]
-    );
-
-    const [pendingEntitleRows] = await connection.query(
-        `
-            SELECT COUNT(*) AS count
-            FROM tblentitle e
-            INNER JOIN tblstaff s
-                ON s.PFNo = e.PFNo
-            WHERE (s.CompanyID = ? OR s.CompanyID IS NULL)
-              AND (s.DOE IS NULL OR DATE(s.DOE) <= ?)
-              AND COALESCE(s.Redundant, 0) = 0
-              AND COALESCE(s.EmpStatus, '01') <> '04'
-              AND COALESCE(e.Approved, 0) = 0
-        `,
-        [companyId, payrollDate]
-    );
-
-    if (Number(pendingSalaryRows[0].count || 0) > 0 || Number(pendingEntitleRows[0].count || 0) > 0) {
-        const error = new Error('Salary processing is blocked because some salary or entitlement records are still pending manager approval.');
-        error.statusCode = 409;
-        throw error;
-    }
-}
-
-async function getDuplicatePayrollCount(connection, { companyId, activityCode, payrollMonth, payrollYear }) {
-    const [rows] = await connection.query(
-        `
-            SELECT COUNT(*) AS count
-            FROM tblpayroll
-            WHERE CompanyID = ?
-              AND PType = ?
-              AND PMonth = ?
-              AND PYear = ?
-        `,
-        [companyId, activityCode, payrollMonth, payrollYear]
-    );
-
-    return Number(rows[0].count || 0);
-}
-
 async function insertFullPaySalaryRows(connection, {
     payrollDate,
     payrollMonth,
@@ -190,6 +135,7 @@ async function insertFullPaySalaryRows(connection, {
                 sal.Ded4, sal.Ded5, 0, 0, sal.MReaction, ?, ?, '01', 0, NULL, sal.FullPay, sal.HalfPay, sal.Days, sal.WithoutPay,
                 ?, NOW(), NOW(), sal.Approved, sal.ApprovedBy, sal.DateApproved, sal.TimeApproved, COALESCE(s.CompanyID, sal.CompanyID, ?)
             FROM tblstaff s
+            ${staffStatusService.getPayrollStatusJoins({ staffAlias: 's' })}
             INNER JOIN tblsalary sal
                 ON s.PFNo = sal.PFNo
             INNER JOIN (
@@ -201,18 +147,14 @@ async function insertFullPaySalaryRows(connection, {
                 AND latest.latest_pdate = sal.PDate
             LEFT JOIN tblentitle e
                 ON e.PFNo = s.PFNo
-                AND COALESCE(e.Approved, -1) IN (-1, 1)
             WHERE sal.TotalIncome > 0
               AND ${isLegacyYesSql('sal.FullPay')}
               AND COALESCE(sal.HalfPay, 0) = 0
               AND COALESCE(sal.WithoutPay, 0) = 0
-              AND COALESCE(sal.Approved, 0) IN (-1, 1)
-              AND COALESCE(s.Approved, 0) IN (-1, 1)
-              AND COALESCE(s.Redundant, 0) = 0
-              AND COALESCE(s.EmpStatus, '01') <> '04'
               AND COALESCE(sal.Posted, 0) = 0
               AND (s.CompanyID = ? OR s.CompanyID IS NULL)
-              AND ((s.DOE IS NULL OR DATE(s.DOE) <= ?) AND (s.ReasonDate IS NULL OR DATE(s.ReasonDate) > ?))
+              AND (s.DOE IS NULL OR DATE(s.DOE) <= ?)
+              AND ${staffStatusService.getPayrollEligibilityClause({ staffAlias: 's', payrollDateExpression: "STR_TO_DATE(?, '%Y-%m-%d')" })}
         `,
         [
             payrollDate,
@@ -224,6 +166,9 @@ async function insertFullPaySalaryRows(connection, {
             operatorName,
             companyId,
             companyId,
+            companyId,
+            payrollDate,
+            payrollDate,
             payrollDate,
             payrollDate
         ]
@@ -269,6 +214,7 @@ async function insertHalfPaySalaryRows(connection, {
                 sal.LoanCounter, sal.LoanRescheduled, sal.Ded1, 0, sal.Ded3, sal.Ded4, sal.Ded5, 0, 0, sal.MReaction, ?, ?, '01', 0, NULL,
                 sal.FullPay, sal.HalfPay, sal.Days, sal.WithoutPay, ?, NOW(), NOW(), sal.Approved, sal.ApprovedBy, sal.DateApproved, sal.TimeApproved, COALESCE(s.CompanyID, sal.CompanyID, ?)
             FROM tblstaff s
+            ${staffStatusService.getPayrollStatusJoins({ staffAlias: 's' })}
             INNER JOIN tblsalary sal
                 ON s.PFNo = sal.PFNo
             INNER JOIN (
@@ -280,16 +226,11 @@ async function insertHalfPaySalaryRows(connection, {
                 AND latest.latest_pdate = sal.PDate
             LEFT JOIN tblentitle e
                 ON e.PFNo = s.PFNo
-                AND COALESCE(e.Approved, -1) IN (-1, 1)
             WHERE ${isLegacyYesSql('sal.HalfPay')}
               AND COALESCE(sal.WithoutPay, 0) = 0
-              AND COALESCE(sal.Approved, 0) IN (-1, 1)
-              AND COALESCE(s.Approved, 0) IN (-1, 1)
-              AND COALESCE(s.Redundant, 0) = 0
-              AND COALESCE(s.EmpStatus, '01') <> '04'
               AND (s.CompanyID = ? OR s.CompanyID IS NULL)
               AND (s.DOE IS NULL OR DATE(s.DOE) <= ?)
-              AND (s.ReasonDate IS NULL OR DATE(s.ReasonDate) > ?)
+              AND ${staffStatusService.getPayrollEligibilityClause({ staffAlias: 's', payrollDateExpression: "STR_TO_DATE(?, '%Y-%m-%d')" })}
         `,
         [
             payrollDate,
@@ -301,12 +242,397 @@ async function insertHalfPaySalaryRows(connection, {
             operatorName,
             companyId,
             companyId,
+            companyId,
+            payrollDate,
+            payrollDate,
             payrollDate,
             payrollDate
         ]
     );
 
     return result.affectedRows || 0;
+}
+
+async function insertWithoutPaySalaryRows(connection, {
+    payrollDate,
+    payrollMonth,
+    payrollYear,
+    companyId,
+    operatorName
+}) {
+    const [result] = await connection.query(
+        `
+            INSERT INTO tblpayroll (
+                SalDate, PDate, PFNo, Dept, Grade, JobTitle, PayThrough, Bank, Branch, PayingBBAN, PayingBank, AccountNo, Level,
+                EmpType, PayCurrency, ExchRate, Salary, Allw02, Allw03, Allw04, Allw05, Allw06, Allw07, Allw08, Allw09, Allw10,
+                Allw11, Allw12, Allw13, Allw14, Allw15, Allw16, Allw17, Allw18, Allw19, Allw20, TotalIncome, Taxable, Tax,
+                NassitEmp, NassitInst, UnionDues, GratEmp, GratInst, NetIncome, LoanCounter, LoanRescheduled, Ded1, Ded2, Ded3,
+                Ded4, Ded5, Ded6, Ded7, MReaction, PMonth, PYear, PType, Paid, DatePaid, FullPay, HalfPay, PDays, WithoutPay,
+                Operator, DateKeyed, TimeKeyed, Approved, ApprovedBy, DateApproved, TimeApproved, CompanyID
+            )
+            SELECT
+                ?, ?, s.PFNo, s.CDept, s.CGrade, s.JobTitle,
+                COALESCE(e.PayThrough, sal.PayThrough), COALESCE(e.Bank, sal.Bank), sal.Branch, COALESCE(e.PayingBBAN, sal.PayingBBAN), COALESCE(e.Bank, sal.PayingBank), COALESCE(e.AccountNo, s.AccountNo, sal.AccountNo), s.Level,
+                s.EmpType, s.PayCurrency, sal.ExchRate,
+                0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0,
+                0, 0, 0, 0, 0,
+                0,
+                sal.LoanCounter, sal.LoanRescheduled,
+                0, 0, 0, 0, 0, 0, 0,
+                sal.MReaction, ?, ?, '01', 0, NULL, 0, 0, sal.Days, 1,
+                ?, NOW(), NOW(), sal.Approved, sal.ApprovedBy, sal.DateApproved, sal.TimeApproved, COALESCE(s.CompanyID, sal.CompanyID, ?)
+            FROM tblstaff s
+            ${staffStatusService.getPayrollStatusJoins({ staffAlias: 's' })}
+            INNER JOIN tblsalary sal
+                ON s.PFNo = sal.PFNo
+            INNER JOIN (
+                SELECT PFNo, MAX(PDate) AS latest_pdate
+                FROM tblsalary
+                GROUP BY PFNo
+            ) latest
+                ON latest.PFNo = sal.PFNo
+                AND latest.latest_pdate = sal.PDate
+            LEFT JOIN tblentitle e
+                ON e.PFNo = s.PFNo
+            WHERE ${isLegacyYesSql('sal.WithoutPay')}
+              AND (s.CompanyID = ? OR s.CompanyID IS NULL)
+              AND (s.DOE IS NULL OR DATE(s.DOE) <= ?)
+              AND ${staffStatusService.getPayrollEligibilityClause({ staffAlias: 's', payrollDateExpression: "STR_TO_DATE(?, '%Y-%m-%d')" })}
+        `,
+        [
+            payrollDate,
+            payrollDate,
+            payrollMonth,
+            payrollYear,
+            operatorName,
+            companyId,
+            companyId,
+            companyId,
+            payrollDate,
+            payrollDate,
+            payrollDate,
+            payrollDate
+        ]
+    );
+
+    return result.affectedRows || 0;
+}
+
+async function applySalaryQueryAdjustments(connection, { companyId, payrollMonth, payrollYear, payrollDate }) {
+    const approvedQueries = await payrollValidationService.getApprovedSalaryQueries(connection, {
+        companyId,
+        payrollDate
+    });
+
+    if (approvedQueries.length === 0) {
+        return { halfPayCount: 0, withoutPayCount: 0, surchargeCount: 0 };
+    }
+
+    // Legacy tblquery payroll effects are driven by MResponse:
+    // 12 = half pay, 13 = without pay, 05 = surcharge.
+    const [withoutPayResult] = await connection.query(
+        `
+            UPDATE tblpayroll p
+            INNER JOIN tblquery q
+                ON q.PFNO = p.PFNo
+            SET
+                p.Salary = 0,
+                p.Allw02 = 0, p.Allw03 = 0, p.Allw04 = 0, p.Allw05 = 0, p.Allw06 = 0, p.Allw07 = 0, p.Allw08 = 0, p.Allw09 = 0, p.Allw10 = 0,
+                p.Allw11 = 0, p.Allw12 = 0, p.Allw13 = 0, p.Allw14 = 0, p.Allw15 = 0, p.Allw16 = 0, p.Allw17 = 0, p.Allw18 = 0, p.Allw19 = 0, p.Allw20 = 0,
+                p.TotalIncome = 0,
+                p.Taxable = 0,
+                p.Tax = 0,
+                p.NassitEmp = 0,
+                p.NassitInst = 0,
+                p.GratEmp = 0,
+                p.GratInst = 0,
+                p.NetIncome = 0,
+                p.Ded1 = 0,
+                p.Ded2 = 0,
+                p.Ded3 = 0,
+                p.Ded4 = 0,
+                p.Ded5 = 0,
+                p.Ded6 = 0,
+                p.Ded7 = 0,
+                p.FullPay = 0,
+                p.HalfPay = 0,
+                p.WithoutPay = 1,
+                p.MReaction = q.MResponse
+            WHERE p.CompanyID = ?
+              AND p.PMonth = ?
+              AND p.PYear = ?
+              AND p.PType = '01'
+              AND COALESCE(q.Approved, 0) IN (-1, 1)
+              AND COALESCE(q.Expired, 0) = 0
+              AND q.MResponse = '13'
+              AND (q.SDate IS NULL OR DATE(q.SDate) <= ?)
+              AND (q.EDate IS NULL OR DATE(q.EDate) >= ?)
+        `,
+        [companyId, payrollMonth, payrollYear, payrollDate, payrollDate]
+    );
+
+    const [halfPayResult] = await connection.query(
+        `
+            UPDATE tblpayroll p
+            INNER JOIN tblquery q
+                ON q.PFNO = p.PFNo
+            SET
+                p.Salary = p.Salary / 2,
+                p.Allw03 = p.Allw03 / 2,
+                p.Allw04 = p.Allw04 / 2,
+                p.Allw05 = p.Allw05 / 2,
+                p.Allw06 = p.Allw06 / 2,
+                p.Allw07 = p.Allw07 / 2,
+                p.Allw08 = p.Allw08 / 2,
+                p.Allw09 = p.Allw09 / 2,
+                p.Allw10 = p.Allw10 / 2,
+                p.Allw11 = p.Allw11 / 2,
+                p.Allw12 = p.Allw12 / 2,
+                p.Allw14 = 0,
+                p.Allw15 = p.Allw15 / 2,
+                p.Allw16 = p.Allw16 / 2,
+                p.Allw17 = p.Allw17 / 2,
+                p.Allw18 = p.Allw18 / 2,
+                p.Allw19 = p.Allw19 / 2,
+                p.Allw20 = p.Allw20 / 2,
+                p.TotalIncome = (p.TotalIncome / 2) + (p.Allw02 / 2) + (p.Allw13 / 2),
+                p.Taxable = (p.Taxable / 2) + (p.Allw02 / 2) + (p.Allw13 / 2),
+                p.Tax = p.Tax / 2,
+                p.NassitEmp = p.NassitEmp / 2,
+                p.NassitInst = p.NassitInst / 2,
+                p.GratEmp = p.GratEmp / 2,
+                p.GratInst = p.GratInst / 2,
+                p.NetIncome = (p.NetIncome / 2) + (p.Allw02 / 2) + (p.Allw13 / 2),
+                p.FullPay = 0,
+                p.HalfPay = 1,
+                p.WithoutPay = 0,
+                p.MReaction = q.MResponse
+            WHERE p.CompanyID = ?
+              AND p.PMonth = ?
+              AND p.PYear = ?
+              AND p.PType = '01'
+              AND COALESCE(p.WithoutPay, 0) = 0
+              AND COALESCE(q.Approved, 0) IN (-1, 1)
+              AND COALESCE(q.Expired, 0) = 0
+              AND q.MResponse = '12'
+              AND (q.SDate IS NULL OR DATE(q.SDate) <= ?)
+              AND (q.EDate IS NULL OR DATE(q.EDate) >= ?)
+        `,
+        [companyId, payrollMonth, payrollYear, payrollDate, payrollDate]
+    );
+
+    const [surchargeResult] = await connection.query(
+        `
+            UPDATE tblpayroll p
+            INNER JOIN tblquery q
+                ON q.PFNO = p.PFNo
+            SET p.MReaction = q.MResponse
+            WHERE p.CompanyID = ?
+              AND p.PMonth = ?
+              AND p.PYear = ?
+              AND p.PType = '01'
+              AND COALESCE(q.Approved, 0) IN (-1, 1)
+              AND COALESCE(q.Expired, 0) = 0
+              AND q.MResponse = '05'
+              AND (q.SDate IS NULL OR DATE(q.SDate) <= ?)
+              AND (q.EDate IS NULL OR DATE(q.EDate) >= ?)
+        `,
+        [companyId, payrollMonth, payrollYear, payrollDate, payrollDate]
+    );
+
+    return {
+        halfPayCount: halfPayResult.affectedRows || 0,
+        withoutPayCount: withoutPayResult.affectedRows || 0,
+        surchargeCount: surchargeResult.affectedRows || 0
+    };
+}
+
+async function applyLoanDeductions(connection, { companyId, payrollMonth, payrollYear, payrollDate }) {
+    const loanRows = await payrollValidationService.getActiveLoanDeductions(connection, {
+        companyId,
+        payrollDate
+    });
+
+    if (loanRows.some((row) => Number(row.loan_deduction || 0) < 0 || Number(row.interest_deduction || 0) < 0)) {
+        const error = new Error('Loan deduction data is invalid for one or more staff.');
+        error.statusCode = 409;
+        throw error;
+    }
+
+    if (loanRows.length === 0) {
+        return 0;
+    }
+
+    const [result] = await connection.query(
+        `
+            UPDATE tblpayroll p
+            INNER JOIN (
+                SELECT
+                    l.PFNo,
+                    SUM(COALESCE(l.MonthlyRepayment, 0)) AS loan_deduction,
+                    SUM(COALESCE(l.MonthlyInt, 0)) AS interest_deduction
+                FROM tblloan l
+                INNER JOIN tblstaff s
+                    ON s.PFNo = l.PFNo
+                WHERE (l.CompanyID = ? OR l.CompanyID IS NULL)
+                  AND (s.CompanyID = ? OR s.CompanyID IS NULL)
+                  AND COALESCE(l.Approved, 0) IN (-1, 1)
+                  AND COALESCE(l.Expired, 0) = 0
+                  AND COALESCE(l.Repaid, 0) = 0
+                  AND COALESCE(l.LoanBal, 0) > 0
+                  AND COALESCE(l.LTrans, '') NOT IN ('03', '04')
+                  AND (l.StartDate IS NULL OR DATE(l.StartDate) <= ?)
+                  AND (l.ExpDate IS NULL OR DATE(l.ExpDate) >= ?)
+                  AND (
+                        COALESCE(l.Reschedule, 0) = 0
+                        OR l.RescheduleDate IS NULL
+                        OR DATE(l.RescheduleDate) <= ?
+                      )
+                GROUP BY l.PFNo
+            ) loan
+                ON loan.PFNo = p.PFNo
+            SET
+                p.Ded1 = ROUND(COALESCE(loan.loan_deduction, 0), 2),
+                p.Ded3 = ROUND(COALESCE(loan.interest_deduction, 0), 2)
+            WHERE p.CompanyID = ?
+              AND p.PMonth = ?
+              AND p.PYear = ?
+              AND p.PType = '01'
+              AND COALESCE(p.WithoutPay, 0) = 0
+        `,
+        [companyId, companyId, payrollDate, payrollDate, payrollDate, companyId, payrollMonth, payrollYear]
+    );
+
+    return result.affectedRows || 0;
+}
+
+async function applyMedicalDeductions(connection, { companyId, payrollMonth, payrollYear, payrollDate }) {
+    const medicalRows = await payrollValidationService.getActiveMedicalDeductions(connection, {
+        companyId,
+        payrollDate,
+        payrollMonth,
+        payrollYear
+    });
+
+    if (medicalRows.some((row) => Number(row.medical_deduction || 0) < 0)) {
+        const error = new Error('Medical deduction data is invalid for one or more staff.');
+        error.statusCode = 409;
+        throw error;
+    }
+
+    if (medicalRows.length === 0) {
+        return 0;
+    }
+
+    const [result] = await connection.query(
+        `
+            UPDATE tblpayroll p
+            INNER JOIN (
+                SELECT
+                    m.PFNo,
+                    SUM(COALESCE(m.Amount, 0)) AS medical_deduction
+                FROM tblmedical m
+                INNER JOIN tblstaff s
+                    ON s.PFNo = m.PFNo
+                WHERE (m.CompanyID = ? OR m.CompanyID IS NULL)
+                  AND (s.CompanyID = ? OR s.CompanyID IS NULL)
+                  AND YEAR(m.EntryDate) = ?
+                  AND MONTH(m.EntryDate) = ?
+                  AND DATE(m.EntryDate) <= ?
+                GROUP BY m.PFNo
+            ) med
+                ON med.PFNo = p.PFNo
+            SET p.Ded6 = ROUND(COALESCE(med.medical_deduction, 0), 2)
+            WHERE p.CompanyID = ?
+              AND p.PMonth = ?
+              AND p.PYear = ?
+              AND p.PType = '01'
+              AND COALESCE(p.WithoutPay, 0) = 0
+        `,
+        [companyId, companyId, payrollYear, payrollMonth, payrollDate, companyId, payrollMonth, payrollYear]
+    );
+
+    return result.affectedRows || 0;
+}
+
+async function applySurchargeDeductions(connection, { companyId, payrollMonth, payrollYear, payrollDate }) {
+    const surchargeRows = await payrollValidationService.getActiveSurchargeDeductions(connection, {
+        companyId,
+        payrollDate
+    });
+
+    if (surchargeRows.some((row) => Number(row.surcharge_deduction || 0) < 0)) {
+        const error = new Error('Approved salary-related query adjustments could not be applied.');
+        error.statusCode = 409;
+        throw error;
+    }
+
+    if (surchargeRows.length === 0) {
+        return 0;
+    }
+
+    const [result] = await connection.query(
+        `
+            UPDATE tblpayroll p
+            INNER JOIN (
+                SELECT
+                    s.PFNo,
+                    SUM(COALESCE(s.SAmount, 0)) AS surcharge_deduction
+                FROM tblsurcharge s
+                INNER JOIN tblstaff st
+                    ON st.PFNo = s.PFNo
+                WHERE (s.CompanyID = ? OR s.CompanyID IS NULL)
+                  AND (st.CompanyID = ? OR st.CompanyID IS NULL)
+                  AND COALESCE(s.Approved, 0) IN (-1, 1)
+                  AND COALESCE(s.Expired, 0) = 0
+                  AND (s.StarDate IS NULL OR DATE(s.StarDate) <= ?)
+                  AND (s.ExpDate IS NULL OR DATE(s.ExpDate) >= ?)
+                GROUP BY s.PFNo
+            ) surcharge
+                ON surcharge.PFNo = p.PFNo
+            SET p.Ded7 = ROUND(COALESCE(surcharge.surcharge_deduction, 0), 2)
+            WHERE p.CompanyID = ?
+              AND p.PMonth = ?
+              AND p.PYear = ?
+              AND p.PType = '01'
+              AND COALESCE(p.WithoutPay, 0) = 0
+        `,
+        [companyId, companyId, payrollDate, payrollDate, companyId, payrollMonth, payrollYear]
+    );
+
+    return result.affectedRows || 0;
+}
+
+async function refreshPayrollNetIncome(connection, { companyId, payrollMonth, payrollYear }) {
+    await connection.query(
+        `
+            UPDATE tblpayroll
+            SET NetIncome = ROUND(
+                COALESCE(TotalIncome, 0) -
+                (
+                    COALESCE(Tax, 0) +
+                    COALESCE(NassitEmp, 0) +
+                    COALESCE(GratEmp, 0) +
+                    COALESCE(UnionDues, 0) +
+                    COALESCE(Ded1, 0) +
+                    COALESCE(Ded2, 0) +
+                    COALESCE(Ded3, 0) +
+                    COALESCE(Ded4, 0) +
+                    COALESCE(Ded5, 0) +
+                    COALESCE(Ded6, 0) +
+                    COALESCE(Ded7, 0)
+                ),
+                2
+            )
+            WHERE CompanyID = ?
+              AND PMonth = ?
+              AND PYear = ?
+              AND PType = '01'
+        `,
+        [companyId, payrollMonth, payrollYear]
+    );
 }
 
 async function runSalarySideEffects(connection, {
@@ -521,20 +847,22 @@ class ProcessEmolumentsService {
     }
 
     static async processEmoluments({ companyId, activityCode, payrollDate, processedByName, userRole }) {
-        const validationError = validateProcessRequest({ companyId, activityCode, payrollDate });
-        if (validationError) {
-            const error = new Error(validationError);
-            error.statusCode = 400;
-            throw error;
-        }
+        const validatedPayload = validateProcessEmolumentsInput({ companyId, activityCode, payrollDate });
 
         this.ensureAuthorized(userRole);
 
-        const { parsedDate, payrollMonth, payrollYear } = derivePayrollPeriod(payrollDate);
+        const {
+            companyId: validatedCompanyId,
+            activityCode: validatedActivityCode,
+            payrollDate: validatedPayrollDate,
+            payrollMonth,
+            payrollYear,
+            activityName
+        } = validatedPayload;
+        const { parsedDate } = derivePayrollPeriod(validatedPayrollDate);
         const sqlDate = formatSqlDate(parsedDate);
-        const activityName = ACTIVITY_DEFINITIONS[activityCode];
 
-        if (activityCode !== '01') {
+        if (validatedActivityCode !== '01') {
             const error = new Error(`${activityName} processing is not fully implemented yet.`);
             error.statusCode = 501;
             throw error;
@@ -544,25 +872,21 @@ class ProcessEmolumentsService {
         try {
             await connection.beginTransaction();
 
-            const duplicateCount = await getDuplicatePayrollCount(connection, {
-                companyId,
-                activityCode,
+            await payrollValidationService.validateProcessEmoluments(connection, {
+                companyId: validatedCompanyId,
+                activityCode: validatedActivityCode,
+                payrollDate: sqlDate,
                 payrollMonth,
                 payrollYear
             });
 
-            if (duplicateCount > 0) {
-                const error = new Error('This activity has already been processed for the selected month and year.');
-                error.statusCode = 409;
-                throw error;
-            }
-
-            await ensureSalarySourceApproved(connection, {
-                companyId,
-                payrollDate: sqlDate
+            await incrementProcessingService.applyApprovedIncrementsBeforePayroll(connection, {
+                companyId: validatedCompanyId,
+                payrollDate: sqlDate,
+                processedBy: processedByName || 'System'
             });
 
-            const companySetup = await getCompanyPaymentSetup(connection, companyId);
+            const companySetup = await getCompanyPaymentSetup(connection, validatedCompanyId);
             // Activity 01 is a posting step from tblSalary into tblPayroll. We read
             // the approved source values from tblSalary and only apply limited
             // legacy exceptions such as half-pay adjustments during the insert.
@@ -570,7 +894,7 @@ class ProcessEmolumentsService {
                 payrollDate: sqlDate,
                 payrollMonth,
                 payrollYear,
-                companyId,
+                companyId: validatedCompanyId,
                 payingBBAN: companySetup.AccNo || '',
                 payingBank: companySetup.PayingBank || '',
                 operatorName: processedByName || 'System'
@@ -579,15 +903,56 @@ class ProcessEmolumentsService {
                 payrollDate: sqlDate,
                 payrollMonth,
                 payrollYear,
-                companyId,
+                companyId: validatedCompanyId,
                 payingBBAN: companySetup.AccNo || '',
                 payingBank: companySetup.PayingBank || '',
                 operatorName: processedByName || 'System'
             });
+            const withoutPayCount = await insertWithoutPaySalaryRows(connection, {
+                payrollDate: sqlDate,
+                payrollMonth,
+                payrollYear,
+                companyId: validatedCompanyId,
+                operatorName: processedByName || 'System'
+            });
 
-            const totalInserted = fullPayCount + halfPayCount;
+            await applySalaryQueryAdjustments(connection, {
+                companyId: validatedCompanyId,
+                payrollMonth,
+                payrollYear,
+                payrollDate: sqlDate
+            });
+
+            await applyLoanDeductions(connection, {
+                companyId: validatedCompanyId,
+                payrollMonth,
+                payrollYear,
+                payrollDate: sqlDate
+            });
+
+            await applyMedicalDeductions(connection, {
+                companyId: validatedCompanyId,
+                payrollMonth,
+                payrollYear,
+                payrollDate: sqlDate
+            });
+
+            await applySurchargeDeductions(connection, {
+                companyId: validatedCompanyId,
+                payrollMonth,
+                payrollYear,
+                payrollDate: sqlDate
+            });
+
+            await refreshPayrollNetIncome(connection, {
+                companyId: validatedCompanyId,
+                payrollMonth,
+                payrollYear
+            });
+
+            const totalInserted = fullPayCount + halfPayCount + withoutPayCount;
             if (totalInserted === 0) {
-                const error = new Error('No approved and eligible salary records were found for the selected month and year.');
+                const error = new Error('No valid salary data found for the selected payroll period.');
                 error.statusCode = 404;
                 throw error;
             }
@@ -612,12 +977,12 @@ class ProcessEmolumentsService {
                       AND PMonth = ?
                       AND PYear = ?
                 `,
-                [companyId, payrollMonth, payrollYear]
+                [validatedCompanyId, payrollMonth, payrollYear]
             );
 
-            const recordId = makeHistoryKey({ activityCode, payrollMonth, payrollYear });
+            const recordId = makeHistoryKey({ activityCode: validatedActivityCode, payrollMonth, payrollYear });
             await logProcessAudit(connection, {
-                companyId,
+                companyId: validatedCompanyId,
                 userName: processedByName || 'System',
                 action: 'New',
                 recordId,
@@ -628,7 +993,7 @@ class ProcessEmolumentsService {
 
             return {
                 batchId: recordId,
-                activityCode,
+                activityCode: validatedActivityCode,
                 activityName,
                 payrollMonth,
                 payrollYear,
@@ -643,10 +1008,10 @@ class ProcessEmolumentsService {
 
             try {
                 await logProcessAudit(connection, {
-                    companyId,
+                    companyId: validatedCompanyId,
                     userName: processedByName || 'System',
                     action: 'Edit',
-                    recordId: makeHistoryKey({ activityCode, payrollMonth, payrollYear }),
+                    recordId: makeHistoryKey({ activityCode: validatedActivityCode, payrollMonth, payrollYear }),
                     message: error.message
                 });
             } catch (auditError) {

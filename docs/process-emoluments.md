@@ -38,12 +38,24 @@ Phase 1 fully implements `01 = Salary` against the legacy schema.
 
 The service:
 
-1. validates that salary and entitlement data are already approved
-2. reads the latest approved salary setup rows from `tblSalary`
-3. inserts full-pay salary rows into `tblPayroll`
-4. inserts half-pay salary rows into `tblPayroll` using the legacy half-pay treatment
-5. excludes without-pay rows from insertion
-6. runs the related legacy follow-up updates for loan repayments, leave allowance, payday, acting reset, and `tblGLTrans`
+1. does not require manager approval before payroll processing
+2. reads the latest salary setup rows from `tblSalary`
+3. checks approved salary-impacting query rows in `tblquery`
+4. applies legacy query reactions such as half pay, without pay, and surcharge markers
+5. checks active loan deductions from `tblloan`
+6. checks payroll-month medical deductions from `tblmedical`
+7. checks active surcharge rows from `tblsurcharge` using `StarDate` and `ExpDate`
+8. inserts full-pay, half-pay, and without-pay salary rows into `tblPayroll`
+9. refreshes payroll deductions and net income before the follow-up legacy updates run
+10. runs the related legacy follow-up updates for loan repayments, leave allowance, payday, acting reset, and `tblGLTrans`
+
+## Legacy Validation Notes
+
+- Manager approval is not a prerequisite for generating payroll rows in `tblPayroll`.
+- `tblquery` drives salary-impacting reactions through legacy `MResponse` codes.
+- `tblloan` contributes active due deductions to payroll.
+- `tblmedical` contributes payroll-month medical deductions.
+- `tblsurcharge` contributes date-range surcharge deductions based on `StarDate` and `ExpDate`.
 
 ## Extending Other Activities
 

@@ -264,7 +264,7 @@ async function insertPostingLines(connection, lines) {
 }
 
 async function markPayrollRowsPosted(connection, { batchId, companyId, activityCode, postingMonth, postingYear }) {
-    await connection.query(
+    const [result] = await connection.query(
         `UPDATE tblpayroll
          SET posted_to_gl = 1,
              gl_posted_batch_id = ?,
@@ -273,9 +273,12 @@ async function markPayrollRowsPosted(connection, { batchId, companyId, activityC
            AND PType = ?
            AND PMonth = ?
            AND PYear = ?
-           AND Approved IN (-1, 1)`,
+           AND Approved IN (-1, 1)
+           AND COALESCE(posted_to_gl, 0) = 0`,
         [batchId, companyId, activityCode, postingMonth, postingYear]
     );
+
+    return result.affectedRows || 0;
 }
 
 async function insertAuditLog(connection, payload) {

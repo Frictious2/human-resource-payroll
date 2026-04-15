@@ -3,6 +3,8 @@ const transporter = require('../config/mailer');
 const ejs = require('ejs');
 const path = require('path');
 const controllerAuditHelper = require('../services/controllerAuditHelper');
+const staffStatusService = require('../services/staffStatusService');
+const payrollPagesService = require('../services/payrollPagesService');
 
 const managerController = {
     getDashboard: async (req, res) => {
@@ -438,10 +440,12 @@ const managerController = {
   },
 
   getPayrollReports: async (req, res) => {
-      try {
-          const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
-          const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
-          const [staffRows] = await pool.query('SELECT PFNo, SName FROM tblstaff ORDER BY PFNo');
+        try {
+            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
+            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
+          const [staffRows] = await pool.query(
+              staffStatusService.getActiveStaffQuery({ orderBy: 'PFNo' })
+          );
           res.render('manager/reports/payroll', {
               title: 'Payroll Reports',
               group: 'Reports',
@@ -1304,6 +1308,186 @@ const managerController = {
             console.error(err);
             res.status(500).send('Server Error');
         }
+    },
+
+    getRunSalaryReview: async (req, res) => {
+      try {
+          const pageData = await payrollPagesService.getRunSalaryReviewData({
+              companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+              filters: req.query
+          });
+
+          res.render('manager/payroll/run_salary_review', {
+              title: 'Run Salary Review',
+              path: '/manager/activity/run-salary-review',
+              user: req.session.user || { name: 'Manager' },
+              role: 'manager',
+              reviewTypes: pageData.reviewTypes,
+              rules: pageData.rules,
+              previewRows: pageData.previewRows,
+              filters: pageData.filters,
+              success: req.query.success || '',
+              error: req.query.error || ''
+          });
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+    },
+
+    postRunSalaryReview: async (req, res) => {
+      try {
+          const result = await payrollPagesService.commitSalaryReviewRun({
+              companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+              reviewDate: req.body.reviewDate,
+              revCode: req.body.revCode,
+              startGrade: req.body.startGrade,
+              endGrade: req.body.endGrade,
+              committedBy: req.session.user?.name || 'Manager'
+          });
+
+          res.redirect(`/manager/activity/run-salary-review?reviewDate=${encodeURIComponent(result.rule.reviewDate)}&revCode=${encodeURIComponent(result.rule.revCode)}&success=${encodeURIComponent(`Created ${result.createdCount} increment record(s) for ${result.rule.reviewName}.`)}`);
+      } catch (error) {
+          console.error(error);
+          const reviewDate = req.body.reviewDate ? `reviewDate=${encodeURIComponent(req.body.reviewDate)}&` : '';
+          const revCode = req.body.revCode ? `revCode=${encodeURIComponent(req.body.revCode)}&` : '';
+          res.redirect(`/manager/activity/run-salary-review?${reviewDate}${revCode}error=${encodeURIComponent(error.message || 'Failed to commit salary review.')}`);
+      }
+    },
+
+    getApproveSalaryReview: async (req, res) => {
+      try {
+          const pageData = await payrollPagesService.getSalaryReviewApprovalData({
+              companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+              filters: req.query
+          });
+
+          res.render('manager/approve/salary_review', {
+              title: 'Approve Salary Review',
+              path: '/manager/approve/salary-review',
+              user: req.session.user || { name: 'Manager' },
+              role: 'manager',
+              reviewTypes: pageData.reviewTypes,
+              grades: pageData.grades,
+              records: pageData.rows,
+              filters: pageData.filters,
+              success: req.query.success || '',
+              error: req.query.error || ''
+          });
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+    },
+
+    postApproveSalaryReview: async (req, res) => {
+      try {
+          await payrollPagesService.decideSalaryReview({
+              companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+              reviewDate: req.body.reviewDate,
+              revCode: req.body.revCode,
+              startGrade: req.body.startGrade,
+              endGrade: req.body.endGrade,
+              action: req.body.action,
+              approvedBy: req.session.user?.name || 'Manager'
+          });
+
+          res.redirect('/manager/approve/salary-review?success=Salary review decision saved successfully.');
+      } catch (error) {
+          console.error(error);
+          res.redirect(`/manager/approve/salary-review?error=${encodeURIComponent(error.message || 'Failed to process salary review decision.')}`);
+      }
+    },
+
+    getApproveEndOfService: async (req, res) => {
+      try {
+          const pageData = await payrollPagesService.getEndOfServiceApprovalData({
+              companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+              filters: req.query
+          });
+
+          res.render('manager/approve/end_of_service', {
+              title: 'Approve End of Service',
+              path: '/manager/approve/end-of-service',
+              user: req.session.user || { name: 'Manager' },
+              role: 'manager',
+              rows: pageData.rows,
+              filters: pageData.filters,
+              success: req.query.success || '',
+              error: req.query.error || ''
+          });
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+    },
+
+    postApproveEndOfService: async (req, res) => {
+      try {
+          await payrollPagesService.decideEndOfService({
+              companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+              pfNo: req.body.pfNo,
+              dateKeyed: req.body.dateKeyed,
+              action: req.body.action,
+              approvedBy: req.session.user?.name || 'Manager'
+          });
+
+          res.redirect('/manager/approve/end-of-service?success=End of service decision saved successfully.');
+      } catch (error) {
+          console.error(error);
+          res.redirect(`/manager/approve/end-of-service?error=${encodeURIComponent(error.message || 'Failed to process EOS decision.')}`);
+      }
+    },
+
+    getYearlyPaymentsReport: async (req, res) => {
+      try {
+          const pageData = await payrollPagesService.getYearlyPaymentsReportData({
+              companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+              filters: req.query
+          });
+
+          res.render('manager/reports/yearly_payments', {
+              title: 'Yearly Payments Report',
+              group: 'Reports',
+              path: '/manager/reports/yearly-payments',
+              user: req.session.user || { name: 'Manager' },
+              role: 'manager',
+              company: pageData.company,
+              payTypes: pageData.payTypes,
+              staffList: pageData.staffList,
+              records: pageData.rows,
+              filters: pageData.filters
+          });
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+    },
+
+    getMasterPaySheetReport: async (req, res) => {
+      try {
+          const pageData = await payrollPagesService.getMasterPaySheetData({
+              companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+              filters: req.query
+          });
+
+          res.render('manager/reports/master_pay_sheet', {
+              title: 'Master Pay Sheet',
+              group: 'Reports',
+              path: '/manager/reports/master-pay-sheet',
+              user: req.session.user || { name: 'Manager' },
+              role: 'manager',
+              company: pageData.company,
+              payTypes: pageData.payTypes,
+              departments: pageData.departments,
+              rows: pageData.rows,
+              totals: pageData.totals,
+              filters: pageData.filters
+          });
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
     },
 
   approveRedundancy: async (req, res) => {

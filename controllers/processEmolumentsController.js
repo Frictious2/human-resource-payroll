@@ -1,4 +1,5 @@
 const ProcessEmolumentsService = require('../services/processEmolumentsService');
+const { validateProcessEmoluments } = require('../validations/processEmolumentsValidation');
 
 function getCompanyId(req) {
     return req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1;
@@ -26,10 +27,15 @@ class ProcessEmolumentsController {
     static async process(req, res) {
         try {
             const user = getUser(req);
-            const result = await ProcessEmolumentsService.processEmoluments({
+            const validatedPayload = validateProcessEmoluments({
                 companyId: getCompanyId(req),
                 activityCode: req.body.activityCode,
-                payrollDate: req.body.payrollDate,
+                payrollDate: req.body.payrollDate
+            });
+            const result = await ProcessEmolumentsService.processEmoluments({
+                companyId: validatedPayload.companyId,
+                activityCode: validatedPayload.activityCode,
+                payrollDate: validatedPayload.payrollDate,
                 processedByName: user.name || user.fullName || user.username || 'System',
                 userRole: user.role
             });

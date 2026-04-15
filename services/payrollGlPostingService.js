@@ -1,4 +1,5 @@
 const payrollGlQueryService = require('./payrollGlQueryService');
+const payrollValidationService = require('./payrollValidationService');
 const pool = require('../config/db');
 
 const SUPPORTED_ACTIVITIES = {
@@ -364,7 +365,41 @@ function groupPostingComponentsByGlAccount({ companyId, activityCode, postingDat
     };
 }
 
+function validateRequiredGlMappings(components, mappingRows) {
+    const mergedMappings = [
+        ...(mappingRows || []),
+        ...getDefaultSalaryMappings()
+    ];
+    const mappingMap = normalizeMappings(mergedMappings);
+    const requiredMappings = new Set();
+
+    components.forEach((component) => {
+        if (!component || Number(component.amount || 0) <= 0) {
+            return;
+        }
+
+        const entryType = ['INCOME_TAX', 'NASSIT_EMP', 'PROVIDENT_EMP', 'DED2_SSA', 'DED2_JSA', 'SALARY_ADVANCE', 'INTEREST_ON_ADVANCE', 'RENT_DEDUCTION', 'SALARY_WAGES'].includes(component.payComponentCode)
+            ? 'credit'
+            : 'debit';
+        requiredMappings.add(`${component.payComponentCode}:${entryType}`);
+    });
+
+    const missingMappings = Array.from(requiredMappings).filter((mappingKey) => !mappingMap.has(mappingKey));
+    if (missingMappings.length > 0) {
+        const error = new Error(`Required GL accounts are missing for: ${missingMappings.join(', ')}.`);
+        error.statusCode = 409;
+        throw error;
+    }
+}
+
 async function buildSalaryPostingPayload({ connection, companyId, activityCode, postingDate, postingMonth, postingYear }) {
+    await payrollValidationService.validatePayrollBeforePosting(connection, {
+        companyId,
+        activityCode,
+        postingMonth,
+        postingYear
+    });
+
     const sourceRows = await payrollGlQueryService.getApprovedMonthlyPayrollRows(connection, {
         companyId,
         activityCode,
@@ -384,6 +419,14 @@ async function buildSalaryPostingPayload({ connection, companyId, activityCode, 
     });
 
     const components = sourceRows.flatMap((row) => buildPostingComponents(row));
+    if (components.length === 0) {
+        const error = new Error('Payroll not found for the selected month and activity.');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    validateRequiredGlMappings(components, mappingRows);
+
     const grouped = groupPostingComponentsByGlAccount({
         companyId,
         activityCode,
@@ -466,13 +509,19 @@ async function postMonthlyPayrollToGL({ companyId, activityCode, postingDate, po
                 sourceRecordId: line.sourceRecordId
             })));
 
-            await payrollGlQueryService.markPayrollRowsPosted(connection, {
+            const markedRows = await payrollGlQueryService.markPayrollRowsPosted(connection, {
                 batchId,
                 companyId,
                 activityCode,
                 postingMonth,
                 postingYear
             });
+
+            if (markedRows !== postingPayload.sourceRows.length) {
+                const error = new Error('Payroll posting state changed during processing. Please try again.');
+                error.statusCode = 409;
+                throw error;
+            }
 
             await payrollGlQueryService.insertAuditLog(connection, {
                 companyId,

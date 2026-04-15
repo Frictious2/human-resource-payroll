@@ -14,12 +14,13 @@ router.get('/enquiry/staff', managerController.getStaffEnquiry);
 router.get('/enquiry/staff/general-info', managerController.getStaffGeneralInfo);
 router.get('/enquiry/transfer-prom', managerController.getComingSoon);
 router.get('/enquiry/warning', managerController.getComingSoon);
-router.get('/enquiry/training', managerController.getTransferApprovals);
+router.get('/enquiry/training', managerController.getComingSoon);
 router.get('/enquiry/on-leave', managerController.getComingSoon);
 router.get('/enquiry/medical', managerController.getComingSoon);
 
 // Activity
-router.get('/activity/run-salary-review', managerController.getComingSoon);
+router.get('/activity/run-salary-review', managerController.getRunSalaryReview);
+router.post('/activity/run-salary-review', managerController.postRunSalaryReview);
 router.get('/activity/medical-limits', managerController.getComingSoon);
 
 // Approve
@@ -78,16 +79,17 @@ router.post('/approve/loan', managerController.postApproveLoan);
 router.post('/api/approve/loan-repayment', managerController.postApproveLoanRepayment);
 router.get('/approve/guarantee', managerController.getApproveGuarantee);
 router.post('/api/approve/guarantee', managerController.postApproveGuarantee);
-router.get('/approve/salary-review', managerController.getComingSoon);
+router.get('/approve/salary-review', managerController.getApproveSalaryReview);
+router.post('/approve/salary-review', managerController.postApproveSalaryReview);
 router.get('/approve/increment', managerController.getApproveIncrement);
 router.post('/approve/increment', managerController.postApproveIncrement);
 router.get('/approve/bonus', managerController.getApproveBonus);
 router.get('/api/bonus-awards/:id', managerController.getBonusAwardById);
 router.post('/api/approve/bonus', managerController.postApproveBonus);
-router.get('/approve/end-of-service', managerController.getComingSoon);
+router.get('/approve/end-of-service', managerController.getApproveEndOfService);
+router.post('/approve/end-of-service', managerController.postApproveEndOfService);
 router.get('/approve/redundancy', managerController.getApproveRedundancy);
 router.post('/approve/redundancy', managerController.approveRedundancy);
-router.get('/approve/entitlement', managerController.getComingSoon);
 
 // Reports
 router.get('/reports/payroll', managerController.getPayrollReports);
@@ -108,11 +110,11 @@ router.get('/reports/attendance', managerController.getComingSoon);
 router.get('/reports/nassit-grats', managerController.getComingSoon);
 router.get('/reports/payroll-liabilities', managerController.getComingSoon);
 router.get('/reports/com-org-liabilities', managerController.getComingSoon);
-router.get('/reports/yearly-payments', managerController.getComingSoon);
+router.get('/reports/yearly-payments', managerController.getYearlyPaymentsReport);
 router.get('/reports/benefit-status', benefitController.getBenefitStatusManager);
 router.post('/api/reports/benefit-status/calculate', benefitController.calculateBenefits);
 router.get('/reports/travel', managerController.getComingSoon);
 router.get('/reports/redundancy', managerController.getReportsRedundancy);
-router.get('/reports/master-pay-sheet', managerController.getComingSoon);
+router.get('/reports/master-pay-sheet', managerController.getMasterPaySheetReport);
 
 module.exports = router;
