@@ -5,7 +5,9 @@ const payrollGlPostingService = require('../services/payrollGlPostingService');
 const payrollAuditService = require('../services/payrollAuditService');
 const payrollPagesService = require('../services/payrollPagesService');
 const leavePagesService = require('../services/leavePagesService');
+const loansMedicalPagesService = require('../services/loansMedicalPagesService');
 const staffTransfersPagesService = require('../services/staffTransfersPagesService');
+const enquiryReportsService = require('../services/enquiryReportsService');
 const staffStatusService = require('../services/staffStatusService');
 
 function roundCurrency(value) {
@@ -1841,6 +1843,81 @@ const dataEntryController = {
                 leaveTypes: pageData.leaveTypes,
                 staffList: pageData.staffList,
                 rows: pageData.rows,
+                filters: pageData.filters
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getLoanBalanceEnquiry: async (req, res) => {
+        try {
+            const pageData = await loansMedicalPagesService.getLoanBalanceEnquiryData({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                filters: req.query
+            });
+
+            res.render('data_entry/enquiry/loan_balance', {
+                title: 'Loan Balance Enquiry',
+                group: 'Enquiry',
+                path: '/data-entry/enquiry/loan-balance',
+                user: req.session.user || { name: 'Data Entry Clerk' },
+                company: pageData.company,
+                departments: pageData.departments,
+                loanCodes: pageData.loanCodes,
+                staffList: pageData.staffList,
+                rows: pageData.rows,
+                filters: pageData.filters
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getMedicalEnquiryPage: async (req, res) => {
+        try {
+            const pageData = await loansMedicalPagesService.getMedicalEnquiryData({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                filters: req.query
+            });
+
+            res.render('data_entry/enquiry/medical', {
+                title: 'Medical Enquiry',
+                group: 'Enquiry',
+                path: '/data-entry/enquiry/medical',
+                user: req.session.user || { name: 'Data Entry Clerk' },
+                company: pageData.company,
+                departments: pageData.departments,
+                medicalCodes: pageData.medicalCodes,
+                staffList: pageData.staffList,
+                rows: pageData.rows,
+                filters: pageData.filters
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getLoanReport: async (req, res) => {
+        try {
+            const pageData = await loansMedicalPagesService.getLoanReportData({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                filters: req.query
+            });
+
+            res.render('data_entry/reports/loan', {
+                title: 'Loan Report',
+                group: 'Reports',
+                path: '/data-entry/reports/loan',
+                user: req.session.user || { name: 'Data Entry Clerk' },
+                company: pageData.company,
+                departments: pageData.departments,
+                loanCodes: pageData.loanCodes,
+                rows: pageData.rows,
+                totals: pageData.totals,
                 filters: pageData.filters
             });
         } catch (error) {
@@ -6283,6 +6360,152 @@ const dataEntryController = {
         } catch (error) {
             console.error('Post Acting Allowance Error:', error);
             res.status(500).json({ error: 'Server Error: ' + error.message });
+        }
+    },
+
+    getVehicleInsuranceStatusReport: async (req, res) => {
+        try {
+            const pageData = await enquiryReportsService.getVehicleInsuranceReportData({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                filters: req.query
+            });
+
+            res.render('data_entry/reports/vehicle_insurance_status', {
+                title: 'Vehicle Insurance Status Report',
+                group: 'Reports',
+                path: '/data-entry/reports/vehicle-insurance-status',
+                user: req.session.user || { name: 'Data Entry Clerk' },
+                company: pageData.company,
+                departments: pageData.departments,
+                insurers: pageData.insurers,
+                rows: pageData.rows,
+                filters: pageData.filters
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getBioDataReport: async (req, res) => {
+        try {
+            const pageData = await enquiryReportsService.getBioDataReportData({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                filters: req.query
+            });
+
+            res.render('data_entry/reports/bio_data', {
+                title: 'Bio-Data Report',
+                group: 'Reports',
+                path: '/data-entry/reports/bio-data',
+                user: req.session.user || { name: 'Data Entry Clerk' },
+                company: pageData.company,
+                departments: pageData.departments,
+                statuses: pageData.statuses,
+                rows: pageData.rows,
+                filters: pageData.filters
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getGuaranteesReport: async (req, res) => {
+        try {
+            const pageData = await enquiryReportsService.getGuaranteesReportData({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                filters: req.query
+            });
+
+            res.render('data_entry/reports/guarantees', {
+                title: 'Guarantees Report',
+                group: 'Reports',
+                path: '/data-entry/reports/guarantees',
+                user: req.session.user || { name: 'Data Entry Clerk' },
+                company: pageData.company,
+                departments: pageData.departments,
+                banks: pageData.banks,
+                rows: pageData.rows,
+                totals: pageData.totals,
+                filters: pageData.filters
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getActingAllowanceReport: async (req, res) => {
+        try {
+            const pageData = await enquiryReportsService.getActingAllowanceReportData({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                filters: req.query
+            });
+
+            res.render('data_entry/reports/acting_allowance', {
+                title: 'Acting Allowance Report',
+                group: 'Reports',
+                path: '/data-entry/reports/acting-allowance',
+                user: req.session.user || { name: 'Data Entry Clerk' },
+                company: pageData.company,
+                departments: pageData.departments,
+                rows: pageData.rows,
+                totals: pageData.totals,
+                filters: pageData.filters
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getAttendanceReport: async (req, res) => {
+        try {
+            const pageData = await enquiryReportsService.getAttendanceReportData({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                filters: req.query
+            });
+
+            res.render('data_entry/reports/attendance', {
+                title: 'Attendance Report',
+                group: 'Reports',
+                path: '/data-entry/reports/attendance',
+                user: req.session.user || { name: 'Data Entry Clerk' },
+                company: pageData.company,
+                departments: pageData.departments,
+                statuses: pageData.statuses,
+                rows: pageData.rows,
+                totals: pageData.totals,
+                filters: pageData.filters
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getYearlyPaymentsReport: async (req, res) => {
+        try {
+            const pageData = await enquiryReportsService.getYearlyPaymentsReportData({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                filters: req.query
+            });
+
+            res.render('data_entry/reports/yearly_payments', {
+                title: 'Yearly Payments Report',
+                group: 'Reports',
+                path: '/data-entry/reports/yearly-payments',
+                user: req.session.user || { name: 'Data Entry Clerk' },
+                company: pageData.company,
+                payTypes: pageData.payTypes,
+                staffList: pageData.staffList,
+                records: pageData.rows,
+                filters: pageData.filters
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
         }
     }
 };

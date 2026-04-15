@@ -16,7 +16,7 @@ router.get('/enquiry/transfer-prom', managerController.getTransferPromotionEnqui
 router.get('/enquiry/warning', managerController.getComingSoon);
 router.get('/enquiry/training', managerController.getTrainingEnquiryPage);
 router.get('/enquiry/on-leave', managerController.getOnLeaveEnquiryPage);
-router.get('/enquiry/medical', managerController.getComingSoon);
+router.get('/enquiry/medical', managerController.getMedicalEnquiryReport);
 
 // Activity
 router.get('/activity/run-salary-review', managerController.getRunSalaryReview);
@@ -98,15 +98,15 @@ router.get('/api/staff/:pfno/name', dataEntryController.getStaffName);
 router.get('/api/reports/redundancy', dataEntryController.getRedundancySheetData);
 router.get('/reports/journal', managerController.getJournalReport);
 router.get('/reports/journal/preview', managerController.getJournalReportPreview);
-router.get('/reports/vehicle-insurance', managerController.getComingSoon);
+router.get('/reports/vehicle-insurance', managerController.getVehicleInsuranceReport);
 router.get('/reports/medical', dataEntryController.getMedicalReports);
-router.get('/reports/bio-data', managerController.getComingSoon);
-router.get('/reports/loan', managerController.getComingSoon);
+router.get('/reports/bio-data', managerController.getBioDataReport);
+router.get('/reports/loan', managerController.getLoanReportPage);
 router.get('/reports/long-service', managerController.getComingSoon);
 router.get('/reports/leave', managerController.getLeaveReportPage);
-router.get('/reports/guarantees', managerController.getComingSoon);
-router.get('/reports/acting-allowance', managerController.getComingSoon);
-router.get('/reports/attendance', managerController.getComingSoon);
+router.get('/reports/guarantees', managerController.getGuaranteesReport);
+router.get('/reports/acting-allowance', managerController.getActingAllowanceReport);
+router.get('/reports/attendance', managerController.getAttendanceReport);
 router.get('/reports/nassit-grats', managerController.getComingSoon);
 router.get('/reports/payroll-liabilities', managerController.getComingSoon);
 router.get('/reports/com-org-liabilities', managerController.getComingSoon);

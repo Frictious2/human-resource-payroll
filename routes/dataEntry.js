@@ -50,8 +50,8 @@ router.get('/enquiry/staff/general-info', dataEntryController.getStaffGeneralInf
 router.get('/enquiry/transfer-promotion', dataEntryController.getEnquiryTransferPromotion);
 router.get('/enquiry/training', dataEntryController.getTrainingEnquiry);
 router.get('/enquiry/discipline', dataEntryController.getDisciplineEnquiry);
-router.get('/enquiry/loan-balance', dataEntryController.getComingSoon);
-router.get('/enquiry/medical', dataEntryController.getComingSoon);
+router.get('/enquiry/loan-balance', dataEntryController.getLoanBalanceEnquiry);
+router.get('/enquiry/medical', dataEntryController.getMedicalEnquiryPage);
 router.get('/enquiry/applications', dataEntryController.getApplicationsEnquiry);
 
 // 2. Staff
@@ -175,19 +175,19 @@ router.get('/api/reports/payslip', dataEntryController.getPayslipData);
 router.post('/api/reports/voucher/preview', dataEntryController.getVoucherReportPreview);
 router.get('/reports/journal', dataEntryController.getJournalReport);
 router.get('/reports/journal/preview', dataEntryController.getJournalReportPreview);
-router.get('/reports/vehicle-insurance-status', dataEntryController.getComingSoon);
+router.get('/reports/vehicle-insurance-status', dataEntryController.getVehicleInsuranceStatusReport);
 router.get('/reports/medical', dataEntryController.getMedicalReports);
-router.get('/reports/bio-data', dataEntryController.getComingSoon);
-router.get('/reports/loan', dataEntryController.getComingSoon);
+router.get('/reports/bio-data', dataEntryController.getBioDataReport);
+router.get('/reports/loan', dataEntryController.getLoanReport);
 router.get('/reports/long-service', dataEntryController.getComingSoon);
 router.get('/reports/leave', dataEntryController.getLeaveReport);
-router.get('/reports/guarantees', dataEntryController.getComingSoon);
-router.get('/reports/acting-allowance', dataEntryController.getComingSoon);
-router.get('/reports/attendance', dataEntryController.getComingSoon);
+router.get('/reports/guarantees', dataEntryController.getGuaranteesReport);
+router.get('/reports/acting-allowance', dataEntryController.getActingAllowanceReport);
+router.get('/reports/attendance', dataEntryController.getAttendanceReport);
 router.get('/reports/nassit-grats-statement', dataEntryController.getComingSoon);
 router.get('/reports/payroll-liabilities', dataEntryController.getComingSoon);
 router.get('/reports/com-org-liabilities', dataEntryController.getComingSoon);
-router.get('/reports/yearly-payments', dataEntryController.getComingSoon);
+router.get('/reports/yearly-payments', dataEntryController.getYearlyPaymentsReport);
 router.get('/reports/benefit-status', benefitController.getBenefitStatusReport);
 router.post('/api/reports/benefit-status/calculate', benefitController.calculateBenefits);
 router.get('/reports/travel', dataEntryController.getComingSoon);

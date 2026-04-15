@@ -6,7 +6,9 @@ const controllerAuditHelper = require('../services/controllerAuditHelper');
 const staffStatusService = require('../services/staffStatusService');
 const payrollPagesService = require('../services/payrollPagesService');
 const leavePagesService = require('../services/leavePagesService');
+const loansMedicalPagesService = require('../services/loansMedicalPagesService');
 const staffTransfersPagesService = require('../services/staffTransfersPagesService');
+const enquiryReportsService = require('../services/enquiryReportsService');
 
 const managerController = {
     getDashboard: async (req, res) => {
@@ -1595,6 +1597,56 @@ const managerController = {
       }
     },
 
+    getMedicalEnquiryReport: async (req, res) => {
+      try {
+          const pageData = await loansMedicalPagesService.getMedicalEnquiryData({
+              companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+              filters: req.query
+          });
+
+          res.render('manager/enquiry/medical', {
+              title: 'Medical Enquiry',
+              path: '/manager/enquiry/medical',
+              user: req.session.user || { name: 'Manager' },
+              role: 'manager',
+              company: pageData.company,
+              departments: pageData.departments,
+              medicalCodes: pageData.medicalCodes,
+              staffList: pageData.staffList,
+              rows: pageData.rows,
+              filters: pageData.filters
+          });
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+    },
+
+    getLoanReportPage: async (req, res) => {
+      try {
+          const pageData = await loansMedicalPagesService.getLoanReportData({
+              companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+              filters: req.query
+          });
+
+          res.render('manager/reports/loan', {
+              title: 'Loan Report',
+              path: '/manager/reports/loan',
+              user: req.session.user || { name: 'Manager' },
+              role: 'manager',
+              company: pageData.company,
+              departments: pageData.departments,
+              loanCodes: pageData.loanCodes,
+              rows: pageData.rows,
+              totals: pageData.totals,
+              filters: pageData.filters
+          });
+      } catch (error) {
+          console.error(error);
+          res.status(500).send('Server Error');
+      }
+    },
+
   approveRedundancy: async (req, res) => {
         try {
             const { pfno } = req.body;
@@ -2829,6 +2881,128 @@ const managerController = {
         } catch (error) {
             console.error('Approve Acting Allowance Error:', error);
             res.status(500).json({ error: 'Server Error' });
+        }
+    },
+
+    getVehicleInsuranceReport: async (req, res) => {
+        try {
+            const pageData = await enquiryReportsService.getVehicleInsuranceReportData({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                filters: req.query
+            });
+
+            res.render('manager/reports/vehicle_insurance', {
+                title: 'Vehicle Insurance Report',
+                group: 'Reports',
+                path: '/manager/reports/vehicle-insurance',
+                user: req.session.user || { name: 'Manager' },
+                company: pageData.company,
+                departments: pageData.departments,
+                insurers: pageData.insurers,
+                rows: pageData.rows,
+                filters: pageData.filters
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getBioDataReport: async (req, res) => {
+        try {
+            const pageData = await enquiryReportsService.getBioDataReportData({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                filters: req.query
+            });
+
+            res.render('manager/reports/bio_data', {
+                title: 'Bio-Data Report',
+                group: 'Reports',
+                path: '/manager/reports/bio-data',
+                user: req.session.user || { name: 'Manager' },
+                company: pageData.company,
+                departments: pageData.departments,
+                statuses: pageData.statuses,
+                rows: pageData.rows,
+                filters: pageData.filters
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getGuaranteesReport: async (req, res) => {
+        try {
+            const pageData = await enquiryReportsService.getGuaranteesReportData({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                filters: req.query
+            });
+
+            res.render('manager/reports/guarantees', {
+                title: 'Guarantees Report',
+                group: 'Reports',
+                path: '/manager/reports/guarantees',
+                user: req.session.user || { name: 'Manager' },
+                company: pageData.company,
+                departments: pageData.departments,
+                banks: pageData.banks,
+                rows: pageData.rows,
+                totals: pageData.totals,
+                filters: pageData.filters
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getActingAllowanceReport: async (req, res) => {
+        try {
+            const pageData = await enquiryReportsService.getActingAllowanceReportData({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                filters: req.query
+            });
+
+            res.render('manager/reports/acting_allowance', {
+                title: 'Acting Allowance Report',
+                group: 'Reports',
+                path: '/manager/reports/acting-allowance',
+                user: req.session.user || { name: 'Manager' },
+                company: pageData.company,
+                departments: pageData.departments,
+                rows: pageData.rows,
+                totals: pageData.totals,
+                filters: pageData.filters
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    getAttendanceReport: async (req, res) => {
+        try {
+            const pageData = await enquiryReportsService.getAttendanceReportData({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                filters: req.query
+            });
+
+            res.render('manager/reports/attendance', {
+                title: 'Attendance Report',
+                group: 'Reports',
+                path: '/manager/reports/attendance',
+                user: req.session.user || { name: 'Manager' },
+                company: pageData.company,
+                departments: pageData.departments,
+                statuses: pageData.statuses,
+                rows: pageData.rows,
+                totals: pageData.totals,
+                filters: pageData.filters
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
         }
     }
 };
