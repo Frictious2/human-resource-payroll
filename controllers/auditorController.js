@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const auditorDashboardService = require('../services/auditorDashboardService');
 
 const AUDITOR_SCOPE_CLAUSE = `
     (
@@ -51,48 +52,49 @@ function buildAuditFilters(query) {
 const auditorController = {
     renderDashboard: async (req, res) => {
         try {
-            const [
-                totalRows,
-                todayRows,
-                activeUserRows,
-                actionRows,
-                recentRows
-            ] = await Promise.all([
-                pool.query(`SELECT COUNT(*) AS totalCount FROM tblaudittrail WHERE ${AUDITOR_SCOPE_CLAUSE}`),
-                pool.query(`SELECT COUNT(*) AS todayCount FROM tblaudittrail WHERE ${AUDITOR_SCOPE_CLAUSE} AND DATE(ChangeDate) = CURDATE()`),
-                pool.query(`SELECT COUNT(DISTINCT UserName) AS activeUsers FROM tblaudittrail WHERE ${AUDITOR_SCOPE_CLAUSE} AND DATE(ChangeDate) = CURDATE() AND UserName IS NOT NULL`),
-                pool.query(`
-                    SELECT Action, COUNT(*) AS total
-                    FROM tblaudittrail
-                    WHERE ${AUDITOR_SCOPE_CLAUSE}
-                    GROUP BY Action
-                    ORDER BY total DESC, Action ASC
-                    LIMIT 8
-                `),
-                pool.query(`
-                    SELECT AuditTrailID, ChangeDate, UserName, FormName, Action, RecordID, FieldName, OldValue, NewValue
-                    FROM tblaudittrail
-                    WHERE ${AUDITOR_SCOPE_CLAUSE}
-                    ORDER BY ChangeDate DESC, AuditTrailID DESC
-                    LIMIT 20
-                `)
-            ]);
+            const companyId = req.user?.companyId
+                || req.user?.company_id
+                || req.session?.companyId
+                || req.session?.CompanyID
+                || 1;
+
+            const dashboardData = await auditorDashboardService.getAuditorDashboardData({ companyId });
 
             res.render('auditor/dashboard', {
                 title: 'Auditor Dashboard',
                 path: '/auditor/dashboard',
                 user: req.session.user || { name: 'Auditor' },
-                metrics: {
-                    totalCount: totalRows[0][0].totalCount || 0,
-                    todayCount: todayRows[0][0].todayCount || 0,
-                    activeUsers: activeUserRows[0][0].activeUsers || 0
-                },
-                actionBreakdown: actionRows[0],
-                recentActivity: recentRows[0]
+                error: null,
+                ...dashboardData
             });
         } catch (error) {
             console.error('Auditor dashboard error:', error);
-            res.status(500).send('Server Error');
+            res.render('auditor/dashboard', {
+                title: 'Auditor Dashboard',
+                path: '/auditor/dashboard',
+                user: req.session.user || { name: 'Auditor' },
+                error: 'Failed to load dashboard data',
+                metrics: {
+                    totalCount: 0,
+                    todayCount: 0,
+                    activeUsers: 0,
+                    highRiskEvents30Days: 0,
+                    pendingFinancialApprovals: 0,
+                    unpostedPayrollPeriods: 0,
+                    pendingPostingBatches: 0,
+                    payrollExceptions: 0
+                },
+                actionBreakdown: [],
+                recentActivity: [],
+                highRiskActivity: [],
+                moduleBreakdown: [],
+                topUsersToday: [],
+                controlChecks: {
+                    financialApprovals: [],
+                    unpostedPeriods: [],
+                    pendingBatches: []
+                }
+            });
         }
     },
 

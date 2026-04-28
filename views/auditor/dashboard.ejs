@@ -17,15 +17,19 @@
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
         <div>
           <h1 class="h3 mb-1">Auditor Dashboard</h1>
-          <p class="text-muted mb-0">Monitor activity, approvals, and field-level changes across the system.</p>
+          <p class="text-muted mb-0">Trace approvals, payroll control checks, and high-risk changes across the system.</p>
         </div>
         <a class="btn btn-primary" href="/auditor/audit-trail">
           <i class="bi bi-journal-text me-2"></i>Open Full Audit Trail
         </a>
       </div>
 
+      <% if (error) { %>
+        <div class="alert alert-danger shadow-sm"><%= error %></div>
+      <% } %>
+
       <div class="row g-3 mb-4">
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-6 col-xxl-3">
           <div class="card shadow-sm h-100">
             <div class="card-body">
               <div class="text-muted small mb-2">Total Audit Entries</div>
@@ -33,7 +37,7 @@
             </div>
           </div>
         </div>
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-6 col-xxl-3">
           <div class="card shadow-sm h-100">
             <div class="card-body">
               <div class="text-muted small mb-2">Today’s Activity</div>
@@ -41,17 +45,52 @@
             </div>
           </div>
         </div>
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-6 col-xxl-3">
           <div class="card shadow-sm h-100">
             <div class="card-body">
-              <div class="text-muted small mb-2">Active Users Today</div>
-              <div class="display-6 fw-semibold"><%= metrics.activeUsers %></div>
+              <div class="text-muted small mb-2">High-Risk Events (30 Days)</div>
+              <div class="display-6 fw-semibold"><%= metrics.highRiskEvents30Days %></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-xxl-3">
+          <div class="card shadow-sm h-100">
+            <div class="card-body">
+              <div class="text-muted small mb-2">Payroll Exception Groups</div>
+              <div class="display-6 fw-semibold"><%= metrics.payrollExceptions %></div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="row g-4">
+      <div class="row g-3 mb-4">
+        <div class="col-12 col-md-4">
+          <div class="card shadow-sm h-100">
+            <div class="card-body">
+              <div class="text-muted small mb-2">Active Users Today</div>
+              <div class="fs-2 fw-semibold"><%= metrics.activeUsers %></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="card shadow-sm h-100">
+            <div class="card-body">
+              <div class="text-muted small mb-2">Pending Financial Approvals</div>
+              <div class="fs-2 fw-semibold"><%= metrics.pendingFinancialApprovals %></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="card shadow-sm h-100">
+            <div class="card-body">
+              <div class="text-muted small mb-2">Unposted Payroll / GL Batches</div>
+              <div class="fs-2 fw-semibold"><%= metrics.unpostedPayrollPeriods %> / <%= metrics.pendingPostingBatches %></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-4 mb-4">
         <div class="col-12 col-xl-4">
           <div class="card shadow-sm h-100">
             <div class="card-header bg-body">
@@ -74,10 +113,191 @@
           </div>
         </div>
 
-        <div class="col-12 col-xl-8">
+        <div class="col-12 col-xl-4">
+          <div class="card shadow-sm h-100">
+            <div class="card-header bg-body">
+              <h2 class="h6 mb-0">Module Breakdown</h2>
+            </div>
+            <div class="card-body">
+              <% if (!moduleBreakdown.length) { %>
+                <p class="text-muted mb-0">No module activity found.</p>
+              <% } else { %>
+                <div class="list-group list-group-flush">
+                  <% moduleBreakdown.forEach(function(item) { %>
+                    <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                      <span><%= item.module %></span>
+                      <span class="badge bg-secondary-subtle text-secondary-emphasis rounded-pill"><%= item.total %></span>
+                    </div>
+                  <% }) %>
+                </div>
+              <% } %>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-xl-4">
+          <div class="card shadow-sm h-100">
+            <div class="card-header bg-body">
+              <h2 class="h6 mb-0">Top Users Today</h2>
+            </div>
+            <div class="card-body">
+              <% if (!topUsersToday.length) { %>
+                <p class="text-muted mb-0">No active users recorded today.</p>
+              <% } else { %>
+                <div class="list-group list-group-flush">
+                  <% topUsersToday.forEach(function(item) { %>
+                    <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                      <span><%= item.UserName || 'System' %></span>
+                      <span class="badge bg-info-subtle text-info-emphasis rounded-pill"><%= item.total %></span>
+                    </div>
+                  <% }) %>
+                </div>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-4 mb-4">
+        <div class="col-12 col-xl-5">
+          <div class="card shadow-sm h-100">
+            <div class="card-header bg-body">
+              <h2 class="h6 mb-0">Control Checks</h2>
+            </div>
+            <div class="card-body">
+              <h3 class="h6">Pending Financial Approvals</h3>
+              <% if (!controlChecks.financialApprovals.length) { %>
+                <p class="text-muted small">No pending financial approvals found.</p>
+              <% } else { %>
+                <div class="list-group list-group-flush mb-3">
+                  <% controlChecks.financialApprovals.forEach(function(item) { %>
+                    <a href="<%= item.route %>" class="list-group-item list-group-item-action px-0 d-flex justify-content-between align-items-center">
+                      <span><%= item.label %></span>
+                      <span class="badge bg-warning-subtle text-warning-emphasis rounded-pill"><%= item.total %></span>
+                    </a>
+                  <% }) %>
+                </div>
+              <% } %>
+
+              <h3 class="h6">Quick Links</h3>
+              <div class="list-group list-group-flush">
+                <a href="/data-entry/reports/payroll/non-active-status-audit" class="list-group-item list-group-item-action px-0">Payroll non-active staff audit</a>
+                <a href="/manager/reports/journal" class="list-group-item list-group-item-action px-0">Journal review</a>
+                <a href="/manager/reports/master-pay-sheet" class="list-group-item list-group-item-action px-0">Master pay sheet</a>
+                <a href="/manager/reports/yearly-payments" class="list-group-item list-group-item-action px-0">Yearly payments report</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-xl-7">
+          <div class="card shadow-sm h-100">
+            <div class="card-header bg-body">
+              <h2 class="h6 mb-0">Payroll / Posting Checks</h2>
+            </div>
+            <div class="card-body">
+              <div class="row g-4">
+                <div class="col-12 col-lg-6">
+                  <h3 class="h6">Unposted Payroll Periods</h3>
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                      <thead class="table-light">
+                        <tr>
+                          <th>Period</th>
+                          <th>Type</th>
+                          <th class="text-end">Rows</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <% if (!controlChecks.unpostedPeriods.length) { %>
+                          <tr><td colspan="3" class="text-center text-muted py-3">No unposted payroll periods.</td></tr>
+                        <% } %>
+                        <% controlChecks.unpostedPeriods.forEach(function(row) { %>
+                          <tr>
+                            <td><%= row.PMonth %>/<%= row.PYear %></td>
+                            <td><%= row.PType %></td>
+                            <td class="text-end"><%= row.RowCount %></td>
+                          </tr>
+                        <% }) %>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div class="col-12 col-lg-6">
+                  <h3 class="h6">Pending GL Posting Batches</h3>
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                      <thead class="table-light">
+                        <tr>
+                          <th>Batch</th>
+                          <th>Status</th>
+                          <th class="text-end">Lines</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <% if (!controlChecks.pendingBatches.length) { %>
+                          <tr><td colspan="3" class="text-center text-muted py-3">No pending posting batches.</td></tr>
+                        <% } %>
+                        <% controlChecks.pendingBatches.forEach(function(row) { %>
+                          <tr>
+                            <td>#<%= row.id %></td>
+                            <td><%= row.status %></td>
+                            <td class="text-end"><%= row.total_lines %></td>
+                          </tr>
+                        <% }) %>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-12 col-xl-5">
+          <div class="card shadow-sm h-100">
+            <div class="card-header bg-body d-flex justify-content-between align-items-center">
+              <h2 class="h6 mb-0">Recent High-Risk Activity</h2>
+              <a class="btn btn-sm btn-outline-primary" href="/auditor/audit-trail">Drill down</a>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Date</th>
+                      <th>User</th>
+                      <th>Form</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% if (!highRiskActivity.length) { %>
+                      <tr>
+                        <td colspan="4" class="text-center py-4 text-muted">No recent high-risk activity found.</td>
+                      </tr>
+                    <% } %>
+                    <% highRiskActivity.forEach(function(entry) { %>
+                      <tr>
+                        <td><%= entry.ChangeDate ? new Date(entry.ChangeDate).toLocaleString() : '' %></td>
+                        <td><%= entry.UserName || 'System' %></td>
+                        <td><%= entry.FormName || '-' %></td>
+                        <td><span class="badge text-bg-light"><%= entry.Action || '-' %></span></td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-xl-7">
           <div class="card shadow-sm">
             <div class="card-header bg-body d-flex justify-content-between align-items-center">
-              <h2 class="h6 mb-0">Recent Activity</h2>
+              <h2 class="h6 mb-0">Recent Activity Timeline</h2>
               <a class="btn btn-sm btn-outline-primary" href="/auditor/audit-trail">View all</a>
             </div>
             <div class="card-body p-0">
