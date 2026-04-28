@@ -10,6 +10,7 @@ const staffTransfersPagesService = require('../services/staffTransfersPagesServi
 const enquiryReportsService = require('../services/enquiryReportsService');
 const journalReportService = require('../services/journalReportService');
 const staffStatusService = require('../services/staffStatusService');
+const dataEntryDashboardService = require('../services/dataEntryDashboardService');
 
 function roundCurrency(value) {
     return Math.round((Number(value) || 0) * 100) / 100;
@@ -238,39 +239,50 @@ async function calculateStaffCompensation(gradeCode, notch) {
 const dataEntryController = {
     getDashboard: async (req, res) => {
         try {
-            // 1. Staff Records Count (Active & Not Redundant)
-            const [staffRows] = await pool.query('SELECT COUNT(*) as count FROM tblstaff WHERE EmpStatus = 1 AND Redundant = 0');
-            const staffCount = staffRows[0].count;
+            const companyId = req.user?.companyId
+                || req.user?.company_id
+                || req.session?.companyId
+                || req.session?.CompanyID
+                || 1;
 
-            // 2. Pending Approvals Count
-            const tables = [
-                'tblstaff', 'tbldependant', 'tblallowance', 'tblleave', 'tblapplication',
-                'tblpromotions', 'tbltransfer', 'tblcourse', 'tblquery', 'tblformer',
-                'tblappraisal', 'tblentitle', 'tblloan', 'tblbankguarantee'
-            ];
-            
-            let pendingApprovals = 0;
-            const approvalPromises = tables.map(table => 
-                pool.query(`SELECT COUNT(*) as count FROM ${table} WHERE Approved = 0`)
-            );
-            const results = await Promise.all(approvalPromises);
-            results.forEach(([rows]) => pendingApprovals += rows[0].count);
+            const dashboardData = await dataEntryDashboardService.getDataEntryDashboardData({ companyId });
 
             res.render('data_entry/dashboard', {
                 title: 'Data Entry Dashboard',
                 path: '/data-entry/dashboard',
                 user: req.session.user || { name: 'Data Entry Clerk' },
-                staffCount,
-                pendingApprovals
+                error: null,
+                ...dashboardData
             });
         } catch (error) {
-            console.error('Dashboard Error:', error);
+            console.error('Data Entry dashboard error:', error);
             res.render('data_entry/dashboard', {
                 title: 'Data Entry Dashboard',
                 path: '/data-entry/dashboard',
                 user: req.session.user || { name: 'Data Entry Clerk' },
-                staffCount: 0,
-                pendingApprovals: 0
+                error: 'Failed to load dashboard data',
+                company: {},
+                topCards: {
+                    activeStaffCount: 0,
+                    pendingApprovals: 0,
+                    payrollSetupGaps: 0,
+                    upcomingLeaveStarts: 0
+                },
+                operationalQueues: [],
+                payrollReadiness: {
+                    cards: {
+                        missingSalaryRows: 0,
+                        missingEntitlementRows: 0,
+                        pendingYearlyPayments: 0,
+                        pendingSalaryReviews: 0
+                    },
+                    missingSetupRows: []
+                },
+                recentActivity: [],
+                watchlist: {
+                    upcomingLeaveRows: [],
+                    yearlyPeriods: []
+                }
             });
         }
     },

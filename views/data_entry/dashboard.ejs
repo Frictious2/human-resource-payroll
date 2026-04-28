@@ -11,35 +11,39 @@
           crossorigin="anonymous" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
           rel="stylesheet" />
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/main.min.css"
-          rel="stylesheet" />
     <link href="/css/styles.css" rel="stylesheet" />
 </head>
 <body>
-    <!-- Top Navbar -->
     <%- include('partials/topbar', { user }) %>
-
-    <!-- Sidebar -->
     <%- include('partials/sidebar') %>
 
-    <!-- Main content -->
     <main class="main">
         <div class="container-fluid">
-            <div class="d-flex align-items-center justify-content-between mb-4">
+            <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
                 <div>
-                    <h2 class="mb-0">Overview</h2>
-                    <div class="text-muted">Quick stats and recent data entry activity</div>
+                    <h2 class="mb-1">Data Entry Overview</h2>
+                    <div class="text-muted">
+                        Operational workload, payroll readiness, and watchlist items for <%= company.Com_Name || 'your company' %>.
+                    </div>
+                </div>
+                <div class="text-muted small">
+                    Focus the day on entries waiting review, payroll setup gaps, and upcoming leave or payment actions.
                 </div>
             </div>
 
-            <div class="row g-4">
+            <% if (error) { %>
+                <div class="alert alert-danger shadow-sm"><%= error %></div>
+            <% } %>
+
+            <div class="row g-4 mb-4">
                 <div class="col-12 col-md-6 col-xxl-3">
-                    <div class="card shadow-sm">
+                    <div class="card shadow-sm h-100">
                         <div class="card-body">
                             <div class="d-flex align-items-center justify-content-between">
                                 <div>
-                                    <div class="text-muted">Staff Records</div>
-                                    <div class="fs-4 fw-semibold"><%= staffCount %></div>
+                                    <div class="text-muted">Active Staff</div>
+                                    <div class="fs-3 fw-semibold"><%= topCards.activeStaffCount %></div>
+                                    <div class="small text-muted">Visible operational staff</div>
                                 </div>
                                 <i class="bi bi-people fs-2 text-primary"></i>
                             </div>
@@ -53,7 +57,8 @@
                                 <div class="d-flex align-items-center justify-content-between">
                                     <div>
                                         <div class="text-muted">Pending Approvals</div>
-                                        <div class="fs-4 fw-semibold text-dark"><%= pendingApprovals %></div>
+                                        <div class="fs-3 fw-semibold text-dark"><%= topCards.pendingApprovals %></div>
+                                        <div class="small text-muted">Waiting on review</div>
                                     </div>
                                     <i class="bi bi-pencil-square fs-2 text-warning"></i>
                                 </div>
@@ -62,94 +67,254 @@
                     </a>
                 </div>
                 <div class="col-12 col-md-6 col-xxl-3">
-                    <div class="card shadow-sm">
+                    <div class="card shadow-sm h-100">
                         <div class="card-body">
                             <div class="d-flex align-items-center justify-content-between">
                                 <div>
-                                    <div class="text-muted">Processed Today</div>
-                                    <div class="fs-4 fw-semibold">15</div>
+                                    <div class="text-muted">Payroll Setup Gaps</div>
+                                    <div class="fs-3 fw-semibold"><%= topCards.payrollSetupGaps %></div>
+                                    <div class="small text-muted">Missing salary or entitlement</div>
                                 </div>
-                                <i class="bi bi-check2-circle fs-2 text-success"></i>
+                                <i class="bi bi-exclamation-diamond fs-2 text-danger"></i>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="col-12 col-md-6 col-xxl-3">
-                    <div class="card shadow-sm">
+                    <div class="card shadow-sm h-100">
                         <div class="card-body">
                             <div class="d-flex align-items-center justify-content-between">
                                 <div>
-                                    <div class="text-muted">Issues Flagged</div>
-                                    <div class="fs-4 fw-semibold">3</div>
+                                    <div class="text-muted">Leave Starting Soon</div>
+                                    <div class="fs-3 fw-semibold"><%= topCards.upcomingLeaveStarts %></div>
+                                    <div class="small text-muted">Next 14 days</div>
                                 </div>
-                                <i class="bi bi-exclamation-triangle fs-2 text-danger"></i>
+                                <i class="bi bi-calendar-event fs-2 text-info"></i>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="row g-4 mt-1">
-                <div class="col-12 col-lg-8">
+            <div class="row g-4 mb-4">
+                <div class="col-12 col-xl-7">
                     <div class="card shadow-sm h-100">
                         <div class="card-header d-flex justify-content-between align-items-center">
-                            <span class="fw-semibold">Data Entry Activity</span>
-                            <span class="text-muted small">Last 7 days</span>
+                            <span class="fw-semibold">Open Work Queues</span>
+                            <a href="/data-entry/pending-approvals" class="small text-decoration-none">Open pending approvals</a>
                         </div>
-                        <div class="card-body">
-                            <canvas id="lineChart" height="250"></canvas>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Module</th>
+                                            <th class="text-end">Open</th>
+                                            <th class="text-end">Added Today</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% if (!operationalQueues.length) { %>
+                                            <tr>
+                                                <td colspan="4" class="text-center text-muted py-4">No open work queues found.</td>
+                                            </tr>
+                                        <% } %>
+                                        <% operationalQueues.forEach((item) => { %>
+                                            <tr>
+                                                <td>
+                                                    <div class="fw-semibold"><%= item.label %></div>
+                                                    <div class="small text-muted"><%= item.route %></div>
+                                                </td>
+                                                <td class="text-end fw-semibold"><%= item.count %></td>
+                                                <td class="text-end"><%= item.todayCount %></td>
+                                                <td class="text-end">
+                                                    <a href="<%= item.route %>" class="btn btn-sm btn-outline-primary">Open</a>
+                                                </td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-12 col-lg-4">
+
+                <div class="col-12 col-xl-5">
                     <div class="card shadow-sm h-100">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <span class="fw-semibold">Recent Updates</span>
-                            <a href="#" class="text-decoration-none small">View All</a>
+                        <div class="card-header">
+                            <span class="fw-semibold">Recent Activity</span>
                         </div>
                         <div class="list-group list-group-flush">
-                            <div class="list-group-item">
-                                <div class="d-flex w-100 justify-content-between">
-                                    <h6 class="mb-1">New Staff Added</h6>
-                                    <small class="text-muted">10 mins ago</small>
+                            <% if (!recentActivity.length) { %>
+                                <div class="list-group-item text-muted py-4">No recent operational activity was found.</div>
+                            <% } %>
+                            <% recentActivity.forEach((item) => { %>
+                                <a href="<%= item.route %>" class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1"><%= item.module %></h6>
+                                        <small class="text-muted"><%= item.ActivityDate ? new Date(item.ActivityDate).toLocaleDateString('en-GB') : 'N/A' %></small>
+                                    </div>
+                                    <p class="mb-1 small text-muted">
+                                        <strong><%= item.SName || 'Unknown Staff' %></strong>
+                                        <% if (item.PFNo) { %> · <%= item.PFNo %><% } %>
+                                    </p>
+                                    <small class="text-muted">
+                                        <%= item.DeptName || item.Dept || 'No department' %>
+                                        ·
+                                        <%= Number(item.Approved || 0) === 0 ? 'Pending review' : 'Approved / processed' %>
+                                    </small>
+                                </a>
+                            <% }) %>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-header">
+                            <span class="fw-semibold">Payroll Readiness</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3 mb-4">
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Missing Salary Setup</div>
+                                        <div class="fs-4 fw-semibold"><%= payrollReadiness.cards.missingSalaryRows %></div>
+                                    </div>
                                 </div>
-                                <p class="mb-1 small text-muted">John Doe (IT Dept)</p>
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Missing Entitlement Setup</div>
+                                        <div class="fs-4 fw-semibold"><%= payrollReadiness.cards.missingEntitlementRows %></div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Pending Yearly Payments</div>
+                                        <div class="fs-4 fw-semibold"><%= payrollReadiness.cards.pendingYearlyPayments %></div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Pending Salary Reviews</div>
+                                        <div class="fs-4 fw-semibold"><%= payrollReadiness.cards.pendingSalaryReviews %></div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="list-group-item">
-                                <div class="d-flex w-100 justify-content-between">
-                                    <h6 class="mb-1">Leave Request Processed</h6>
-                                    <small class="text-muted">1 hr ago</small>
-                                </div>
-                                <p class="mb-1 small text-muted">Jane Smith (HR Dept)</p>
-                            </div>
-                            <div class="list-group-item">
-                                <div class="d-flex w-100 justify-content-between">
-                                    <h6 class="mb-1">Payroll Adjustment</h6>
-                                    <small class="text-muted">2 hrs ago</small>
-                                </div>
-                                <p class="mb-1 small text-muted">Michael Brown (Finance)</p>
-                            </div>
-                            <div class="list-group-item">
-                                <div class="d-flex w-100 justify-content-between">
-                                    <h6 class="mb-1">Training Record Updated</h6>
-                                    <small class="text-muted">Yesterday</small>
-                                </div>
-                                <p class="mb-1 small text-muted">Sarah Wilson (Sales)</p>
+
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>PF No</th>
+                                            <th>Staff</th>
+                                            <th>Department</th>
+                                            <th class="text-end">Missing Salary</th>
+                                            <th class="text-end">Missing Entitlement</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% if (!payrollReadiness.missingSetupRows.length) { %>
+                                            <tr>
+                                                <td colspan="5" class="text-center text-muted py-4">No active staff are missing salary or entitlement setup.</td>
+                                            </tr>
+                                        <% } %>
+                                        <% payrollReadiness.missingSetupRows.forEach((row) => { %>
+                                            <tr>
+                                                <td class="fw-semibold"><%= row.PFNo %></td>
+                                                <td><%= row.SName %></td>
+                                                <td><%= row.DeptName || row.Dept || 'N/A' %></td>
+                                                <td class="text-end"><%= row.MissingSalary ? 'Yes' : 'No' %></td>
+                                                <td class="text-end"><%= row.MissingEntitlement ? 'Yes' : 'No' %></td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="row g-4 mt-1">
-                <div class="col-12">
-                    <div class="card shadow-sm">
+            <div class="row g-4">
+                <div class="col-12 col-xl-6">
+                    <div class="card shadow-sm h-100">
                         <div class="card-header d-flex justify-content-between align-items-center">
-                            <span class="fw-semibold">Company Calendar</span>
-                            <span class="text-muted small">Events and Holidays</span>
+                            <span class="fw-semibold">Upcoming Leave Starts</span>
+                            <a href="/data-entry/reports/leave" class="small text-decoration-none">Open leave report</a>
                         </div>
-                        <div class="card-body">
-                            <div id="calendar"></div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>PF No</th>
+                                            <th>Staff</th>
+                                            <th>Leave Type</th>
+                                            <th>Start Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% if (!watchlist.upcomingLeaveRows.length) { %>
+                                            <tr>
+                                                <td colspan="4" class="text-center text-muted py-4">No approved leave starts are coming up in the next 14 days.</td>
+                                            </tr>
+                                        <% } %>
+                                        <% watchlist.upcomingLeaveRows.forEach((row) => { %>
+                                            <tr>
+                                                <td class="fw-semibold"><%= row.PFNO %></td>
+                                                <td>
+                                                    <div class="fw-semibold"><%= row.SName %></div>
+                                                    <div class="small text-muted"><%= row.DeptName || row.Dept || 'N/A' %></div>
+                                                </td>
+                                                <td><%= row.LeaveType || 'N/A' %></td>
+                                                <td><%= row.StartDate ? new Date(row.StartDate).toLocaleDateString('en-GB') : 'N/A' %></td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="fw-semibold">Yearly Payment Watchlist</span>
+                            <a href="/data-entry/reports/yearly-payments" class="small text-decoration-none">Open yearly payments</a>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Period</th>
+                                            <th>Type</th>
+                                            <th class="text-end">Rows</th>
+                                            <th class="text-end">Net Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% if (!watchlist.yearlyPeriods.length) { %>
+                                            <tr>
+                                                <td colspan="4" class="text-center text-muted py-4">No pending yearly payment periods were found.</td>
+                                            </tr>
+                                        <% } %>
+                                        <% watchlist.yearlyPeriods.forEach((row) => { %>
+                                            <tr>
+                                                <td><%= row.PMonth %>/<%= row.PYear %></td>
+                                                <td><%= row.PType %></td>
+                                                <td class="text-end"><%= row.RowCount %></td>
+                                                <td class="text-end"><%= Number(row.NetTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -162,8 +327,5 @@
     </main>
 
     <script src="/vendor/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
-    <script src="/js/dashboard.js"></script>
 </body>
 </html>
