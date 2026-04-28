@@ -11,63 +11,67 @@
           crossorigin="anonymous" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
           rel="stylesheet" />
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/main.min.css"
-          rel="stylesheet" />
     <link href="/css/styles.css" rel="stylesheet" />
 </head>
 <body>
-    <!-- Top Navbar -->
     <%- include('partials/topbar', { user }) %>
-
-    <!-- Sidebar -->
     <%- include('partials/sidebar') %>
 
-    <!-- Main content -->
     <main class="main">
         <div class="container-fluid">
-            <div class="d-flex align-items-center justify-content-between mb-4">
+            <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
                 <div>
-                    <h2 class="mb-0">Overview</h2>
-                    <div class="text-muted">Quick stats and recent activity</div>
+                    <h2 class="mb-1">Manager Overview</h2>
+                    <div class="text-muted">
+                        Approval workload, people status, and payroll oversight for <%= company.Com_Name || 'your company' %>.
+                    </div>
+                </div>
+                <div class="text-muted small">
+                    Upcoming retirements are based on a retirement age of <strong><%= peopleSnapshot.cards.retirementAge %></strong> from <code>tblparams1.RetireAge</code>.
                 </div>
             </div>
 
-            <div class="row g-4">
+            <% if (error) { %>
+                <div class="alert alert-danger shadow-sm"><%= error %></div>
+            <% } %>
+
+            <div class="row g-4 mb-4">
                 <div class="col-12 col-md-6 col-xxl-3">
-                    <div class="card shadow-sm">
+                    <div class="card shadow-sm h-100">
                         <div class="card-body">
                             <div class="d-flex align-items-center justify-content-between">
                                 <div>
-                                    <div class="text-muted">Staff Records</div>
-                                    <div class="fs-4 fw-semibold"><%= staffCount %></div>
+                                    <div class="text-muted">Pending Approvals</div>
+                                    <div class="fs-3 fw-semibold"><%= approvalQueue.totalPending %></div>
+                                    <div class="small text-muted">Across active manager workflows</div>
                                 </div>
-                                <i class="bi bi-people fs-2 text-primary"></i>
+                                <i class="bi bi-check2-square fs-2 text-warning"></i>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="col-12 col-md-6 col-xxl-3">
-                    <a href="/manager/pending-approvals" class="text-decoration-none">
-                        <div class="card shadow-sm h-100 hover-card">
-                            <div class="card-body">
-                                <div class="d-flex align-items-center justify-content-between">
-                                    <div>
-                                        <div class="text-muted">Pending Approvals</div>
-                                        <div class="fs-4 fw-semibold text-dark"><%= pendingApprovals %></div>
-                                    </div>
-                                    <i class="bi bi-check2-square fs-2 text-warning"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </a>
-                </div>
-                <div class="col-12 col-md-6 col-xxl-3">
-                    <div class="card shadow-sm">
+                    <div class="card shadow-sm h-100">
                         <div class="card-body">
                             <div class="d-flex align-items-center justify-content-between">
                                 <div>
-                                    <div class="text-muted">Upcoming Leaves</div>
-                                    <div class="fs-4 fw-semibold">2</div>
+                                    <div class="text-muted">Overdue Approvals</div>
+                                    <div class="fs-3 fw-semibold"><%= approvalQueue.overdueTotal %></div>
+                                    <div class="small text-muted">Waiting more than 7 days</div>
+                                </div>
+                                <i class="bi bi-exclamation-triangle fs-2 text-danger"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6 col-xxl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="text-muted">Staff On Leave Now</div>
+                                    <div class="fs-3 fw-semibold"><%= peopleSnapshot.cards.onLeaveNow %></div>
+                                    <div class="small text-muted">Approved, active leave records</div>
                                 </div>
                                 <i class="bi bi-calendar-event fs-2 text-info"></i>
                             </div>
@@ -75,43 +79,419 @@
                     </div>
                 </div>
                 <div class="col-12 col-md-6 col-xxl-3">
-                    <div class="card shadow-sm">
+                    <div class="card shadow-sm h-100">
                         <div class="card-body">
                             <div class="d-flex align-items-center justify-content-between">
                                 <div>
-                                    <div class="text-muted">Department Budget</div>
-                                    <div class="fs-4 fw-semibold">$12,000</div>
+                                    <div class="text-muted">Upcoming Retirements</div>
+                                    <div class="fs-3 fw-semibold"><%= peopleSnapshot.cards.upcomingRetirementsCount %></div>
+                                    <div class="small text-muted">Within the next 12 months</div>
                                 </div>
-                                <i class="bi bi-wallet2 fs-2 text-success"></i>
+                                <i class="bi bi-hourglass-split fs-2 text-primary"></i>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="row g-4 mt-1">
-                <div class="col-12">
-                    <div class="card shadow-sm">
+            <div class="row g-4 mb-4">
+                <div class="col-12 col-xl-7">
+                    <div class="card shadow-sm h-100">
                         <div class="card-header d-flex justify-content-between align-items-center">
-                            <span class="fw-semibold">Department Performance</span>
-                            <span class="text-muted small">Last 6 months</span>
+                            <span class="fw-semibold">Approval Queue</span>
+                            <a href="/manager/pending-approvals" class="small text-decoration-none">View all approvals</a>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Module</th>
+                                            <th class="text-end">Pending</th>
+                                            <th class="text-end">Overdue</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% if (!approvalQueue.modules.length) { %>
+                                            <tr>
+                                                <td colspan="4" class="text-center text-muted py-4">No approval items are pending right now.</td>
+                                            </tr>
+                                        <% } %>
+                                        <% approvalQueue.modules.forEach((item) => { %>
+                                            <tr>
+                                                <td>
+                                                    <div class="fw-semibold"><%= item.label %></div>
+                                                    <div class="small text-muted"><%= item.route %></div>
+                                                </td>
+                                                <td class="text-end fw-semibold"><%= item.count %></td>
+                                                <td class="text-end">
+                                                    <span class="badge text-bg-<%= item.overdue > 0 ? 'danger' : 'secondary' %>"><%= item.overdue %></span>
+                                                </td>
+                                                <td class="text-end">
+                                                    <a href="<%= item.route %>" class="btn btn-sm btn-outline-primary">Open</a>
+                                                </td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header">
+                            <span class="fw-semibold">Operational Alerts</span>
                         </div>
                         <div class="card-body">
-                            <canvas id="lineChart" height="120"></canvas>
+                            <% if (!alerts.length) { %>
+                                <div class="text-muted">No high-priority alerts right now.</div>
+                            <% } %>
+                            <% alerts.forEach((alert) => { %>
+                                <div class="alert alert-<%= alert.tone %> mb-3">
+                                    <div class="fw-semibold mb-1"><%= alert.title %></div>
+                                    <div class="small mb-2"><%= alert.message %></div>
+                                    <a href="<%= alert.route %>" class="small text-decoration-none">Open related page</a>
+                                </div>
+                            <% }) %>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="row g-4 mt-1">
+            <div class="row g-4 mb-4">
                 <div class="col-12">
                     <div class="card shadow-sm">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <span class="fw-semibold">Company Calendar</span>
-                            <span class="text-muted small">Events and Holidays</span>
+                        <div class="card-header">
+                            <span class="fw-semibold">People Snapshot</span>
                         </div>
                         <div class="card-body">
-                            <div id="calendar"></div>
+                            <div class="row g-3">
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Active Staff</div>
+                                        <div class="fs-4 fw-semibold"><%= peopleSnapshot.cards.activeStaffCount %></div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Former Staff</div>
+                                        <div class="fs-4 fw-semibold"><%= peopleSnapshot.cards.formerCount %></div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Retired Staff</div>
+                                        <div class="fs-4 fw-semibold"><%= peopleSnapshot.cards.retiredCount %></div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Redundant Staff</div>
+                                        <div class="fs-4 fw-semibold"><%= peopleSnapshot.cards.redundantCount %></div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Active Queries</div>
+                                        <div class="fs-4 fw-semibold"><%= peopleSnapshot.cards.activeQueries %></div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Pending Exits</div>
+                                        <div class="fs-4 fw-semibold"><%= peopleSnapshot.cards.pendingExits %></div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Training in Last 12 Months</div>
+                                        <div class="fs-4 fw-semibold"><%= peopleSnapshot.cards.trainingParticipants %></div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Attendance Exceptions</div>
+                                        <div class="fs-4 fw-semibold"><%= peopleSnapshot.cards.attendanceExceptions %></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-12 col-xl-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="fw-semibold">Upcoming Retirements</span>
+                            <span class="small text-muted">Next 12 months</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>PF No</th>
+                                            <th>Staff</th>
+                                            <th>Department</th>
+                                            <th>Retirement Date</th>
+                                            <th class="text-end">Months Left</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% if (!peopleSnapshot.upcomingRetirements.length) { %>
+                                            <tr>
+                                                <td colspan="5" class="text-center text-muted py-4">No retirements fall within the next 12 months.</td>
+                                            </tr>
+                                        <% } %>
+                                        <% peopleSnapshot.upcomingRetirements.forEach((row) => { %>
+                                            <tr>
+                                                <td class="fw-semibold"><%= row.PFNo %></td>
+                                                <td>
+                                                    <div class="fw-semibold"><%= row.SName %></div>
+                                                    <div class="small text-muted">Age <%= row.CurrentAge %></div>
+                                                </td>
+                                                <td><%= row.DeptName || row.Dept || 'N/A' %></td>
+                                                <td><%= row.RetirementDate ? new Date(row.RetirementDate).toLocaleDateString('en-GB') : 'N/A' %></td>
+                                                <td class="text-end"><%= row.MonthsToRetirement %></td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="fw-semibold">Currently On Leave</span>
+                            <a href="/manager/enquiry/on-leave" class="small text-decoration-none">Open enquiry</a>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>PF No</th>
+                                            <th>Staff</th>
+                                            <th>Leave Type</th>
+                                            <th>Resumption</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% if (!peopleSnapshot.staffOnLeaveRows.length) { %>
+                                            <tr>
+                                                <td colspan="4" class="text-center text-muted py-4">No staff are currently on leave.</td>
+                                            </tr>
+                                        <% } %>
+                                        <% peopleSnapshot.staffOnLeaveRows.forEach((row) => { %>
+                                            <tr>
+                                                <td class="fw-semibold"><%= row.PFNO %></td>
+                                                <td>
+                                                    <div class="fw-semibold"><%= row.SName %></div>
+                                                    <div class="small text-muted"><%= row.DeptName || row.Dept || 'N/A' %></div>
+                                                </td>
+                                                <td><%= row.LeaveType || 'N/A' %></td>
+                                                <td><%= row.ResumptionDate ? new Date(row.ResumptionDate).toLocaleDateString('en-GB') : 'N/A' %></td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-header">
+                            <span class="fw-semibold">Payroll Oversight</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3 mb-4">
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Unposted Payroll Periods</div>
+                                        <div class="fs-4 fw-semibold"><%= payrollOversight.cards.unpostedPayrollPeriods %></div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Pending Yearly Payments</div>
+                                        <div class="fs-4 fw-semibold"><%= payrollOversight.cards.pendingYearlyPayments %></div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Pending GL Posting Batches</div>
+                                        <div class="fs-4 fw-semibold"><%= payrollOversight.cards.pendingPostingBatches %></div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <div class="border rounded p-3 h-100">
+                                        <div class="text-muted small">Payroll Exceptions</div>
+                                        <div class="fs-4 fw-semibold"><%= payrollOversight.cards.payrollExceptions %></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row g-4">
+                                <div class="col-12 col-xl-4">
+                                    <h6 class="fw-semibold mb-3">Unposted Payroll Periods</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm align-middle">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Period</th>
+                                                    <th>Activity</th>
+                                                    <th class="text-end">Rows</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <% if (!payrollOversight.unpostedPeriods.length) { %>
+                                                    <tr><td colspan="3" class="text-center text-muted py-3">No unposted periods.</td></tr>
+                                                <% } %>
+                                                <% payrollOversight.unpostedPeriods.forEach((row) => { %>
+                                                    <tr>
+                                                        <td><%= row.PMonth %>/<%= row.PYear %></td>
+                                                        <td><%= row.PType %></td>
+                                                        <td class="text-end"><%= row.RowCount %></td>
+                                                    </tr>
+                                                <% }) %>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <div class="col-12 col-xl-4">
+                                    <h6 class="fw-semibold mb-3">Pending Yearly Payments</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm align-middle">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>PF No</th>
+                                                    <th>Type</th>
+                                                    <th class="text-end">Net</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <% if (!payrollOversight.yearlyPending.length) { %>
+                                                    <tr><td colspan="3" class="text-center text-muted py-3">No pending yearly payments.</td></tr>
+                                                <% } %>
+                                                <% payrollOversight.yearlyPending.forEach((row) => { %>
+                                                    <tr>
+                                                        <td><%= row.PFNo %></td>
+                                                        <td><%= row.PType %> <span class="text-muted">(<%= row.PMonth %>/<%= row.PYear %>)</span></td>
+                                                        <td class="text-end"><%= Number(row.NetIncome || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                                    </tr>
+                                                <% }) %>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <div class="col-12 col-xl-4">
+                                    <h6 class="fw-semibold mb-3">Pending GL Posting Batches</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm align-middle">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Batch</th>
+                                                    <th>Status</th>
+                                                    <th class="text-end">Amount</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <% if (!payrollOversight.pendingBatches.length) { %>
+                                                    <tr><td colspan="3" class="text-center text-muted py-3">No pending posting batches.</td></tr>
+                                                <% } %>
+                                                <% payrollOversight.pendingBatches.forEach((row) => { %>
+                                                    <tr>
+                                                        <td>#<%= row.id %> <span class="text-muted">(<%= row.posting_month %>/<%= row.posting_year %>)</span></td>
+                                                        <td><span class="badge text-bg-secondary"><%= row.status %></span></td>
+                                                        <td class="text-end"><%= Number(row.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                                    </tr>
+                                                <% }) %>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-12 col-xl-7">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header">
+                            <span class="fw-semibold">Department Summaries</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Department</th>
+                                            <th class="text-end">Active Staff</th>
+                                            <th class="text-end">On Leave</th>
+                                            <th class="text-end">Trained (12 Months)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% if (!departmentSummaries.length) { %>
+                                            <tr>
+                                                <td colspan="4" class="text-center text-muted py-4">No department summary data is available.</td>
+                                            </tr>
+                                        <% } %>
+                                        <% departmentSummaries.forEach((row) => { %>
+                                            <tr>
+                                                <td><%= row.DeptName || row.Dept || 'Unassigned' %></td>
+                                                <td class="text-end"><%= row.ActiveStaff %></td>
+                                                <td class="text-end"><%= row.OnLeaveNow %></td>
+                                                <td class="text-end"><%= row.TrainedLast12Months %></td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header">
+                            <span class="fw-semibold">Quick Actions</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="list-group">
+                                <a href="/manager/pending-approvals" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                    Review approval queue
+                                    <span class="badge text-bg-primary rounded-pill"><%= approvalQueue.totalPending %></span>
+                                </a>
+                                <a href="/manager/enquiry/on-leave" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                    Check staff on leave
+                                    <span class="badge text-bg-secondary rounded-pill"><%= peopleSnapshot.cards.onLeaveNow %></span>
+                                </a>
+                                <a href="/manager/reports/payroll" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                    Review payroll reports
+                                    <span class="badge text-bg-secondary rounded-pill"><%= payrollOversight.cards.unpostedPayrollPeriods %></span>
+                                </a>
+                                <a href="/manager/reports/yearly-payments" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                    Check yearly payments
+                                    <span class="badge text-bg-secondary rounded-pill"><%= payrollOversight.cards.pendingYearlyPayments %></span>
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -124,8 +504,5 @@
     </main>
 
     <script src="/vendor/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
-    <script src="/js/dashboard.js"></script>
 </body>
 </html>

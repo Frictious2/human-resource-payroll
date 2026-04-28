@@ -10,54 +10,69 @@ const loansMedicalPagesService = require('../services/loansMedicalPagesService')
 const staffTransfersPagesService = require('../services/staffTransfersPagesService');
 const enquiryReportsService = require('../services/enquiryReportsService');
 const journalReportService = require('../services/journalReportService');
+const managerDashboardService = require('../services/managerDashboardService');
 
 const managerController = {
     getDashboard: async (req, res) => {
-    try {
-        // 1. My Staff count (Active & Not Redundant)
-        const [staffRows] = await pool.query('SELECT COUNT(*) as count FROM tblstaff WHERE EmpStatus = 1 AND Redundant = 0');
-        const staffCount = staffRows[0].count;
+        try {
+            const companyId = req.user?.companyId
+                || req.user?.company_id
+                || req.session?.companyId
+                || req.session?.CompanyID
+                || 1;
 
-        // 2. Pending Approvals
-        // List of tables to check
-        const tables = [
-            'tblstaff', 'tbldependant', 'tblallowance', 'tblleave', 'tblapplication',
-            'tblpromotions', 'tbltransfer', 'tblcourse', 'tblquery', 'tblformer',
-            'tblappraisal', 'tblentitle', 'tblloan', 'tblbankguarantee'
-        ];
-        
-        let pendingApprovals = 0;
-        
-        // Use Promise.all to run queries in parallel
-        const approvalPromises = tables.map(table => 
-            pool.query(`SELECT COUNT(*) as count FROM ${table} WHERE Approved = 0`)
-        );
-        
-        const results = await Promise.all(approvalPromises);
-        
-        results.forEach(([rows]) => {
-            pendingApprovals += rows[0].count;
-        });
+            const dashboardData = await managerDashboardService.getManagerDashboardData({ companyId });
 
-        res.render('manager/dashboard', { 
-            title: 'Manager Dashboard',
-            path: '/manager/dashboard',
-            user: req.session.user || { name: 'Manager' },
-            staffCount,
-            pendingApprovals
-        });
-    } catch (error) {
-        console.error('Dashboard Error:', error);
-        res.render('manager/dashboard', { 
-            title: 'Manager Dashboard',
-            path: '/manager/dashboard',
-            user: req.session.user || { name: 'Manager' },
-            staffCount: 0,
-            pendingApprovals: 0,
-            error: 'Failed to load dashboard data'
-        });
-    }
-  },
+            res.render('manager/dashboard', {
+                title: 'Manager Dashboard',
+                path: '/manager/dashboard',
+                user: req.session.user || { name: 'Manager' },
+                error: null,
+                ...dashboardData
+            });
+        } catch (error) {
+            console.error('Manager dashboard error:', error);
+            res.render('manager/dashboard', {
+                title: 'Manager Dashboard',
+                path: '/manager/dashboard',
+                user: req.session.user || { name: 'Manager' },
+                company: {},
+                approvalQueue: { modules: [], totalPending: 0, overdueTotal: 0 },
+                peopleSnapshot: {
+                    cards: {
+                        activeStaffCount: 0,
+                        retiredCount: 0,
+                        formerCount: 0,
+                        redundantCount: 0,
+                        onLeaveNow: 0,
+                        activeQueries: 0,
+                        pendingExits: 0,
+                        trainingParticipants: 0,
+                        attendanceExceptions: 0,
+                        upcomingRetirementsCount: 0,
+                        retirementAge: 60
+                    },
+                    upcomingRetirements: [],
+                    staffOnLeaveRows: []
+                },
+                payrollOversight: {
+                    cards: {
+                        unpostedPayrollPeriods: 0,
+                        pendingYearlyPayments: 0,
+                        pendingPostingBatches: 0,
+                        payrollExceptions: 0
+                    },
+                    unpostedPeriods: [],
+                    yearlyPending: [],
+                    pendingBatches: [],
+                    payrollAudit: { totals: { suspiciousGroups: 0, rows: [] } }
+                },
+                departmentSummaries: [],
+                alerts: [],
+                error: 'Failed to load dashboard data'
+            });
+        }
+    },
 
   getPendingApprovals: async (req, res) => {
     try {
