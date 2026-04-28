@@ -95,12 +95,23 @@
                 <%= company.City %>, <%= company.Country %>
             </div>
             <div class="report-title">
-                <%= searchType === 'ex-gracia' ? 'EX-GRACIA BENEFIT REPORT' : 'END OF SERVICE BENEFIT REPORT' %>
+                <%= searchType === 'ex-gracia' ? 'EX-GRATIA BENEFIT REPORT' : 'END OF SERVICE BENEFIT REPORT' %>
             </div>
             <div class="mt-2">
                 <strong>Reference Date:</strong> <%= new Date(endDate).toLocaleDateString() %>
             </div>
         </div>
+
+        <% if (validationErrors && validationErrors.length) { %>
+            <div class="alert alert-warning">
+                <div class="fw-bold mb-2">Validation Warnings</div>
+                <ul class="mb-0">
+                    <% validationErrors.forEach((message) => { %>
+                        <li><%= message %></li>
+                    <% }) %>
+                </ul>
+            </div>
+        <% } %>
 
         <!-- Report Content -->
         <% if (results && Object.keys(results).length > 0) { %>
@@ -109,18 +120,33 @@
                 <table class="table table-bordered table-sm">
                     <thead>
                         <tr>
-                            <th>PF No</th>
-                            <th>Name</th>
-                            <th>Grade</th>
-                            <th>Date Emp</th>
-                            <th>Age</th>
-                            <th>Yrs</th>
-                            <th class="text-end">Salary</th>
-                            <th class="text-center">Days</th>
-                            <th class="text-end">Benefit</th>
-                            <th class="text-end">Taxable</th>
-                            <th class="text-end">Tax</th>
-                            <th class="text-end">Net Benefit</th>
+                            <% if (searchType === 'ex-gracia') { %>
+                                <th>PF No</th>
+                                <th>Name</th>
+                                <th>Department</th>
+                                <th>Date Emp</th>
+                                <th>Preview Date</th>
+                                <th class="text-center">Age</th>
+                                <th class="text-center">Service Yrs</th>
+                                <th class="text-center">Years Left to 60</th>
+                                <th class="text-end">Monthly Basic</th>
+                                <th class="text-end">Annual Basic</th>
+                                <th class="text-end">Ex-Gratia</th>
+                                <th class="text-center">Eligibility</th>
+                            <% } else { %>
+                                <th>PF No</th>
+                                <th>Name</th>
+                                <th>Grade</th>
+                                <th>Date Emp</th>
+                                <th>Age</th>
+                                <th>Yrs</th>
+                                <th class="text-end">Salary</th>
+                                <th class="text-center">Days</th>
+                                <th class="text-end">Benefit</th>
+                                <th class="text-end">Taxable</th>
+                                <th class="text-end">Tax</th>
+                                <th class="text-end">Net Benefit</th>
+                            <% } %>
                         </tr>
                     </thead>
                     <tbody>
@@ -129,23 +155,44 @@
                             <% const netPay = (row.Final !== undefined && row.Final !== null) ? row.Final : (row.Benefit - row.Tax); %>
                             <% deptTotal += parseFloat(netPay || 0); %>
                             <tr>
-                                <td class="text-center"><%= row.PFNo %></td>
-                                <td><%= row.SName %></td>
-                                <td class="text-center"><%= row.Grade %></td>
-                                <td class="text-center"><%= new Date(row.DateEmp).toLocaleDateString() %></td>
-                                <td class="text-center"><%= row.Age %></td>
-                                <td class="text-center"><%= row.Years %></td>
-                                <td class="text-end"><%= parseFloat(row.Salary).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
-                                <td class="text-center"><%= row.Days %></td>
-                                <td class="text-end"><%= parseFloat(row.Benefit).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
-                                <td class="text-end"><%= parseFloat(row.Taxable).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
-                                <td class="text-end"><%= parseFloat(row.Tax).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
-                                <td class="text-end fw-bold"><%= netPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                                <% if (searchType === 'ex-gracia') { %>
+                                    <td class="text-center"><%= row.PFNo %></td>
+                                    <td><%= row.SName %></td>
+                                    <td><%= row.DeptName || dept %></td>
+                                    <td class="text-center"><%= row.DateEmp ? new Date(row.DateEmp).toLocaleDateString() : '-' %></td>
+                                    <td class="text-center"><%= row.PreviewDate ? new Date(row.PreviewDate).toLocaleDateString() : '-' %></td>
+                                    <td class="text-center"><%= row.Age ?? '-' %></td>
+                                    <td class="text-center"><%= row.YearsServed %></td>
+                                    <td class="text-center"><%= row.YearsLeftToEligibility ?? '-' %></td>
+                                    <td class="text-end"><%= parseFloat(row.MonthlyBasicSalary || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                                    <td class="text-end"><%= parseFloat(row.AnnualBasicSalary || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                                    <td class="text-end"><%= parseFloat(row.ExGratiaAmount || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                                    <td class="text-center"><%= row.EligibilityStatus %></td>
+                                <% } else { %>
+                                    <td class="text-center"><%= row.PFNo %></td>
+                                    <td><%= row.SName %></td>
+                                    <td class="text-center"><%= row.Grade %></td>
+                                    <td class="text-center"><%= new Date(row.DateEmp).toLocaleDateString() %></td>
+                                    <td class="text-center"><%= row.Age %></td>
+                                    <td class="text-center"><%= row.Years %></td>
+                                    <td class="text-end"><%= parseFloat(row.Salary).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                                    <td class="text-center"><%= row.Days %></td>
+                                    <td class="text-end"><%= parseFloat(row.Benefit).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                                    <td class="text-end"><%= parseFloat(row.Taxable).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                                    <td class="text-end"><%= parseFloat(row.Tax).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                                    <td class="text-end fw-bold"><%= netPay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                                <% } %>
                             </tr>
                         <% }); %>
                         <tr class="table-light fw-bold">
-                            <td colspan="11" class="text-end">Total for <%= dept %>:</td>
-                            <td class="text-end"><%= deptTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                            <% if (searchType === 'ex-gracia') { %>
+                                <td colspan="11" class="text-end">Total for <%= dept %>:</td>
+                                <td class="text-end"><%= deptTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                                <td></td>
+                            <% } else { %>
+                                <td colspan="11" class="text-end">Total for <%= dept %>:</td>
+                                <td class="text-end"><%= deptTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) %></td>
+                            <% } %>
                         </tr>
                     </tbody>
                 </table>
