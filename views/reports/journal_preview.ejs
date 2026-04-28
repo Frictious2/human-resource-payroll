@@ -56,10 +56,10 @@
                             <td><%= row.head %></td>
                             <td class="text-center"><%= row.code %></td>
                             <td class="text-end">
-                                <%= row.debit ? Number(row.debit).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '' %>
+                                <%= Number(row.debit || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>
                             </td>
                             <td class="text-end">
-                                <%= row.credit ? Number(row.credit).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '' %>
+                                <%= Number(row.credit || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>
                             </td>
                         </tr>
                     <% }); %>
