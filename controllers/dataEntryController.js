@@ -8,6 +8,7 @@ const leavePagesService = require('../services/leavePagesService');
 const loansMedicalPagesService = require('../services/loansMedicalPagesService');
 const staffTransfersPagesService = require('../services/staffTransfersPagesService');
 const enquiryReportsService = require('../services/enquiryReportsService');
+const journalReportService = require('../services/journalReportService');
 const staffStatusService = require('../services/staffStatusService');
 
 function roundCurrency(value) {
@@ -5994,8 +5995,7 @@ const dataEntryController = {
 
     getJournalReport: async (req, res) => {
         try {
-            // Fetch distinct dates (ignoring time) from tblgltrans
-            const [dates] = await pool.query('SELECT DISTINCT DATE(GLDate) as GLDateVal FROM tblgltrans ORDER BY GLDateVal DESC');
+            const dates = await journalReportService.getJournalDates();
             
             res.render('reports/journal_index', {
                 title: 'Journal Report',
@@ -6013,82 +6013,26 @@ const dataEntryController = {
     getJournalReportPreview: async (req, res) => {
         try {
             const { glDate } = req.query;
-            const [companyRows] = await pool.query('SELECT * FROM tblcominfo LIMIT 1');
-            const companyInfo = companyRows[0] || {};
-
-            // Fetch GL Accounts
-            const [glAccounts] = await pool.query('SELECT * FROM tblglaccounts ORDER BY GLNo');
-
-            // Fetch journal entries for the selected date
-            const [journalEntries] = await pool.query(`
-                SELECT * FROM tblgltrans 
-                WHERE DATE(GLDate) = ?
-            `, [glDate]);
-
-            // Aggregate journal entries
-            const fieldsToSum = [
-                'BasicSalary', 'Headquarters', 'Responsibility', 'MaidAllowance', 'StaffWelfare', 
-                'Transport', 'COLA', 'Risk', 'Acting', 'Professional', 'Academic', 
-                'IncomeTax', 'NassitEmp', 'ProvidentEmp', 'Rent', 'SSA', 'JSA', 
-                'SalAdvance', 'IntOnAdv', 'SalaryWages'
-            ];
-
-            const aggregatedJournal = journalEntries.reduce((acc, entry) => {
-                fieldsToSum.forEach(field => {
-                    const val = parseFloat(entry[field]);
-                    if (!isNaN(val)) {
-                        acc[field] = (acc[field] || 0) + val;
-                    }
-                });
-                return acc;
-            }, {});
-
-            // Preserve metadata from the first entry
-            if (journalEntries.length > 0) {
-                aggregatedJournal.GLDate = journalEntries[0].GLDate;
-                aggregatedJournal.GLMonth = journalEntries[0].GLMonth;
-                aggregatedJournal.GLYear = journalEntries[0].GLYear;
-            }
-
-            let effectiveJournal = aggregatedJournal;
-            let { rows: journalRows, totalDebit, totalCredit } = buildJournalRows(glAccounts, effectiveJournal);
-
-            if (journalEntries.length > 0 && Math.abs(totalDebit - totalCredit) > 0.009) {
-                const fallbackCompanyId = Number(companyInfo.CompanyID || (req.session.user && req.session.user.company_id) || 1);
-                const rebuiltJournal = await rebuildBalancedJournalFromPayroll(
-                    fallbackCompanyId,
-                    Number(aggregatedJournal.GLMonth),
-                    Number(aggregatedJournal.GLYear)
-                );
-
-                if (rebuiltJournal) {
-                    effectiveJournal = {
-                        ...aggregatedJournal,
-                        ...rebuiltJournal
-                    };
-
-                    const rebuilt = buildJournalRows(glAccounts, effectiveJournal);
-                    journalRows = rebuilt.rows;
-                    totalDebit = rebuilt.totalDebit;
-                    totalCredit = rebuilt.totalCredit;
-                }
-            }
+            const previewData = await journalReportService.getJournalPreviewData({
+                companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
+                glDate
+            });
 
             res.render('reports/journal_preview', {
                 title: 'Journal Report Preview',
-                companyInfo,
-                journalEntries, // Keep for reference
-                aggregatedJournal: effectiveJournal,
-                journalRows,
-                totalDebit,
-                totalCredit,
-                glAccounts,
-                glDate,
+                companyInfo: previewData.companyInfo,
+                journalEntries: previewData.journalEntries,
+                aggregatedJournal: previewData.aggregatedJournal,
+                journalRows: previewData.journalRows,
+                totalDebit: previewData.totalDebit,
+                totalCredit: previewData.totalCredit,
+                glAccounts: previewData.glAccounts,
+                glDate: previewData.glDate,
                 user: req.session.user || { name: 'Data Entry' },
                 role: 'data_entry'
             });
         } catch (error) {
-            console.error(error);
+            console.error('Journal preview error (data entry):', error);
             res.status(500).send('Server Error');
         }
     },
