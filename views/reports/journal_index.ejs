@@ -44,10 +44,10 @@
                                         <option value="" selected disabled>Select a GL Date...</option>
                                         <% dates.forEach(date => { %>
                                             <% 
-                                                // Format date as YYYY-MM-DD for value and readable string for display
-                                                const d = new Date(date.GLDateVal);
-                                                const val = d.toISOString().split('T')[0];
-                                                const display = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                                                const val = String(date.GLDateVal || '').slice(0, 10);
+                                                const display = val
+                                                    ? new Date(`${val}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                                                    : '';
                                             %>
                                             <option value="<%= val %>"><%= display %></option>
                                         <% }); %>

@@ -154,10 +154,11 @@ async function rebuildBalancedJournalFromPayroll(companyId, month, year) {
 async function getJournalDates(connection = pool) {
     const [dates] = await connection.query(
         `
-            SELECT DISTINCT DATE(GLDate) AS GLDateVal
+            SELECT DISTINCT
+                DATE_FORMAT(GLDate, '%Y-%m-%d') AS GLDateVal
             FROM tblgltrans
             WHERE GLDate IS NOT NULL
-            ORDER BY GLDateVal DESC
+            ORDER BY DATE(GLDate) DESC
         `
     );
 
