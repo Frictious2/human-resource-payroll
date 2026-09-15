@@ -1,0 +1,53 @@
+<aside class="sidebar bg-body border-end">
+  <div class="px-3 py-4">
+    <nav class="nav flex-column sub-nav mb-3">
+      <a class="nav-link" href="/finance/dashboard"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
+      <a class="nav-link" href="/work-queue"><i class="bi bi-list-task me-2"></i>My Work Queue</a>
+      <a class="nav-link" href="/notifications"><i class="bi bi-bell me-2"></i>Notifications</a>
+    </nav>
+
+    <a class="nav-link d-flex justify-content-between align-items-center" role="button" data-bs-toggle="collapse" data-bs-target="#navFinancePayroll" aria-expanded="false" aria-controls="navFinancePayroll">
+      <span><i class="bi bi-cash-stack me-2"></i>Payroll Processing</span><i class="bi bi-chevron-down small"></i>
+    </a>
+    <div class="collapse show" id="navFinancePayroll">
+      <nav class="nav flex-column sub-nav">
+        <a class="nav-link" href="/finance/payroll/process-emoluments"><i class="bi bi-cpu me-2"></i>Process Emoluments</a>
+        <a class="nav-link" href="/finance/payroll/workflow"><i class="bi bi-diagram-3 me-2"></i>Payroll Workflow / Submission</a>
+        <a class="nav-link" href="/finance/payroll/reversals"><i class="bi bi-arrow-counterclockwise me-2"></i>Payroll Reversals</a>
+        <a class="nav-link" href="/finance/payroll/process-emoluments/history"><i class="bi bi-clock-history me-2"></i>Payroll Processing History</a>
+        <a class="nav-link" href="/finance/payroll/master-pay-sheet"><i class="bi bi-table me-2"></i>Master Pay Sheet</a>
+        <a class="nav-link" href="/finance/payroll/yearly-payments"><i class="bi bi-calendar3 me-2"></i>Yearly Payments</a>
+        <a class="nav-link" href="/finance/payroll/special-payments"><i class="bi bi-gift me-2"></i>Special Payments</a>
+      </nav>
+    </div>
+
+    <a class="nav-link d-flex justify-content-between align-items-center" role="button" data-bs-toggle="collapse" data-bs-target="#navFinanceAccounts" aria-expanded="false" aria-controls="navFinanceAccounts">
+      <span><i class="bi bi-journal-check me-2"></i>Accounts</span><i class="bi bi-chevron-down small"></i>
+    </a>
+    <div class="collapse" id="navFinanceAccounts">
+      <nav class="nav flex-column sub-nav">
+        <a class="nav-link" href="/finance/payroll/post-to-accounts"><i class="bi bi-box-arrow-in-right me-2"></i>Post to Accounts</a>
+        <a class="nav-link" href="/finance/payroll/post-to-accounts/history"><i class="bi bi-journal-text me-2"></i>GL Posting History</a>
+        <a class="nav-link" href="/finance/payroll/reversals?status=READY_TO_EXECUTE"><i class="bi bi-lightning-charge me-2"></i>Ready to Execute</a>
+      </nav>
+    </div>
+
+    <a class="nav-link d-flex justify-content-between align-items-center" role="button" data-bs-toggle="collapse" data-bs-target="#navFinanceReports" aria-expanded="false" aria-controls="navFinanceReports">
+      <span><i class="bi bi-bar-chart me-2"></i>Reports</span><i class="bi bi-chevron-down small"></i>
+    </a>
+    <div class="collapse" id="navFinanceReports">
+      <nav class="nav flex-column sub-nav">
+        <a class="nav-link" href="/finance/reports/payroll"><i class="bi bi-file-earmark-bar-graph me-2"></i>Payroll Reports</a>
+        <a class="nav-link" href="/finance/reports/master-pay-sheet"><i class="bi bi-table me-2"></i>Master Pay Sheet</a>
+        <a class="nav-link" href="/finance/reports/journal"><i class="bi bi-journal-text me-2"></i>Journal</a>
+        <a class="nav-link" href="/finance/reports/end-of-service"><i class="bi bi-award me-2"></i>End of Service</a>
+        <a class="nav-link" href="/finance/reports/payslip"><i class="bi bi-receipt me-2"></i>Payslip</a>
+        <a class="nav-link" href="/finance/reports/payroll-liabilities"><i class="bi bi-file-earmark-ruled me-2"></i>Payroll Liabilities</a>
+        <a class="nav-link" href="/finance/reports/nassit-gratuity"><i class="bi bi-file-earmark-text me-2"></i>NASSIT / Gratuity Statement</a>
+        <a class="nav-link" href="/finance/reports/yearly-payments"><i class="bi bi-calendar-event me-2"></i>Yearly Payments Report</a>
+        <a class="nav-link" href="/finance/reports/financial-deductions"><i class="bi bi-cash-coin me-2"></i>Financial Deductions</a>
+      </nav>
+    </div>
+  </div>
+</aside>
+<script src="/js/sidebar.js" defer></script>

@@ -1,26 +1,10 @@
-const ALLOWED_ACTIVITY_CODES = new Set(['01', '02', '05', '08', '09', '13', '15']);
-const ALLOWED_ROLES = new Set([
-    'payroll admin',
-    'data-entry',
-    'data entry',
-    'data_entry',
-    'data-entry officer',
-    'data entry officer',
-    'data_entry_officer',
-    'accountant manager',
-    'hr/payroll super admin',
-    'payroll_admin',
-    'accountant_manager',
-    'hr_payroll_super_admin'
-]);
-
 function normalizeRole(role) {
     const normalized = String(role || '')
         .trim()
         .toLowerCase();
 
-    if (['data-entry', 'data entry', 'data_entry', 'data-entry officer', 'data entry officer', 'data_entry_officer'].includes(normalized)) {
-        return 'data-entry';
+    if (['finance-officer', 'finance officer'].includes(normalized)) {
+        return 'finance-officer';
     }
 
     return normalized;
@@ -56,8 +40,8 @@ function assertAuthorizedUser(user, companyId) {
     }
 
     const normalizedRole = normalizeRole(user.role || user.userType || user.level || '');
-    if (!ALLOWED_ROLES.has(normalizedRole)) {
-        const error = new Error('You are not authorized to post payroll activities to GL accounts.');
+    if (normalizedRole !== 'finance-officer') {
+        const error = new Error('You are not authorized to post payroll to accounts.');
         error.statusCode = 403;
         throw error;
     }
@@ -70,9 +54,32 @@ function assertAuthorizedUser(user, companyId) {
     }
 }
 
+function assertHistoryAuthorizedUser(user, companyId) {
+    if (!user) {
+        const error = new Error('Authentication is required.');
+        error.statusCode = 401;
+        throw error;
+    }
+
+    const normalizedRole = normalizeRole(user.role || user.userType || user.level || '');
+    const allowedRoles = new Set(['finance-officer', 'finance-manager']);
+    if (!allowedRoles.has(normalizedRole)) {
+        const error = new Error('You are not authorized to view General Ledger posting history.');
+        error.statusCode = 403;
+        throw error;
+    }
+
+    const userCompanyId = parsePositiveInteger(user.company_id || user.companyId || user.CompanyID);
+    if (userCompanyId && companyId && userCompanyId !== companyId) {
+        const error = new Error('You are not allowed to view another company\'s General Ledger history.');
+        error.statusCode = 403;
+        throw error;
+    }
+}
+
 function validatePostingPayload(payload) {
     const companyId = parsePositiveInteger(payload.companyId);
-    const activityCode = String(payload.activityCode || '').trim();
+    const activityCode = String(payload.activityCode || payload.activity || '').trim();
     const postingDate = String(payload.postingDate || '').trim();
 
     if (!companyId) {
@@ -83,12 +90,6 @@ function validatePostingPayload(payload) {
 
     if (!activityCode) {
         const error = new Error('activityCode is required.');
-        error.statusCode = 400;
-        throw error;
-    }
-
-    if (!ALLOWED_ACTIVITY_CODES.has(activityCode)) {
-        const error = new Error('activityCode is invalid.');
         error.statusCode = 400;
         throw error;
     }
@@ -144,6 +145,7 @@ function validateBatchId(value) {
 
 module.exports = {
     assertAuthorizedUser,
+    assertHistoryAuthorizedUser,
     resolveAuthenticatedUser,
     resolveUserId,
     validateBatchId,

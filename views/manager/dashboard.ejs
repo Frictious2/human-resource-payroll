@@ -37,6 +37,27 @@
 
             <div class="row g-4 mb-4">
                 <div class="col-12 col-md-6 col-xxl-3">
+                    <a href="/work-queue" class="card shadow-sm h-100 text-decoration-none text-reset">
+                        <div class="card-body">
+                            <div class="text-muted">My Work Queue</div>
+                            <div class="fs-3 fw-semibold"><%= workQueueSummary.totalActionable %></div>
+                            <div class="small text-muted"><%= workQueueSummary.payroll %> payroll and <%= workQueueSummary.records %> record items awaiting action</div>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-12 col-md-6 col-xxl-3">
+                    <a href="/notifications" class="card shadow-sm h-100 text-decoration-none text-reset">
+                        <div class="card-body">
+                            <div class="text-muted">Unread Notifications</div>
+                            <div class="fs-3 fw-semibold"><%= unreadNotifications %></div>
+                            <div class="small text-muted">Workflow alerts and returned-item visibility</div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-12 col-md-6 col-xxl-3">
                     <div class="card shadow-sm h-100">
                         <div class="card-body">
                             <div class="d-flex align-items-center justify-content-between">
@@ -88,6 +109,41 @@
                                     <div class="small text-muted">Within the next 12 months</div>
                                 </div>
                                 <i class="bi bi-hourglass-split fs-2 text-primary"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">Sensitive Record Endorsement Workflow</span>
+                    <a href="/manager/record-workflow" class="small text-decoration-none">Open endorsement queue</a>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-3">
+                            <div class="border rounded p-3 h-100">
+                                <div class="text-muted small">Awaiting Endorsement</div>
+                                <div class="fs-4 fw-semibold"><%= recordWorkflow.counts.SUBMITTED_TO_MANAGER || 0 %></div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <div class="border rounded p-3 h-100">
+                                <div class="text-muted small">Endorsed and Sent to HNO</div>
+                                <div class="fs-4 fw-semibold"><%= recordWorkflow.counts.SUBMITTED_TO_ENTITY_HEAD || 0 %></div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <div class="border rounded p-3 h-100">
+                                <div class="text-muted small">Returned to Data Entry</div>
+                                <div class="fs-4 fw-semibold"><%= recordWorkflow.counts.RETURNED_BY_MANAGER || 0 %></div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <div class="border rounded p-3 h-100">
+                                <div class="text-muted small">Recent Endorsement Actions</div>
+                                <div class="fs-4 fw-semibold"><%= (recordWorkflow.recent || []).length %></div>
                             </div>
                         </div>
                     </div>
@@ -341,6 +397,60 @@
                                         <div class="fs-4 fw-semibold"><%= payrollOversight.cards.payrollExceptions %></div>
                                     </div>
                                 </div>
+                                <div class="col-6 col-lg-3">
+                                    <a href="/manager/payroll/endorsement" class="border rounded p-3 h-100 d-block text-decoration-none text-reset">
+                                        <div class="text-muted small">Payroll Awaiting Endorsement</div>
+                                        <div class="fs-4 fw-semibold"><%= payrollOversight.cards.awaitingEndorsement %></div>
+                                    </a>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <a href="/manager/payroll/endorsement?status=SUBMITTED_TO_AUDITOR" class="border rounded p-3 h-100 d-block text-decoration-none text-reset">
+                                        <div class="text-muted small">Endorsed and Sent to Auditor</div>
+                                        <div class="fs-4 fw-semibold"><%= payrollOversight.cards.endorsedToAuditor %></div>
+                                    </a>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <a href="/manager/payroll/endorsement?status=RETURNED_BY_MANAGER" class="border rounded p-3 h-100 d-block text-decoration-none text-reset">
+                                        <div class="text-muted small">Returned to Finance</div>
+                                        <div class="fs-4 fw-semibold"><%= payrollOversight.cards.returnedToFinance %></div>
+                                    </a>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <a href="/manager/payroll/endorsement?status=SUBMITTED_TO_ENTITY_HEAD" class="border rounded p-3 h-100 d-block text-decoration-none text-reset">
+                                        <div class="text-muted small">Auditor Endorsed</div>
+                                        <div class="fs-4 fw-semibold"><%= payrollOversight.cards.auditorEndorsed %></div>
+                                    </a>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <a href="/manager/payroll/endorsement?status=RETURNED_BY_AUDITOR" class="border rounded p-3 h-100 d-block text-decoration-none text-reset">
+                                        <div class="text-muted small">Returned by Auditor</div>
+                                        <div class="fs-4 fw-semibold"><%= payrollOversight.cards.returnedByAuditor %></div>
+                                    </a>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <a href="/manager/payroll/endorsement?status=FINAL_APPROVED" class="border rounded p-3 h-100 d-block text-decoration-none text-reset">
+                                        <div class="text-muted small">Finally Approved</div>
+                                        <div class="fs-4 fw-semibold"><%= payrollOversight.cards.finalApproved %></div>
+                                    </a>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <a href="/manager/payroll/endorsement?status=FINAL_REJECTED" class="border rounded p-3 h-100 d-block text-decoration-none text-reset">
+                                        <div class="text-muted small">Final Returned / Rejected</div>
+                                        <div class="fs-4 fw-semibold"><%= payrollOversight.cards.finalRejected %></div>
+                                    </a>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <a href="/manager/payroll/reversals" class="border rounded p-3 h-100 d-block text-decoration-none text-reset">
+                                        <div class="text-muted small">Reversals Awaiting Endorsement</div>
+                                        <div class="fs-4 fw-semibold"><%= Number(reversalCounts.SUBMITTED_TO_MANAGER || 0) %></div>
+                                    </a>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <a href="/manager/payroll/reopen" class="border rounded p-3 h-100 d-block text-decoration-none text-reset">
+                                        <div class="text-muted small">Reopen Requests Awaiting Endorsement</div>
+                                        <div class="fs-4 fw-semibold"><%= Number(reopenCounts.SUBMITTED_TO_MANAGER || 0) %></div>
+                                    </a>
+                                </div>
                             </div>
 
                             <div class="row g-4">
@@ -424,6 +534,39 @@
                                         </table>
                                     </div>
                                 </div>
+
+                                <div class="col-12">
+                                    <h6 class="fw-semibold mb-3">Recent Payroll Workflow Actions</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm align-middle">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Period</th>
+                                                    <th>Action</th>
+                                                    <th>From</th>
+                                                    <th>To</th>
+                                                    <th>Actor</th>
+                                                    <th>At</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <% if (!payrollOversight.recentWorkflowActions.length) { %>
+                                                    <tr><td colspan="6" class="text-center text-muted py-3">No recent payroll workflow actions.</td></tr>
+                                                <% } %>
+                                                <% payrollOversight.recentWorkflowActions.forEach((row) => { %>
+                                                    <tr>
+                                                        <td><a href="/manager/payroll/endorsement/<%= row.WorkflowBatchID %>" class="text-decoration-none"><%= row.PMonth %>/<%= row.PYear %> - <%= row.PType %></a></td>
+                                                        <td><%= row.Action %></td>
+                                                        <td><%= row.FromStatus || 'DRAFT' %></td>
+                                                        <td><%= row.ToStatus %></td>
+                                                        <td><%= row.actorName || row.actorRole || 'System' %></td>
+                                                        <td><%= row.ActionAt ? new Date(row.ActionAt).toLocaleString('en-GB') : 'N/A' %></td>
+                                                    </tr>
+                                                <% }) %>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -490,6 +633,10 @@
                                 <a href="/manager/reports/yearly-payments" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                                     Check yearly payments
                                     <span class="badge text-bg-secondary rounded-pill"><%= payrollOversight.cards.pendingYearlyPayments %></span>
+                                </a>
+                                <a href="/manager/payroll/endorsement" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                    Payroll endorsement queue
+                                    <span class="badge text-bg-warning rounded-pill"><%= payrollOversight.cards.awaitingEndorsement %></span>
                                 </a>
                             </div>
                         </div>

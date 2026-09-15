@@ -9,8 +9,8 @@
     <link href="/css/styles.css" rel="stylesheet" />
 </head>
 <body>
-    <%- include('../../data_entry/partials/topbar', { user }) %>
-    <%- include('../../data_entry/partials/sidebar') %>
+    <%- include('../../' + partialsBase + '/topbar', { user }) %>
+    <%- include('../../' + partialsBase + '/sidebar') %>
 
     <main class="main">
         <div class="container-fluid py-3">
@@ -20,7 +20,7 @@
                     <p class="text-muted mb-0">Generate monthly payroll transactions for the selected activity.</p>
                     <nav aria-label="breadcrumb">
                         <ol class="breadcrumb mt-2 mb-0">
-                            <li class="breadcrumb-item"><a class="text-decoration-none" href="/data-entry/dashboard">Home</a></li>
+                            <li class="breadcrumb-item"><a class="text-decoration-none" href="<%= homePath %>">Home</a></li>
                             <li class="breadcrumb-item">Payroll</li>
                             <li class="breadcrumb-item active" aria-current="page">Process Emoluments</li>
                         </ol>
@@ -38,6 +38,16 @@
 
             <div id="submissionAlert"></div>
 
+            <% if (correctionMode && correctionBatchId) { %>
+                <div class="alert alert-warning shadow-sm">
+                    <div class="fw-semibold mb-1">Controlled Correction Run</div>
+                    <div class="small">
+                        This payroll batch is in correction mode. Reprocess the selected payroll period to replace the existing unposted
+                        <code>tblPayroll</code> rows and reset the workflow back to <code>PROCESSED</code>.
+                    </div>
+                </div>
+            <% } %>
+
             <div class="row g-4">
                 <div class="col-xl-7">
                     <div class="card shadow-sm">
@@ -50,19 +60,22 @@
 
                                 <div class="col-md-6">
                                     <label for="activityCode" class="form-label">Activity</label>
-                                    <select class="form-select" id="activityCode" name="activityCode" required>
+                                    <select class="form-select" id="activityCode" name="activityCode" <%= correctionMode ? 'disabled' : '' %> required>
                                         <% activities.forEach(activity => { %>
                                             <option value="<%= activity.code %>" data-name="<%= activity.name %>" <%= activity.code === defaultActivityCode ? 'selected' : '' %>>
                                                 <%= activity.code %> - <%= activity.name %>
                                             </option>
                                         <% }) %>
                                     </select>
+                                    <% if (correctionMode) { %>
+                                        <input type="hidden" name="activityCode" value="<%= defaultActivityCode %>">
+                                    <% } %>
                                     <div class="invalid-feedback">Select the payroll activity to process.</div>
                                 </div>
 
                                 <div class="col-md-6">
                                     <label for="payrollDate" class="form-label">Payroll Date</label>
-                                    <input type="date" class="form-control" id="payrollDate" name="payrollDate" value="<%= new Date().toISOString().split('T')[0] %>" required>
+                                    <input type="date" class="form-control" id="payrollDate" name="payrollDate" value="<%= defaultPayrollDate %>" <%= correctionMode ? 'readonly' : '' %> required>
                                     <div class="invalid-feedback">Enter the payroll date to process.</div>
                                 </div>
 
@@ -96,6 +109,7 @@
                             <ul class="small text-muted mb-0">
                                 <li>Salary processing is fully implemented in this first phase.</li>
                                 <li>Duplicate processing is blocked directly against existing <code>tblPayroll</code> rows for the same company, month, year, and activity.</li>
+                                <li>Returned or rejected payroll can only be regenerated after Finance starts a controlled correction from the workflow page.</li>
                                 <li>Processing uses approved salary setup data from the existing legacy payroll tables and writes results into <code>tblPayroll</code>.</li>
                                 <li>Additional activities are scaffolded in the service for later extension.</li>
                             </ul>
@@ -105,7 +119,7 @@
             </div>
 
             <footer class="mt-4 py-3 text-center text-muted border-top">
-                <%- include('../../data_entry/partials/footer') %>
+                <%- include('../../' + partialsBase + '/footer') %>
             </footer>
         </div>
     </main>
@@ -237,7 +251,7 @@
                             Gross: <strong>${Number(data.totalGross || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>.
                             Net: <strong>${Number(data.totalNet || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>.
                             <div class="mt-2">
-                                <a class="btn btn-sm btn-outline-success" href="/data-entry/payroll/process-emoluments/history/${data.batchId}">View Batch Details</a>
+                                <a class="btn btn-sm btn-outline-success" href="<%= historyDetailsBaseUrl %>/${data.batchId}">View Batch Details</a>
                             </div>
                         </div>`
                     );

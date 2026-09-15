@@ -20,6 +20,9 @@
         <a class="btn btn-primary" href="/admin/data-entry-officers/new"><i class="bi bi-plus-circle me-2"></i>Add Data Entry Officer</a>
       </div>
 
+      <% if (success) { %><div class="alert alert-success shadow-sm"><%= success %></div><% } %>
+      <% if (warning) { %><div class="alert alert-warning shadow-sm"><%= warning %></div><% } %>
+
       <div class="card shadow-sm">
         <div class="card-body">
           <table id="dataEntryTable" class="table table-striped table-hover w-100">
@@ -33,6 +36,21 @@
                 <th>Actions</th>
               </tr>
             </thead>
+            <tbody>
+              <% (rows || []).forEach((row) => { %>
+                <tr>
+                  <td><img src="https://picsum.photos/seed/data-entry-<%= row.PFNo %>/40" class="rounded-circle" alt="avatar"></td>
+                  <td><%= row.FullName || row.Username || '' %></td>
+                  <td><%= row.Email || '' %></td>
+                  <td><%= row.Com_Name || '' %></td>
+                  <td><%= row.DateCreated ? new Date(row.DateCreated).toLocaleString() : '' %></td>
+                  <td>
+                    <button class="btn btn-sm btn-warning resend-link" data-id="<%= row.PFNo %>">Resend Link</button>
+                    <button class="btn btn-sm btn-danger delete-data-entry" data-id="<%= row.PFNo %>">Delete</button>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
           </table>
         </div>
       </div>
@@ -50,30 +68,25 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
   <script>
-    $(function () {
-      const table = $('#dataEntryTable').DataTable({
-        ajax: { url: '/admin/api/data-entry-officers', dataSrc: 'data' },
-        columns: [
-          { data: 'PFNo', orderable: false, searchable: false, render: (pfno) => `<img src="https://picsum.photos/seed/data-entry-${pfno}/40" class="rounded-circle" alt="avatar">` },
-          { data: null, render: (row) => row.FullName || row.Username || '' },
-          { data: 'Email' },
-          { data: 'Com_Name', defaultContent: '' },
-          { data: 'DateCreated', render: (val) => val ? new Date(val).toLocaleString() : '' },
-          { data: null, orderable: false, searchable: false, render: (row) => `
-            <button class="btn btn-sm btn-warning resend-link" data-id="${row.PFNo}">Resend Link</button>
-            <button class="btn btn-sm btn-danger delete-data-entry" data-id="${row.PFNo}">Delete</button>
-          ` }
-        ],
-        dom: 'Bfrtip',
-        buttons: [
-          { extend: 'excelHtml5', title: 'Data Entry Officers' },
-          { extend: 'pdfHtml5', title: 'Data Entry Officers', orientation: 'landscape', pageSize: 'A4' }
-        ],
-        responsive: true,
-      });
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.jQuery && $.fn.DataTable) {
+        $('#dataEntryTable').DataTable({
+          dom: 'Bfrtip',
+          buttons: [
+            { extend: 'excelHtml5', title: 'Data Entry Officers' },
+            { extend: 'pdfHtml5', title: 'Data Entry Officers', orientation: 'landscape', pageSize: 'A4' }
+          ],
+          responsive: true,
+        });
+      }
 
-      $(document).on('click', '.resend-link', async function() {
-        const id = $(this).data('id');
+      document.addEventListener('click', async function(event) {
+        const resendButton = event.target.closest('.resend-link');
+        if (!resendButton) {
+          return;
+        }
+
+        const id = resendButton.dataset.id;
         try {
           const res = await fetch('/admin/api/data-entry-officers/' + id + '/resend-link', { method: 'POST' });
           if (res.ok) alert('Link resent');
@@ -82,12 +95,17 @@
         }
       });
 
-      $(document).on('click', '.delete-data-entry', async function() {
-        const id = $(this).data('id');
+      document.addEventListener('click', async function(event) {
+        const deleteButton = event.target.closest('.delete-data-entry');
+        if (!deleteButton) {
+          return;
+        }
+
+        const id = deleteButton.dataset.id;
         if (!confirm('Delete this data entry officer?')) return;
         try {
           const res = await fetch('/admin/api/data-entry-officers/' + id, { method: 'DELETE' });
-          if (res.ok) table.ajax.reload(null, false);
+          if (res.ok) window.location.reload();
         } catch (e) {
           alert('Failed to delete data entry officer');
         }

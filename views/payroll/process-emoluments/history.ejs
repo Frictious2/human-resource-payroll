@@ -9,8 +9,8 @@
     <link href="/css/styles.css" rel="stylesheet" />
 </head>
 <body>
-    <%- include('../../data_entry/partials/topbar', { user }) %>
-    <%- include('../../data_entry/partials/sidebar') %>
+    <%- include('../../' + partialsBase + '/topbar', { user }) %>
+    <%- include('../../' + partialsBase + '/sidebar') %>
 
     <main class="main">
         <div class="container-fluid py-3">
@@ -20,7 +20,7 @@
                     <p class="text-muted mb-0">Review monthly payroll processing batches by activity and period.</p>
                     <nav aria-label="breadcrumb">
                         <ol class="breadcrumb mt-2 mb-0">
-                            <li class="breadcrumb-item"><a class="text-decoration-none" href="/data-entry/dashboard">Home</a></li>
+                            <li class="breadcrumb-item"><a class="text-decoration-none" href="<%= homePath %>">Home</a></li>
                             <li class="breadcrumb-item">Payroll</li>
                             <li class="breadcrumb-item"><a class="text-decoration-none" href="<%= formUrl %>">Process Emoluments</a></li>
                             <li class="breadcrumb-item active" aria-current="page">History</li>
@@ -36,7 +36,7 @@
 
             <div class="card shadow-sm mb-4">
                 <div class="card-body">
-                    <form class="row g-3" method="GET" action="/data-entry/payroll/process-emoluments/history">
+                    <form class="row g-3" method="GET" action="<%= historyUrl %>">
                         <div class="col-md-3">
                             <label for="activityCode" class="form-label">Activity</label>
                             <select class="form-select" id="activityCode" name="activityCode">
@@ -66,7 +66,7 @@
                         </div>
                         <div class="col-md-2 d-flex align-items-end gap-2">
                             <button type="submit" class="btn btn-primary w-100">Filter</button>
-                            <a href="/data-entry/payroll/process-emoluments/history" class="btn btn-outline-secondary">Reset</a>
+                            <a href="<%= historyUrl %>" class="btn btn-outline-secondary">Reset</a>
                         </div>
                     </form>
                 </div>
@@ -123,7 +123,7 @@
             </div>
 
             <footer class="mt-4 py-3 text-center text-muted border-top">
-                <%- include('../../data_entry/partials/footer') %>
+                <%- include('../../' + partialsBase + '/footer') %>
             </footer>
         </div>
     </main>

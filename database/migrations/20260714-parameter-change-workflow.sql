@@ -1,0 +1,50 @@
+CREATE TABLE IF NOT EXISTS parameter_change_requests (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    CompanyID INT NOT NULL,
+    ParameterModule VARCHAR(80) NOT NULL,
+    SourceTable VARCHAR(100) NOT NULL,
+    RecordReference VARCHAR(255) NOT NULL,
+    ChangeType VARCHAR(20) NOT NULL,
+    Status VARCHAR(40) NOT NULL,
+    OldValues LONGTEXT NULL,
+    ProposedValues LONGTEXT NOT NULL,
+    Reason TEXT NOT NULL,
+    SubmittedBy INT NOT NULL,
+    SubmittedAt DATETIME NULL,
+    FinalApprovedBy INT NULL,
+    FinalApprovedAt DATETIME NULL,
+    EntityHeadComments TEXT NULL,
+    RejectedBy INT NULL,
+    RejectedAt DATETIME NULL,
+    RejectionReason TEXT NULL,
+    AppliedAt DATETIME NULL,
+    AppliedBy INT NULL,
+    SourceChecksum VARCHAR(128) NULL,
+    CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UpdatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_parameter_change_company_status (CompanyID, Status),
+    KEY idx_parameter_change_module_status (ParameterModule, Status),
+    KEY idx_parameter_change_source_reference (SourceTable, RecordReference),
+    KEY idx_parameter_change_submitted_at (SubmittedAt)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS parameter_change_actions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    ChangeRequestID BIGINT UNSIGNED NOT NULL,
+    CompanyID INT NOT NULL,
+    Action VARCHAR(50) NOT NULL,
+    FromStatus VARCHAR(40) NULL,
+    ToStatus VARCHAR(40) NOT NULL,
+    ActionBy INT NOT NULL,
+    ActionAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    Comments TEXT NULL,
+    Metadata LONGTEXT NULL,
+    Result VARCHAR(20) NOT NULL DEFAULT 'SUCCESS',
+    PRIMARY KEY (id),
+    KEY idx_parameter_change_actions_request (ChangeRequestID),
+    KEY idx_parameter_change_actions_company (CompanyID, ActionAt),
+    CONSTRAINT fk_parameter_change_actions_request
+        FOREIGN KEY (ChangeRequestID) REFERENCES parameter_change_requests(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

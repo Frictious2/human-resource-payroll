@@ -1,40 +1,130 @@
 const express = require('express');
 const session = require('express-session');
 const path = require('path');
-require('dotenv').config({ override: true });
+const fs = require('fs');
+// Deployment environment variables must take precedence over any local .env file.
+require('dotenv').config();
 
 const requestContextMiddleware = require('./middleware/requestContext');
-const { attachAuthenticatedUser, requireRoles, redirectAuthenticatedToDashboard } = require('./middleware/auth');
+const { attachAuthenticatedUser, requireAuth, requireRoles, redirectAuthenticatedToDashboard } = require('./middleware/auth');
+const { attachBranding } = require('./middleware/branding');
+const { attachNotificationSummary } = require('./middleware/notificationContext');
 const authService = require('./services/authService');
 const auditTrailService = require('./services/auditTrailService');
+const {
+    buildSessionMiddlewareOptions,
+    getSessionSecret,
+    getTrustProxySetting,
+    initializeSessionStore,
+    isProductionEnvironment
+} = require('./config/sessionStore');
 
 const adminRoutes = require('./routes/admin');
 const developerRoutes = require('./routes/developer');
 const managerRoutes = require('./routes/manager');
 const dataEntryRoutes = require('./routes/dataEntry');
 const auditorRoutes = require('./routes/auditor');
+const entityHeadRoutes = require('./routes/entityHead');
+const financeRoutes = require('./routes/finance');
+const financeManagerRoutes = require('./routes/financeManager');
+const profileRoutes = require('./routes/profile');
+const notificationRoutes = require('./routes/notifications');
+const workQueueRoutes = require('./routes/workQueue');
+const entityHeadAccessMiddleware = require('./middleware/entityHeadAccess');
+const {
+    createCsrfProtectionMiddleware,
+    createCsrfViewMiddleware,
+    createLoginRateLimiter,
+    createSecurityHeadersMiddleware,
+    isCsrfError
+} = require('./middleware/security');
+const { assertEnvironmentIsSafe } = require('./services/environmentValidationService');
+const { logSecurityEvent } = require('./services/securityEventService');
 
-const app = express();
+function renderLogin(req, res, error = null, identifier = '', options = {}) {
+    res.render('login', {
+        error,
+        identifier,
+        pageTitle: options.pageTitle || 'Sign In - HR & Payroll',
+        accessTitle: options.accessTitle || 'Sign in',
+        accessCopy: options.accessCopy || 'Enter your username or email and password to continue.',
+        formAction: options.formAction || '/login'
+    });
+}
 
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
+async function handleLogin(req, res, options = {}) {
+    const identifier = req.body.identifier || req.body.email || '';
+    const password = req.body.password || '';
 
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+    try {
+        const authResult = await authService.authenticateUser({ identifier, password });
+        if (!authResult.success) {
+            logSecurityEvent('LOGIN_FAILED', req, { outcome: 'denied', reason: 'invalid-credentials' });
+            return res.status(401).render('login', {
+                error: authResult.message,
+                identifier,
+                pageTitle: options.pageTitle || 'Sign In - HR & Payroll',
+                accessTitle: options.accessTitle || 'Sign in',
+                accessCopy: options.accessCopy || 'Enter your username or email and password to continue.',
+                formAction: options.formAction || '/login'
+            });
+        }
 
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'secret_key',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { secure: false }
-}));
+        if (options.expectedRole && authResult.user.role !== options.expectedRole) {
+            logSecurityEvent('LOGIN_FAILED', req, { outcome: 'denied', reason: 'wrong-login-area' });
+            return res.status(403).render('login', {
+                error: options.wrongRoleMessage || 'This login area is not available for your account.',
+                identifier,
+                pageTitle: options.pageTitle || 'Sign In - HR & Payroll',
+                accessTitle: options.accessTitle || 'Sign in',
+                accessCopy: options.accessCopy || 'Enter your username or email and password to continue.',
+                formAction: options.formAction || '/login'
+            });
+        }
 
-app.use(requestContextMiddleware);
-app.use(attachAuthenticatedUser);
+        await new Promise((resolve, reject) => {
+            req.session.regenerate((sessionError) => {
+                if (sessionError) {
+                    reject(sessionError);
+                    return;
+                }
+                resolve();
+            });
+        });
 
-function renderLogin(req, res, error = null, identifier = '') {
-    res.render('login', { error, identifier });
+        req.session.user = authResult.user;
+        req.session.companyId = authResult.user.companyId || null;
+        req.session.CompanyID = authResult.user.companyId || null;
+        await new Promise((resolve, reject) => {
+            req.session.save((sessionError) => {
+                if (sessionError) {
+                    reject(sessionError);
+                    return;
+                }
+                resolve();
+            });
+        });
+
+        await auditTrailService.logAuthEvent({
+            action: 'Logged On',
+            userName: authResult.user.name || authResult.user.username || authResult.user.email,
+            formName: authResult.user.role === 'developer' ? 'developer/auth' : 'auth',
+            companyId: authResult.user.companyId || null,
+            loggedout: 0
+        });
+
+        return res.redirect(authService.getDashboardPathForRole(authResult.user.role));
+    } catch (error) {
+        console.error('Login error:', error);
+        return res.status(500).render('login', {
+            error: 'Unable to sign in right now. Please try again.',
+            identifier,
+            pageTitle: options.pageTitle || 'Sign In - HR & Payroll',
+            accessTitle: options.accessTitle || 'Sign in',
+            accessCopy: options.accessCopy || 'Enter your username or email and password to continue.',
+            formAction: options.formAction || '/login'
+        });
+    }
 }
 
 function adminAccessMiddleware(req, res, next) {
@@ -53,103 +143,249 @@ function developerAccessMiddleware(req, res, next) {
     return requireRoles('developer')(req, res, next);
 }
 
-app.get('/', (req, res) => {
-    if (req.user) {
-        return res.redirect('/dashboard');
-    }
+function createApp({ sessionStore } = {}) {
+    const app = express();
+    const isProduction = isProductionEnvironment();
 
-    return res.redirect('/login');
-});
+    assertEnvironmentIsSafe(process.env);
+    getSessionSecret({ isProduction });
 
-app.get('/login', redirectAuthenticatedToDashboard, (req, res) => {
-    renderLogin(req, res);
-});
+    app.set('view engine', 'ejs');
+    app.set('views', path.join(__dirname, 'views'));
+    app.set('trust proxy', getTrustProxySetting({ isProduction }));
+    app.disable('x-powered-by');
 
-app.post('/login', redirectAuthenticatedToDashboard, async (req, res) => {
-    const identifier = req.body.identifier || req.body.email || '';
-    const password = req.body.password || '';
+    app.use(createSecurityHeadersMiddleware({ isProduction }));
+    app.use(express.static(path.join(__dirname, 'public')));
+    app.use(express.json());
+    app.use(express.urlencoded({ extended: true }));
 
-    try {
-        const authResult = await authService.authenticateUser({ identifier, password });
-        if (!authResult.success) {
-            return res.status(401).render('login', {
-                error: authResult.message,
-                identifier
+    app.use(session(buildSessionMiddlewareOptions({
+        store: sessionStore,
+        isProduction
+    })));
+
+    app.use(requestContextMiddleware);
+    app.use(attachAuthenticatedUser);
+    app.use(createCsrfProtectionMiddleware());
+    app.use(createCsrfViewMiddleware());
+    app.use(attachBranding);
+    app.use(attachNotificationSummary);
+
+    const loginRateLimiter = createLoginRateLimiter();
+
+    app.get('/', (req, res) => {
+        if (req.user) {
+            return res.redirect('/dashboard');
+        }
+
+        return res.redirect('/login');
+    });
+
+    app.get('/login', redirectAuthenticatedToDashboard, (req, res) => {
+        renderLogin(req, res);
+    });
+
+    app.post('/login', loginRateLimiter, redirectAuthenticatedToDashboard, async (req, res) => {
+        return handleLogin(req, res);
+    });
+
+    app.get('/entity-head/login', redirectAuthenticatedToDashboard, (req, res) => {
+        renderLogin(req, res, null, '', {
+            pageTitle: 'Entity Head Sign In - HR & Payroll',
+            accessTitle: 'Entity Head sign in',
+            accessCopy: 'Sign in to access the read-only dashboard and reports for your assigned entity.',
+            formAction: '/entity-head/login'
+        });
+    });
+
+    app.post('/entity-head/login', loginRateLimiter, redirectAuthenticatedToDashboard, async (req, res) => {
+        return handleLogin(req, res, {
+            expectedRole: 'entity-head',
+            wrongRoleMessage: 'This login area is reserved for Entity Head accounts only.',
+            pageTitle: 'Entity Head Sign In - HR & Payroll',
+            accessTitle: 'Entity Head sign in',
+            accessCopy: 'Sign in to access the read-only dashboard and reports for your assigned entity.',
+            formAction: '/entity-head/login'
+        });
+    });
+
+    app.get('/dashboard', (req, res) => {
+        if (!req.user) {
+            return res.redirect('/login');
+        }
+
+        return res.redirect(authService.getDashboardPathForRole(req.user.role));
+    });
+
+    app.use('/admin', adminAccessMiddleware, adminRoutes);
+    app.use('/developer', developerAccessMiddleware, developerRoutes);
+    app.use('/manager', requireRoles('manager'), managerRoutes);
+    app.use('/data-entry', requireRoles('data-entry'), dataEntryRoutes);
+    app.use('/finance', requireRoles('finance-officer'), financeRoutes);
+    app.use('/finance-manager', requireRoles('finance-manager'), financeManagerRoutes);
+    app.use('/auditor', requireRoles('auditor'), auditorRoutes);
+    app.use('/entity-head', requireRoles('entity-head'), entityHeadAccessMiddleware, entityHeadRoutes);
+    app.use('/profile', requireAuth, profileRoutes);
+    app.use('/notifications', requireAuth, notificationRoutes);
+    app.use('/work-queue', requireAuth, workQueueRoutes);
+
+    app.get('/favicon.ico', async (req, res) => {
+        try {
+            const pool = require('./config/db');
+            const [rows] = await pool.query(
+                `SELECT LogoPath
+                 FROM tblcominfo
+                 WHERE LogoPath IS NOT NULL
+                   AND LogoPath <> ''
+                 ORDER BY CompanyID ASC
+                 LIMIT 1`
+            );
+
+            const logoPath = rows[0] && rows[0].LogoPath ? String(rows[0].LogoPath).trim() : '';
+            if (!logoPath) {
+                return res.status(204).end();
+            }
+
+            const normalizedPath = logoPath.replace(/^\/+/, '').replace(/\//g, path.sep);
+            const absolutePath = path.join(__dirname, 'public', normalizedPath);
+
+            if (!absolutePath.startsWith(path.join(__dirname, 'public')) || !fs.existsSync(absolutePath)) {
+                return res.status(204).end();
+            }
+
+            return res.sendFile(absolutePath, {
+                headers: {
+                    'Cache-Control': 'no-cache'
+                }
+            });
+        } catch (error) {
+            console.error('Favicon error:', error);
+            return res.status(204).end();
+        }
+    });
+
+    app.post('/logout', requireAuth, async (req, res) => {
+        const userName = req.user
+            ? (req.user.name || req.user.username || req.user.email)
+            : 'System';
+        const companyId = req.user ? req.user.companyId || null : null;
+
+        try {
+            await auditTrailService.logAuthEvent({
+                action: 'Logged Off',
+                userName,
+                formName: req.user?.role === 'developer' ? 'developer/auth' : 'auth',
+                companyId,
+                loggedout: 1
+            });
+        } catch (error) {
+            console.error('Logout audit error:', error);
+        }
+
+        req.session.destroy((sessionError) => {
+            if (sessionError) {
+                console.error('Session destroy error:', sessionError);
+            }
+            res.clearCookie(buildSessionMiddlewareOptions({ isProduction }).name, {
+                path: '/',
+                httpOnly: true,
+                sameSite: 'lax',
+                secure: isProduction
+            });
+            res.redirect('/login');
+        });
+    });
+
+    app.get('/logout', (req, res) => {
+        return res.status(405).render('shared/error', {
+            title: 'Method not allowed',
+            message: 'Please use the secure Logout action from the account menu.',
+            backUrl: req.user ? '/dashboard' : '/login'
+        });
+    });
+
+    app.use((req, res) => {
+        if (req.xhr || String(req.get('accept') || '').includes('application/json')) {
+            return res.status(404).json({ success: false, message: 'The requested resource was not found.' });
+        }
+        return res.status(404).render('shared/error', {
+            title: 'Page not found',
+            message: 'The requested page is not available.',
+            backUrl: req.user ? '/dashboard' : '/login'
+        });
+    });
+
+    app.use((error, req, res, next) => {
+        if (res.headersSent) {
+            return next(error);
+        }
+
+        if (isCsrfError(error)) {
+            logSecurityEvent('INVALID_CSRF', req, { outcome: 'blocked', reason: 'invalid-or-missing-token' });
+            const message = 'The security token is invalid or has expired. Refresh the page and try again.';
+            if (req.xhr || String(req.get('accept') || '').includes('application/json')) {
+                return res.status(403).json({ success: false, message });
+            }
+            return res.status(403).render('shared/error', {
+                title: 'Request could not be verified',
+                message,
+                backUrl: req.get('referer') || (req.user ? '/dashboard' : '/login')
             });
         }
 
-        req.session.user = authResult.user;
-        req.session.companyId = authResult.user.companyId || null;
-        req.session.CompanyID = authResult.user.companyId || null;
-
-        await auditTrailService.logAuthEvent({
-            action: 'Logged On',
-            userName: authResult.user.name || authResult.user.username || authResult.user.email,
-            companyId: authResult.user.companyId || null,
-            loggedout: 0
+        console.error('Unhandled request error:', {
+            method: req.method,
+            path: req.originalUrl,
+            message: error && error.message
         });
-
-        return res.redirect(authService.getDashboardPathForRole(authResult.user.role));
-    } catch (error) {
-        console.error('Login error:', error);
-        return res.status(500).render('login', {
-            error: 'Unable to sign in right now. Please try again.',
-            identifier
-        });
-    }
-});
-
-app.get('/dashboard', (req, res) => {
-    if (!req.user) {
-        return res.redirect('/login');
-    }
-
-    return res.redirect(authService.getDashboardPathForRole(req.user.role));
-});
-
-app.use('/admin', adminAccessMiddleware, adminRoutes);
-app.use('/developer', developerAccessMiddleware, developerRoutes);
-app.use('/manager', requireRoles('manager'), managerRoutes);
-app.use('/data-entry', requireRoles('data-entry'), dataEntryRoutes);
-app.use('/auditor', requireRoles('auditor'), auditorRoutes);
-
-app.get('/logout', async (req, res) => {
-    const userName = req.user
-        ? (req.user.name || req.user.username || req.user.email)
-        : 'System';
-    const companyId = req.user ? req.user.companyId || null : null;
-
-    try {
-        await auditTrailService.logAuthEvent({
-            action: 'Logged Off',
-            userName,
-            companyId,
-            loggedout: 1
-        });
-    } catch (error) {
-        console.error('Logout audit error:', error);
-    }
-
-    req.session.destroy(() => {
-        res.redirect('/login');
-    });
-});
-
-async function startServer() {
-    try {
-        const seedDeveloper = await authService.ensureSeedDeveloper();
-        if (seedDeveloper.created) {
-            console.log(`Seed developer created: ${seedDeveloper.username} / ${seedDeveloper.password}`);
+        const status = Number(error && error.status) >= 400 && Number(error.status) < 600
+            ? Number(error.status)
+            : 500;
+        const message = status === 500
+            ? 'The request could not be completed. Please try again or contact support.'
+            : (error.message || 'The request could not be completed.');
+        if (req.xhr || String(req.get('accept') || '').includes('application/json')) {
+            return res.status(status).json({ success: false, message });
         }
-
-        const PORT = process.env.PORT || 3001;
-        app.listen(PORT, () => {
-            console.log(`Server running on http://localhost:${PORT}`);
+        return res.status(status).render('shared/error', {
+            title: status === 500 ? 'Unexpected error' : 'Request error',
+            message,
+            backUrl: req.user ? '/dashboard' : '/login'
         });
-    } catch (error) {
-        console.error('Failed to start server:', error);
-        process.exit(1);
-    }
+    });
+
+    return app;
 }
 
-startServer();
+async function startServer() {
+    assertEnvironmentIsSafe(process.env);
+    const sessionStore = await initializeSessionStore();
+    const app = createApp({ sessionStore });
+    const seedDeveloper = await authService.ensureSeedDeveloper();
+    if (seedDeveloper.created) {
+        console.log(`Seed developer created: ${seedDeveloper.username} / ${seedDeveloper.password}`);
+    }
+
+    const PORT = process.env.PORT || 3001;
+    return new Promise((resolve, reject) => {
+        const server = app.listen(PORT, () => {
+            console.log(`Server running on http://localhost:${PORT}`);
+            resolve({ app, server, sessionStore });
+        });
+
+        server.on('error', reject);
+    });
+}
+
+if (require.main === module) {
+    startServer().catch((error) => {
+        console.error('Failed to start server:', error);
+        process.exit(1);
+    });
+}
+
+module.exports = {
+    createApp,
+    startServer
+};

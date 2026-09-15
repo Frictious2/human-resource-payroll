@@ -9,8 +9,8 @@
     <link href="/css/styles.css" rel="stylesheet" />
 </head>
 <body>
-    <%- include('../../data_entry/partials/topbar', { user }) %>
-    <%- include('../../data_entry/partials/sidebar') %>
+    <%- include('../../' + partialsBase + '/topbar', { user }) %>
+    <%- include('../../' + partialsBase + '/sidebar') %>
 
     <main class="main">
         <div class="container-fluid py-3">
@@ -20,7 +20,7 @@
                     <p class="text-muted mb-0"><%= subtitle %></p>
                     <nav aria-label="breadcrumb">
                         <ol class="breadcrumb mt-2 mb-0">
-                            <li class="breadcrumb-item"><a class="text-decoration-none" href="/data-entry/dashboard">Home</a></li>
+                            <li class="breadcrumb-item"><a class="text-decoration-none" href="<%= homePath %>">Home</a></li>
                             <li class="breadcrumb-item">Payroll</li>
                             <li class="breadcrumb-item active" aria-current="page"><%= breadcrumbCurrent %></li>
                         </ol>
@@ -53,12 +53,30 @@
                                 <div class="col-md-6">
                                     <label for="activity" class="form-label">Activity</label>
                                     <select class="form-select" id="activity" name="activity" required>
-                                        <% activities.forEach(activity => { %>
-                                            <option value="<%= activity.code %>" <%= activity.code === defaultActivityCode ? 'selected' : '' %>>
-                                                <%= activity.code %> - <%= activity.name %>
-                                            </option>
-                                        <% }) %>
+                                        <% const supportedActivities = activities.filter((activity) => activity.supported); %>
+                                        <% const unsupportedActivities = activities.filter((activity) => !activity.supported); %>
+                                        <% if (supportedActivities.length) { %>
+                                            <optgroup label="Supported for GL Posting">
+                                                <% supportedActivities.forEach(activity => { %>
+                                                    <option value="<%= activity.code %>" <%= activity.code === defaultActivityCode ? 'selected' : '' %>>
+                                                        <%= activity.code %> - <%= activity.name %>
+                                                    </option>
+                                                <% }) %>
+                                            </optgroup>
+                                        <% } %>
+                                        <% if (unsupportedActivities.length) { %>
+                                            <optgroup label="Not Configured for GL Posting">
+                                                <% unsupportedActivities.forEach(activity => { %>
+                                                    <option value="<%= activity.code %>" disabled>
+                                                        <%= activity.code %> - <%= activity.name %> (Not Configured)
+                                                    </option>
+                                                <% }) %>
+                                            </optgroup>
+                                        <% } %>
                                     </select>
+                                    <div class="form-text text-muted">
+                                        This activity can be processed in payroll but does not yet have an approved General Ledger posting configuration when marked as not configured below.
+                                    </div>
                                     <div class="invalid-feedback">Select the payroll activity to post.</div>
                                 </div>
 
@@ -76,6 +94,47 @@
                                 <div class="col-md-6">
                                     <label for="postingPeriod" class="form-label">Posting Period</label>
                                     <input type="text" class="form-control bg-light" id="postingPeriod" readonly>
+                                </div>
+
+                                <div class="col-12">
+                                    <div class="alert alert-light border mb-0" id="workflowReadinessPanel">
+                                        <div class="fw-semibold mb-2">Workflow Readiness</div>
+                                        <div class="text-muted small" id="workflowReadinessMessage">Select a posting date and activity to verify final approval readiness.</div>
+                                        <div class="row g-3 mt-1 d-none" id="workflowReadinessDetails">
+                                            <div class="col-md-3">
+                                                <div class="text-muted small">Workflow Status</div>
+                                                <div><span class="badge" id="workflowStatusBadge">N/A</span></div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="text-muted small">Posting Status</div>
+                                                <div><span class="badge" id="workflowPostingBadge">N/A</span></div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="text-muted small">Final Approved By</div>
+                                                <div class="fw-semibold" id="workflowFinalApprovedBy">N/A</div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="text-muted small">Final Approved At</div>
+                                                <div class="fw-semibold" id="workflowFinalApprovedAt">N/A</div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="text-muted small">Total Staff</div>
+                                                <div class="fw-semibold" id="workflowTotalStaff">0</div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="text-muted small">Total Gross</div>
+                                                <div class="fw-semibold" id="workflowTotalGross">0.00</div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="text-muted small">Total Deductions</div>
+                                                <div class="fw-semibold" id="workflowTotalDeductions">0.00</div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="text-muted small">Total Net</div>
+                                                <div class="fw-semibold" id="workflowTotalNet">0.00</div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="col-12">
@@ -102,22 +161,94 @@
                 </div>
 
                 <div class="col-xl-5">
-                    <div class="card shadow-sm h-100">
+                    <div class="card shadow-sm mb-4">
                         <div class="card-body">
                             <h5 class="card-title">Posting Notes</h5>
                             <ul class="small text-muted mb-0">
-                                <li>Only approved monthly payroll can be posted.</li>
+                                <li>Only final-approved monthly payroll can be posted to accounts.</li>
                                 <li>The same company, activity, month, and year cannot be posted twice unless reversed.</li>
+                                <li>Workflow status, checksum integrity, legacy approval fields, export duplicates, and GL mappings are all validated before posting.</li>
                                 <li>Salary posting uses monthly payroll results first and groups entries into controlled GL lines.</li>
                                 <li>Additional activities can be extended in the GL posting service when their posting rules are confirmed.</li>
                             </ul>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title">Activity GL Posting Support</h5>
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Code</th>
+                                            <th>Activity</th>
+                                            <th>Status</th>
+                                            <th>Notes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% activities.forEach((activity) => { %>
+                                            <tr>
+                                                <td><%= activity.code %></td>
+                                                <td><%= activity.name %></td>
+                                                <td>
+                                                    <span class="badge <%= getReadinessBadgeClass(activity.supported ? 'success' : activity.state === 'NOT_APPLICABLE' ? 'secondary' : activity.state === 'NEEDS_CONFIRMATION' ? 'danger' : 'warning') %>">
+                                                        <%= activity.supported ? 'Supported for GL Posting' : activity.state === 'NOT_APPLICABLE' ? 'Not Configured for GL Posting' : activity.state === 'NEEDS_CONFIRMATION' ? 'Needs Confirmation' : 'Not Configured for GL Posting' %>
+                                                    </span>
+                                                </td>
+                                                <td class="small text-muted"><%= activity.detailedReason || activity.reason %></td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="card-title mb-0">Workflow Posting Queue</h5>
+                                <a href="<%= historyUrl %>" class="small text-decoration-none">Posting history</a>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Period</th>
+                                            <th>Activity</th>
+                                            <th>Workflow</th>
+                                            <th>Posting</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% if (!readinessRows.length) { %>
+                                            <tr><td colspan="4" class="text-center text-muted py-3">No payroll workflow batches are available yet.</td></tr>
+                                        <% } %>
+                                        <% readinessRows.slice(0, 12).forEach((row) => { %>
+                                            <tr>
+                                                <td><%= String(row.PMonth).padStart(2, '0') %>/<%= row.PYear %></td>
+                                                <td><%= row.PType %> - <%= row.activityName %></td>
+                                                <td><span class="badge <%= getWorkflowStatusBadgeClass(row.Status) %>"><%= row.Status %></span></td>
+                                                <td>
+                                                    <span class="badge <%= getReadinessBadgeClass(row.readinessTone) %>"><%= row.readinessLabel %></span>
+                                                    <% if (!row.activitySupported) { %>
+                                                        <div class="small text-muted mt-1"><%= row.activitySupportState %></div>
+                                                    <% } %>
+                                                </td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <footer class="mt-4 py-3 text-center text-muted border-top">
-                <%- include('../../data_entry/partials/footer') %>
+                <%- include('../../' + partialsBase + '/footer') %>
             </footer>
         </div>
     </main>
@@ -143,6 +274,22 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            const readinessRows = <%- JSON.stringify((readinessRows || []).map((row) => ({
+                pMonth: Number(row.PMonth),
+                pYear: Number(row.PYear),
+                pType: String(row.PType).trim(),
+                status: row.Status,
+                readinessLabel: row.readinessLabel,
+                readinessTone: row.readinessTone,
+                canPost: !!row.canPost,
+                finalApprovedByName: row.finalApprovedByName || '',
+                finalApprovedAt: row.FinalApprovedAt || null,
+                totalStaff: Number(row.TotalStaff || 0),
+                totalGross: Number(row.TotalGross || 0),
+                totalDeductions: Number(row.TotalDeductions || 0),
+                totalNet: Number(row.TotalNet || 0),
+                checksumValid: !!row.checksumValid
+            }))) %>;
             const activitySelect = document.getElementById('activity');
             const activityLabel = document.getElementById('activityLabel');
             const postingDateInput = document.getElementById('postingDate');
@@ -150,10 +297,42 @@
             const companyIdInput = document.getElementById('companyId');
             const form = document.getElementById('glPostingForm');
             const alertContainer = document.getElementById('submissionAlert');
+            const readinessPanel = document.getElementById('workflowReadinessPanel');
+            const readinessMessage = document.getElementById('workflowReadinessMessage');
+            const readinessDetails = document.getElementById('workflowReadinessDetails');
+            const workflowStatusBadge = document.getElementById('workflowStatusBadge');
+            const workflowPostingBadge = document.getElementById('workflowPostingBadge');
+            const workflowFinalApprovedBy = document.getElementById('workflowFinalApprovedBy');
+            const workflowFinalApprovedAt = document.getElementById('workflowFinalApprovedAt');
+            const workflowTotalStaff = document.getElementById('workflowTotalStaff');
+            const workflowTotalGross = document.getElementById('workflowTotalGross');
+            const workflowTotalDeductions = document.getElementById('workflowTotalDeductions');
+            const workflowTotalNet = document.getElementById('workflowTotalNet');
             const confirmModal = new bootstrap.Modal(document.getElementById('confirmPostingModal'));
             const openConfirmButton = document.getElementById('openConfirmModal');
             const confirmPostButton = document.getElementById('confirmPostButton');
             let isSubmitting = false;
+            const workflowBadgeClasses = {
+                PROCESSED: 'bg-primary-subtle text-primary-emphasis border border-primary-subtle',
+                SUBMITTED_TO_MANAGER: 'bg-info-subtle text-info-emphasis border border-info-subtle',
+                SUBMITTED_TO_AUDITOR: 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle',
+                SUBMITTED_TO_ENTITY_HEAD: 'bg-dark-subtle text-dark-emphasis border border-dark-subtle',
+                FINAL_APPROVED: 'bg-success-subtle text-success-emphasis border border-success-subtle',
+                FINAL_REJECTED: 'bg-danger-subtle text-danger-emphasis border border-danger-subtle',
+                RETURNED_BY_MANAGER: 'bg-warning-subtle text-warning-emphasis border border-warning-subtle',
+                RETURNED_BY_AUDITOR: 'bg-warning-subtle text-warning-emphasis border border-warning-subtle',
+                POSTED_TO_ACCOUNTS: 'bg-success text-white'
+            };
+            const readinessBadgeClasses = {
+                success: 'bg-success-subtle text-success-emphasis border border-success-subtle',
+                danger: 'bg-danger-subtle text-danger-emphasis border border-danger-subtle',
+                warning: 'bg-warning-subtle text-warning-emphasis border border-warning-subtle',
+                info: 'bg-info-subtle text-info-emphasis border border-info-subtle',
+                secondary: 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle',
+                dark: 'bg-dark-subtle text-dark-emphasis border border-dark-subtle',
+                primary: 'bg-primary-subtle text-primary-emphasis border border-primary-subtle',
+                light: 'bg-light text-dark border'
+            };
 
             function renderAlert(type, message, extraHtml = '') {
                 alertContainer.innerHTML = `
@@ -206,9 +385,59 @@
                 });
             }
 
+            function formatCurrency(value) {
+                return Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            function findReadinessRow() {
+                if (!postingDateInput.value || !activitySelect.value) {
+                    return null;
+                }
+
+                const postingDate = new Date(postingDateInput.value + 'T00:00:00');
+                const month = postingDate.getMonth() + 1;
+                const year = postingDate.getFullYear();
+                const activity = String(activitySelect.value || '').trim();
+
+                return readinessRows.find((row) => row.pMonth === month && row.pYear === year && row.pType === activity) || null;
+            }
+
+            function updateReadinessPanel() {
+                const readiness = findReadinessRow();
+
+                if (!readiness) {
+                    readinessPanel.className = 'alert alert-light border mb-0';
+                    readinessMessage.textContent = 'No payroll workflow batch was found for the selected period and activity.';
+                    readinessDetails.classList.add('d-none');
+                    openConfirmButton.disabled = true;
+                    return;
+                }
+
+                readinessPanel.className = `alert ${readiness.canPost ? 'alert-success' : readiness.readinessTone === 'danger' ? 'alert-danger' : readiness.readinessTone === 'warning' ? 'alert-warning' : 'alert-light'} border mb-0`;
+                readinessMessage.textContent = readiness.checksumValid
+                    ? readiness.readinessLabel
+                    : 'Payroll figures have changed after final approval. The payroll must be returned for correction and approved again before posting.';
+                readinessDetails.classList.remove('d-none');
+                workflowStatusBadge.className = `badge ${workflowBadgeClasses[readiness.status] || 'bg-light text-dark border'}`;
+                workflowStatusBadge.textContent = readiness.status;
+                workflowPostingBadge.className = `badge ${readinessBadgeClasses[readiness.readinessTone] || readinessBadgeClasses.light}`;
+                workflowPostingBadge.textContent = readiness.checksumValid ? readiness.readinessLabel : 'Approval Invalidated';
+                workflowFinalApprovedBy.textContent = readiness.finalApprovedByName || 'N/A';
+                workflowFinalApprovedAt.textContent = readiness.finalApprovedAt ? new Date(readiness.finalApprovedAt).toLocaleString('en-GB') : 'N/A';
+                workflowTotalStaff.textContent = Number(readiness.totalStaff || 0).toLocaleString();
+                workflowTotalGross.textContent = formatCurrency(readiness.totalGross);
+                workflowTotalDeductions.textContent = formatCurrency(readiness.totalDeductions);
+                workflowTotalNet.textContent = formatCurrency(readiness.totalNet);
+                openConfirmButton.disabled = !readiness.canPost;
+            }
+
             openConfirmButton.addEventListener('click', () => {
                 if (!validateForm()) {
                     renderAlert('danger', 'Please fix the highlighted fields before posting.');
+                    return;
+                }
+                if (openConfirmButton.disabled) {
+                    renderAlert('danger', 'The selected payroll batch is not ready for Post to Accounts.');
                     return;
                 }
                 alertContainer.innerHTML = '';
@@ -262,6 +491,14 @@
                             <a href="<%= historyUrl %>?batchId=${data.batchId}" class="alert-link ms-2">View posting history</a>
                         </div>`
                     );
+                    const readiness = findReadinessRow();
+                    if (readiness) {
+                        readiness.status = 'POSTED_TO_ACCOUNTS';
+                        readiness.readinessLabel = 'Already Posted';
+                        readiness.readinessTone = 'success';
+                        readiness.canPost = false;
+                    }
+                    updateReadinessPanel();
                 } catch (error) {
                     renderAlert('danger', `<i class="bi bi-exclamation-triangle-fill"></i> ${error.message}`);
                 } finally {
@@ -271,11 +508,18 @@
                 }
             });
 
-            activitySelect.addEventListener('change', updateActivityLabel);
-            postingDateInput.addEventListener('change', updatePostingPeriod);
+            activitySelect.addEventListener('change', () => {
+                updateActivityLabel();
+                updateReadinessPanel();
+            });
+            postingDateInput.addEventListener('change', () => {
+                updatePostingPeriod();
+                updateReadinessPanel();
+            });
 
             updateActivityLabel();
             updatePostingPeriod();
+            updateReadinessPanel();
         });
     </script>
 </body>

@@ -9,8 +9,8 @@
     <link href="/css/styles.css" rel="stylesheet" />
 </head>
 <body>
-    <%- include('../partials/topbar', { user }) %>
-    <%- include('../partials/sidebar') %>
+    <%- include('../../' + partialsBase + '/topbar', { user }) %>
+    <%- include('../../' + partialsBase + '/sidebar') %>
 
     <main class="main">
         <div class="container-fluid py-3">
@@ -19,7 +19,7 @@
                     <h2 class="mb-0"><%= title %></h2>
                     <nav aria-label="breadcrumb">
                         <ol class="breadcrumb mt-2 mb-0">
-                            <li class="breadcrumb-item"><a href="/data-entry/dashboard" class="text-decoration-none">Home</a></li>
+                            <li class="breadcrumb-item"><a href="<%= dashboardPath %>" class="text-decoration-none">Home</a></li>
                             <li class="breadcrumb-item">Payroll</li>
                             <li class="breadcrumb-item active">Bonus Awards</li>
                         </ol>
@@ -54,7 +54,7 @@
             </div>
 
             <footer class="mt-4 py-3 text-center text-muted border-top">
-                <%- include('../partials/footer') %>
+                <%- include('../../' + partialsBase + '/footer') %>
             </footer>
         </div>
     </main>
@@ -156,7 +156,7 @@
         async function loadPending() {
             tbody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
             try {
-                const res = await fetch('/data-entry/api/payroll/bonus-awards/pending');
+                const res = await fetch('<%= bonusApiBaseUrl %>/pending');
                 const data = await res.json();
                 if (!Array.isArray(data) || data.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="6" class="text-center">No pending bonus awards.</td></tr>';
@@ -194,7 +194,7 @@
             const id = btn.getAttribute('data-id');
             if (!id) return;
             try {
-                const res = await fetch(`/data-entry/api/payroll/bonus-awards/${id}`);
+                const res = await fetch(`<%= bonusApiBaseUrl %>/${id}`);
                 const row = await res.json();
                 if (!row) return;
                 recordId.value = id;
@@ -225,7 +225,7 @@
             btnSave.disabled = true;
             btnSave.textContent = 'Saving...';
             try {
-                const res = await fetch('/data-entry/api/payroll/bonus-awards', {
+                const res = await fetch('<%= bonusApiBaseUrl %>', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)

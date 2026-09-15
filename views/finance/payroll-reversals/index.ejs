@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · HR & Payroll</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+                <div>
+                    <h2 class="mb-1">Payroll Reversal Requests</h2>
+                    <div class="text-muted">Create, monitor, and execute reversal requests only after the full approval chain is complete.</div>
+                </div>
+                <a href="/finance/payroll/post-to-accounts/history" class="btn btn-outline-secondary">
+                    <i class="bi bi-journal-text me-2"></i>GL Posting History
+                </a>
+            </div>
+
+            <% if (successMessage) { %><div class="alert alert-success"><%= successMessage %></div><% } %>
+            <% if (errorMessage) { %><div class="alert alert-danger"><%= errorMessage %></div><% } %>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <form class="row g-3" method="get" action="/finance/payroll/reversals">
+                        <div class="col-md-3">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" name="status">
+                                <option value="">Default Finance Queue</option>
+                                <% statusOptions.forEach((status) => { %>
+                                    <option value="<%= status %>" <%= filters.status === status ? 'selected' : '' %>><%= status %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Month</label>
+                            <input class="form-control" type="number" min="1" max="12" name="month" value="<%= filters.month %>" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Year</label>
+                            <input class="form-control" type="number" min="2000" max="2100" name="year" value="<%= filters.year %>" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Activity</label>
+                            <input class="form-control" type="text" maxlength="10" name="pType" value="<%= filters.pType %>" />
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end gap-2">
+                            <button class="btn btn-primary flex-fill" type="submit">Filter</button>
+                            <a class="btn btn-outline-secondary flex-fill" href="/finance/payroll/reversals">Reset</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">Reversal Queue</span>
+                    <span class="text-muted small"><%= rows.length %> request(s)</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Month</th>
+                                    <th>Year</th>
+                                    <th>Activity</th>
+                                    <th>Status</th>
+                                    <th>Total Staff</th>
+                                    <th>Total Gross</th>
+                                    <th>Total Net</th>
+                                    <th>GL Batch</th>
+                                    <th>Requested</th>
+                                    <th class="text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% if (!rows.length) { %>
+                                    <tr><td colspan="10" class="text-center text-muted py-4">No payroll reversal requests matched the selected filters.</td></tr>
+                                <% } %>
+                                <% rows.forEach((row) => { %>
+                                    <tr>
+                                        <td><%= String(row.PMonth).padStart(2, '0') %></td>
+                                        <td><%= row.PYear %></td>
+                                        <td><span class="fw-semibold"><%= row.PType %></span></td>
+                                        <td><span class="badge <%= row.badgeClass %>"><%= row.Status %></span></td>
+                                        <td><%= Number(row.TotalStaff || 0).toLocaleString('en-US') %></td>
+                                        <td><%= Number(row.TotalGross || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td><%= Number(row.TotalNet || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td>#<%= row.GLPostingBatchID || '—' %></td>
+                                        <td><%= row.RequestedAt ? new Date(row.RequestedAt).toLocaleString('en-GB') : 'N/A' %></td>
+                                        <td class="text-end">
+                                            <a class="btn btn-sm btn-outline-primary" href="/finance/payroll/reversals/<%= row.id %>">Open</a>
+                                        </td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

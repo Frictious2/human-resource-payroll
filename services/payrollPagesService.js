@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const staffStatusService = require('./staffStatusService');
+const recordWorkflowService = require('./recordWorkflowService');
 
 function normalizeText(value) {
     const text = String(value || '').trim();
@@ -314,104 +315,140 @@ async function saveYearlyPayment({
         CompanyID: resolvedCompanyId
     };
 
-    const [existingRows] = await pool.query(
-        `
-            SELECT PFNo
-            FROM tblyearlypayments
-            WHERE CompanyID = ?
-              AND PFNo = ?
-              AND PType = ?
-              AND PMonth = ?
-              AND PYear = ?
-              AND COALESCE(Approved, 0) = 0
-            LIMIT 1
-        `,
-        [resolvedCompanyId, payload.PFNo, payload.PType, payload.PMonth, payload.PYear]
-    );
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+        await recordWorkflowService.ensureWorkflowTables(connection);
 
-    if (existingRows.length > 0) {
-        await pool.query(
+        const [existingRows] = await connection.query(
             `
-                UPDATE tblyearlypayments
-                SET PDate = ?,
-                    SName = ?,
-                    Dept = ?,
-                    Grade = ?,
-                    JobTitle = ?,
-                    AccountNo = ?,
-                    Fixed = ?,
-                    Monthly = ?,
-                    TotalIncome = ?,
-                    Taxable = ?,
-                    Tax = ?,
-                    NetIncome = ?,
-                    Served = ?,
-                    Selected = ?,
-                    Operator = ?,
-                    DateKeyed = NOW(),
-                    TimeKeyed = NOW()
+                SELECT PFNo
+                FROM tblyearlypayments
                 WHERE CompanyID = ?
                   AND PFNo = ?
                   AND PType = ?
                   AND PMonth = ?
                   AND PYear = ?
                   AND COALESCE(Approved, 0) = 0
+                LIMIT 1
             `,
-            [
-                payload.PDate,
-                payload.SName,
-                payload.Dept,
-                payload.Grade,
-                payload.JobTitle,
-                payload.AccountNo,
-                payload.Fixed,
-                payload.Monthly,
-                payload.TotalIncome,
-                payload.Taxable,
-                payload.Tax,
-                payload.NetIncome,
-                payload.Served,
-                payload.Selected,
-                payload.Operator,
-                payload.CompanyID,
-                payload.PFNo,
-                payload.PType,
-                payload.PMonth,
-                payload.PYear
-            ]
+            [resolvedCompanyId, payload.PFNo, payload.PType, payload.PMonth, payload.PYear]
         );
-    } else {
-        await pool.query(
-            `
-                INSERT INTO tblyearlypayments (
-                    PDate, PFNo, SName, Dept, Grade, JobTitle, AccountNo, Fixed, Monthly,
-                    TotalIncome, Taxable, Tax, NetIncome, PMonth, PYear, PType, Served,
-                    Selected, Paid, Operator, DateKeyed, TimeKeyed, Approved, CompanyID
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, NOW(), NOW(), 0, ?)
-            `,
-            [
-                payload.PDate,
-                payload.PFNo,
-                payload.SName,
-                payload.Dept,
-                payload.Grade,
-                payload.JobTitle,
-                payload.AccountNo,
-                payload.Fixed,
-                payload.Monthly,
-                payload.TotalIncome,
-                payload.Taxable,
-                payload.Tax,
-                payload.NetIncome,
-                payload.PMonth,
-                payload.PYear,
-                payload.PType,
-                payload.Served,
-                payload.Selected,
-                payload.Operator,
-                payload.CompanyID
-            ]
+
+        if (existingRows.length > 0) {
+            await connection.query(
+                `
+                    UPDATE tblyearlypayments
+                    SET PDate = ?,
+                        SName = ?,
+                        Dept = ?,
+                        Grade = ?,
+                        JobTitle = ?,
+                        AccountNo = ?,
+                        Fixed = ?,
+                        Monthly = ?,
+                        TotalIncome = ?,
+                        Taxable = ?,
+                        Tax = ?,
+                        NetIncome = ?,
+                        Served = ?,
+                        Selected = ?,
+                        Operator = ?,
+                        DateKeyed = NOW(),
+                        TimeKeyed = NOW()
+                    WHERE CompanyID = ?
+                      AND PFNo = ?
+                      AND PType = ?
+                      AND PMonth = ?
+                      AND PYear = ?
+                      AND COALESCE(Approved, 0) = 0
+                `,
+                [
+                    payload.PDate,
+                    payload.SName,
+                    payload.Dept,
+                    payload.Grade,
+                    payload.JobTitle,
+                    payload.AccountNo,
+                    payload.Fixed,
+                    payload.Monthly,
+                    payload.TotalIncome,
+                    payload.Taxable,
+                    payload.Tax,
+                    payload.NetIncome,
+                    payload.Served,
+                    payload.Selected,
+                    payload.Operator,
+                    payload.CompanyID,
+                    payload.PFNo,
+                    payload.PType,
+                    payload.PMonth,
+                    payload.PYear
+                ]
+            );
+        } else {
+            await connection.query(
+                `
+                    INSERT INTO tblyearlypayments (
+                        PDate, PFNo, SName, Dept, Grade, JobTitle, AccountNo, Fixed, Monthly,
+                        TotalIncome, Taxable, Tax, NetIncome, PMonth, PYear, PType, Served,
+                        Selected, Paid, Operator, DateKeyed, TimeKeyed, Approved, CompanyID
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, NOW(), NOW(), 0, ?)
+                `,
+                [
+                    payload.PDate,
+                    payload.PFNo,
+                    payload.SName,
+                    payload.Dept,
+                    payload.Grade,
+                    payload.JobTitle,
+                    payload.AccountNo,
+                    payload.Fixed,
+                    payload.Monthly,
+                    payload.TotalIncome,
+                    payload.Taxable,
+                    payload.Tax,
+                    payload.NetIncome,
+                    payload.PMonth,
+                    payload.PYear,
+                    payload.PType,
+                    payload.Served,
+                    payload.Selected,
+                    payload.Operator,
+                    payload.CompanyID
+                ]
+            );
+        }
+
+        const recordReference = recordWorkflowService.buildReference(
+            payload.PFNo,
+            payload.PMonth,
+            payload.PYear,
+            payload.PType
         );
+        const sourceRecord = await recordWorkflowService.fetchModuleRecord(
+            resolvedCompanyId,
+            'yearly-payment',
+            recordReference,
+            connection
+        );
+
+        await recordWorkflowService.ensureDraftItemForExistingRecord({
+            companyId: resolvedCompanyId,
+            module: 'yearly-payment',
+            recordReference,
+            record: sourceRecord,
+            user: { name: operatorName || 'Data Entry Officer', role: 'data-entry' },
+            connection
+        });
+
+        await connection.commit();
+        return { recordReference };
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
     }
 }
 
@@ -523,46 +560,82 @@ async function saveSalaryReview({
         throw createError('Review date, review type, grade range, and percentage are required.', 400);
     }
 
-    const [existingRows] = await pool.query(
-        `
-            SELECT RevCode
-            FROM tblsalreview
-            WHERE (CompanyID = ? OR CompanyID IS NULL)
-              AND DATE(RevDate) = ?
-              AND RevCode = ?
-              AND SGrade = ?
-              AND EGrade = ?
-              AND COALESCE(Approved, 0) = 0
-            LIMIT 1
-        `,
-        [resolvedCompanyId, revDateValue, revCodeValue, startGradeValue, endGradeValue]
-    );
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+        await recordWorkflowService.ensureWorkflowTables(connection);
 
-    if (existingRows.length > 0) {
-        await pool.query(
+        const [existingRows] = await connection.query(
             `
-                UPDATE tblsalreview
-                SET Percentage = ?,
-                    Operator = ?,
-                    Datekeyed = NOW()
+                SELECT RevCode
+                FROM tblsalreview
                 WHERE (CompanyID = ? OR CompanyID IS NULL)
                   AND DATE(RevDate) = ?
                   AND RevCode = ?
                   AND SGrade = ?
                   AND EGrade = ?
                   AND COALESCE(Approved, 0) = 0
+                LIMIT 1
             `,
-            [percentageValue, operatorName || 'Data Entry Officer', resolvedCompanyId, revDateValue, revCodeValue, startGradeValue, endGradeValue]
+            [resolvedCompanyId, revDateValue, revCodeValue, startGradeValue, endGradeValue]
         );
-    } else {
-        await pool.query(
-            `
-                INSERT INTO tblsalreview (
-                    RevDate, Percentage, RevCode, SGrade, EGrade, Operator, Datekeyed, Approved, CompanyID
-                ) VALUES (?, ?, ?, ?, ?, ?, NOW(), 0, ?)
-            `,
-            [revDateValue, percentageValue, revCodeValue, startGradeValue, endGradeValue, operatorName || 'Data Entry Officer', resolvedCompanyId]
+
+        if (existingRows.length > 0) {
+            await connection.query(
+                `
+                    UPDATE tblsalreview
+                    SET Percentage = ?,
+                        Operator = ?,
+                        Datekeyed = NOW()
+                    WHERE (CompanyID = ? OR CompanyID IS NULL)
+                      AND DATE(RevDate) = ?
+                      AND RevCode = ?
+                      AND SGrade = ?
+                      AND EGrade = ?
+                      AND COALESCE(Approved, 0) = 0
+                `,
+                [percentageValue, operatorName || 'Data Entry Officer', resolvedCompanyId, revDateValue, revCodeValue, startGradeValue, endGradeValue]
+            );
+        } else {
+            await connection.query(
+                `
+                    INSERT INTO tblsalreview (
+                        RevDate, Percentage, RevCode, SGrade, EGrade, Operator, Datekeyed, Approved, CompanyID
+                    ) VALUES (?, ?, ?, ?, ?, ?, NOW(), 0, ?)
+                `,
+                [revDateValue, percentageValue, revCodeValue, startGradeValue, endGradeValue, operatorName || 'Data Entry Officer', resolvedCompanyId]
+            );
+        }
+
+        const recordReference = recordWorkflowService.buildReference(
+            revDateValue,
+            revCodeValue,
+            startGradeValue,
+            endGradeValue
         );
+        const sourceRecord = await recordWorkflowService.fetchModuleRecord(
+            resolvedCompanyId,
+            'salary-review',
+            recordReference,
+            connection
+        );
+
+        await recordWorkflowService.ensureDraftItemForExistingRecord({
+            companyId: resolvedCompanyId,
+            module: 'salary-review',
+            recordReference,
+            record: sourceRecord,
+            user: { name: operatorName || 'Data Entry Officer', role: 'data-entry' },
+            connection
+        });
+
+        await connection.commit();
+        return { recordReference };
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
     }
 }
 

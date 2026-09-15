@@ -1,5 +1,6 @@
 const payrollGlPostingService = require('../services/payrollGlPostingService');
 const payrollGlPostingValidation = require('../validations/payrollGlPostingValidation');
+const { getWorkspaceContext } = require('../utils/workspaceContext');
 
 function sendSuccess(res, message, data, statusCode = 200) {
     return res.status(statusCode).json({
@@ -36,35 +37,82 @@ function resolveCompanyIdFromUser(user) {
 }
 
 function normalizeActivities(rows) {
-    const fallback = {
-        '01': 'Salary',
-        '02': 'Rent Allowance',
-        '05': 'Inducement',
-        '08': 'EOS Benefits',
-        '09': 'Bonus',
-        '13': 'Leave Allowance',
-        '15': 'Long Service'
-    };
-
     if (!rows || rows.length === 0) {
-        return Object.entries(fallback).map(([code, name]) => ({ code, name }));
+        return [];
     }
 
     return rows.map((row) => ({
         code: row.Code || row.code,
-        name: row.PayType || row.name || fallback[row.Code || row.code] || row.Code || row.code
+        name: row.PayType || row.payType || row.name || row.Code || row.code,
+        supported: Boolean(row.supported),
+        state: row.state || 'NEEDS_CONFIRMATION',
+        reason: row.reason || '',
+        detailedReason: row.detailedReason || '',
+        implementationType: row.implementationType || '',
+        usage: row.usage || {}
     }));
+}
+
+function getWorkflowStatusBadgeClass(status) {
+    const badgeMap = {
+        CORRECTION_IN_PROGRESS: 'bg-warning text-dark',
+        PROCESSED: 'bg-primary-subtle text-primary-emphasis border border-primary-subtle',
+        SUBMITTED_TO_MANAGER: 'bg-info-subtle text-info-emphasis border border-info-subtle',
+        SUBMITTED_TO_AUDITOR: 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle',
+        SUBMITTED_TO_ENTITY_HEAD: 'bg-dark-subtle text-dark-emphasis border border-dark-subtle',
+        FINAL_APPROVED: 'bg-success-subtle text-success-emphasis border border-success-subtle',
+        FINAL_REJECTED: 'bg-danger-subtle text-danger-emphasis border border-danger-subtle',
+        RETURNED_BY_MANAGER: 'bg-warning-subtle text-warning-emphasis border border-warning-subtle',
+        RETURNED_BY_AUDITOR: 'bg-warning-subtle text-warning-emphasis border border-warning-subtle',
+        POSTED_TO_ACCOUNTS: 'bg-success text-white',
+        REVERSED: 'bg-danger text-white'
+    };
+
+    return badgeMap[status] || 'bg-light text-dark border';
+}
+
+function getReadinessBadgeClass(tone) {
+    const badgeMap = {
+        success: 'bg-success-subtle text-success-emphasis border border-success-subtle',
+        danger: 'bg-danger-subtle text-danger-emphasis border border-danger-subtle',
+        warning: 'bg-warning-subtle text-warning-emphasis border border-warning-subtle',
+        info: 'bg-info-subtle text-info-emphasis border border-info-subtle',
+        secondary: 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle',
+        dark: 'bg-dark-subtle text-dark-emphasis border border-dark-subtle',
+        primary: 'bg-primary-subtle text-primary-emphasis border border-primary-subtle'
+    };
+
+    return badgeMap[tone] || 'bg-light text-dark border';
+}
+
+function getWorkspaceUrls(req) {
+    const workspace = getWorkspaceContext(req, 'data-entry');
+    const routeBase = workspace.role === 'finance-manager'
+        ? '/finance-manager'
+        : workspace.isFinance
+            ? '/finance'
+            : '/data-entry';
+
+    return {
+        ...workspace,
+        routeBase,
+        postingFormUrl: workspace.role === 'finance-manager' ? `${routeBase}/reports/general-ledger` : `${routeBase}/payroll/gl-posting`,
+        postingHistoryUrl: workspace.role === 'finance-manager' ? `${routeBase}/reports/general-ledger` : `${routeBase}/payroll/post-to-accounts/history`,
+        processUrl: workspace.role === 'finance-manager' ? workspace.dashboardPath : `${routeBase}/payroll/process-emoluments`
+    };
 }
 
 module.exports = {
     renderPostingForm: async (req, res) => {
         try {
-            const user = payrollGlPostingValidation.resolveAuthenticatedUser(req) || { name: 'Data Entry Officer', role: 'payroll admin' };
+            const workspace = getWorkspaceUrls(req);
+            const user = payrollGlPostingValidation.resolveAuthenticatedUser(req) || { name: workspace.workspaceLabel, role: workspace.role };
             const companyId = resolveCompanyIdFromUser(user);
             const [activityRows, company] = await Promise.all([
-                payrollGlPostingService.getSupportedActivities(companyId),
+                payrollGlPostingService.getActivityGlPostingCatalog(companyId),
                 payrollGlPostingService.getCompanySummary(companyId)
             ]);
+            const readinessRows = await payrollGlPostingService.getPostingReadinessRows(companyId);
 
             return res.render('payroll/gl-posting/index', {
                 title: 'Post Payroll Items to GL Accounts',
@@ -72,13 +120,19 @@ module.exports = {
                 breadcrumbCurrent: 'Post to Accounts',
                 user,
                 role: user.role || 'data_entry',
+                partialsBase: workspace.partialsBase,
+                workspaceLabel: workspace.workspaceLabel,
+                homePath: workspace.dashboardPath,
                 company,
                 companyId,
-                postUrl: '/data-entry/payroll/gl-posting',
-                historyUrl: '/data-entry/payroll/post-to-accounts/history',
-                closeUrl: '/data-entry/payroll/process-emoluments',
+                postUrl: workspace.postingFormUrl,
+                historyUrl: workspace.postingHistoryUrl,
+                closeUrl: workspace.processUrl,
                 activities: normalizeActivities(activityRows),
-                defaultActivityCode: '01'
+                defaultActivityCode: '01',
+                readinessRows,
+                getWorkflowStatusBadgeClass,
+                getReadinessBadgeClass
             });
         } catch (error) {
             console.error(error);
@@ -97,12 +151,13 @@ module.exports = {
                 companyId: payload.companyId,
                 activityCode: payload.activityCode,
                 postingDate: payload.postingDate,
-                postedBy
+                postedBy,
+                postedByUser: user
             });
 
             return sendSuccess(
                 res,
-                'Payroll GL posting completed successfully.',
+                'Payroll posted to accounts successfully.',
                 result
             );
         } catch (error) {
@@ -112,13 +167,14 @@ module.exports = {
 
     getPostingHistory: async (req, res) => {
         try {
+            const workspace = getWorkspaceUrls(req);
             const user = payrollGlPostingValidation.resolveAuthenticatedUser(req);
             const filters = payrollGlPostingValidation.validateHistoryQuery(req.query);
 
             if (req.query.batchId) {
                 const batchId = payrollGlPostingValidation.validateBatchId(req.query.batchId);
                 const printSuffix = req.query.print ? '?print=1' : '';
-                return res.redirect(`/data-entry/payroll/post-to-accounts/history/${batchId}${printSuffix}`);
+                return res.redirect(`${workspace.postingHistoryUrl}/${batchId}${printSuffix}`);
             }
 
             if (!filters.companyId) {
@@ -127,7 +183,7 @@ module.exports = {
             }
 
             requireCompanyId(filters.companyId);
-            payrollGlPostingValidation.assertAuthorizedUser(user, filters.companyId);
+            payrollGlPostingValidation.assertHistoryAuthorizedUser(user, filters.companyId);
 
             const history = await payrollGlPostingService.getPostingHistory(filters);
 
@@ -138,12 +194,17 @@ module.exports = {
                     breadcrumbCurrent: 'Posting History',
                     user,
                     role: user.role || 'data_entry',
+                    partialsBase: workspace.partialsBase,
+                    workspaceLabel: workspace.workspaceLabel,
+                    homePath: workspace.dashboardPath,
                     batches: history.rows,
                     pagination: history.pagination,
                     selectedBatch: null,
                     selectedLines: [],
-                    historyBaseUrl: '/data-entry/payroll/post-to-accounts/history',
-                    formUrl: '/data-entry/payroll/post-to-accounts'
+                    historyBaseUrl: workspace.postingHistoryUrl,
+                    formUrl: workspace.postingFormUrl,
+                    processUrl: workspace.processUrl,
+                    getWorkflowStatusBadgeClass
                 });
             }
 
@@ -155,10 +216,11 @@ module.exports = {
 
     getPostingBatchDetail: async (req, res) => {
         try {
+            const workspace = getWorkspaceUrls(req);
             const user = payrollGlPostingValidation.resolveAuthenticatedUser(req);
             const filters = payrollGlPostingValidation.validateHistoryQuery(req.query);
             const companyId = requireCompanyId(filters.companyId || Number(user && (user.company_id || user.companyId || user.CompanyID)));
-            payrollGlPostingValidation.assertAuthorizedUser(user, companyId);
+            payrollGlPostingValidation.assertHistoryAuthorizedUser(user, companyId);
 
             const batchId = payrollGlPostingValidation.validateBatchId(req.params.id);
             const detail = await payrollGlPostingService.getPostingBatchDetail({
@@ -183,6 +245,9 @@ module.exports = {
                     breadcrumbCurrent: 'Posting History',
                     user,
                     role: user.role || 'data_entry',
+                    partialsBase: workspace.partialsBase,
+                    workspaceLabel: workspace.workspaceLabel,
+                    homePath: workspace.dashboardPath,
                     batches: history.rows,
                     pagination: history.pagination,
                     selectedBatch: detail.batch,
@@ -190,8 +255,10 @@ module.exports = {
                     debitTotal: detail.debitTotal,
                     creditTotal: detail.creditTotal,
                     printMode: req.query.print === '1',
-                    historyBaseUrl: '/data-entry/payroll/post-to-accounts/history',
-                    formUrl: '/data-entry/payroll/post-to-accounts'
+                    historyBaseUrl: workspace.postingHistoryUrl,
+                    formUrl: workspace.postingFormUrl,
+                    processUrl: workspace.processUrl,
+                    getWorkflowStatusBadgeClass
                 });
             }
 
@@ -203,20 +270,9 @@ module.exports = {
 
     reversePostingBatch: async (req, res) => {
         try {
-            const user = payrollGlPostingValidation.resolveAuthenticatedUser(req);
-            const filters = payrollGlPostingValidation.validateHistoryQuery(req.query);
-            const companyId = requireCompanyId(filters.companyId || Number(user && (user.company_id || user.companyId || user.CompanyID)));
-            payrollGlPostingValidation.assertAuthorizedUser(user, companyId);
-            payrollGlPostingValidation.resolveUserId(user);
-
-            const batchId = payrollGlPostingValidation.validateBatchId(req.params.id);
-            await payrollGlPostingService.reversePostingBatch({
-                companyId,
-                batchId,
-                reversedBy: payrollGlPostingValidation.resolveUserId(user)
-            });
-
-            return sendSuccess(res, 'Payroll GL posting reversal completed successfully.', { batchId });
+            const error = new Error('Direct GL reversal is disabled. Use the payroll reversal approval workflow instead.');
+            error.statusCode = 409;
+            throw error;
         } catch (error) {
             return sendFailure(res, error);
         }

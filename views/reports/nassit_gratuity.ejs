@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · <%= workspaceLabel %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        .report-workspace {
+            background: linear-gradient(180deg, #eef2f7 0%, #f6f7fb 100%);
+            min-height: 100vh;
+        }
+        .report-toolbar {
+            position: sticky;
+            top: 76px;
+            z-index: 10;
+        }
+        .report-toolbar .card-body {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .75rem;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .viewer-nav {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+        }
+        .viewer-meta {
+            min-width: 12rem;
+            text-align: center;
+            font-weight: 600;
+        }
+        .report-printable {
+            width: min(100%, 210mm);
+            margin: 0 auto;
+        }
+        .report-page {
+            background: #fff;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 14px;
+            margin-bottom: 1.5rem;
+            padding: 18mm 14mm 14mm;
+            min-height: calc(297mm - 24mm);
+            box-sizing: border-box;
+            overflow: hidden;
+            break-inside: avoid-page;
+            page-break-inside: avoid;
+        }
+        .report-page:not(.active) {
+            display: none;
+        }
+        .report-printable.viewer-export-mode .report-page {
+            display: block !important;
+        }
+        .report-logo-wrap {
+            min-height: 76px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: .75rem;
+        }
+        .report-logo {
+            max-height: 72px;
+            max-width: 120px;
+            object-fit: contain;
+        }
+        .report-branding {
+            text-align: center;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.12);
+            padding-bottom: 1rem;
+            margin-bottom: 1.25rem;
+        }
+        .report-company {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+        .report-address {
+            color: #5b6470;
+            margin-top: .15rem;
+        }
+        .report-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: .03em;
+            margin-top: .95rem;
+            text-transform: uppercase;
+        }
+        .report-subtitle {
+            color: #5b6470;
+            margin-top: .2rem;
+        }
+        .report-table th,
+        .report-table td {
+            vertical-align: middle;
+            font-size: .88rem;
+            line-height: 1.15;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            padding: .42rem .45rem;
+        }
+        .report-table {
+            width: 100%;
+            table-layout: fixed;
+            margin-bottom: 0;
+        }
+        .report-table th {
+            line-height: 1.2;
+        }
+        .report-table thead {
+            display: table-header-group;
+        }
+        .report-table tbody tr,
+        .report-table tfoot tr,
+        .table-responsive {
+            break-inside: avoid-page;
+            page-break-inside: avoid;
+        }
+        .table-responsive {
+            overflow: visible;
+        }
+        .report-page-footer {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-top: 1rem;
+            padding-top: .75rem;
+            border-top: 1px solid rgba(15, 23, 42, 0.12);
+            color: #55606d;
+            font-size: .88rem;
+        }
+        .page-number::after { content: counter(page); }
+        .page-total::after { content: counter(pages); }
+
+        @media print {
+            body {
+                background: #fff !important;
+            }
+            .topbar,
+            .sidebar,
+            .d-print-none,
+            .report-toolbar,
+            .report-filter-card {
+                display: none !important;
+            }
+            .main {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            .container-fluid {
+                padding: 0 !important;
+            }
+            .report-workspace,
+            .report-printable {
+                background: transparent !important;
+                max-width: none !important;
+                width: auto !important;
+            }
+            .report-page,
+            .report-page:not(.active) {
+                display: block !important;
+                box-shadow: none !important;
+                border: 0 !important;
+                border-radius: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                min-height: auto !important;
+                overflow: visible !important;
+                break-after: page;
+                page-break-after: always;
+            }
+            .report-page:last-child {
+                break-after: auto;
+                page-break-after: auto;
+            }
+            @page {
+                size: A4 portrait;
+                margin: 12mm 10mm 16mm;
+            }
+        }
+    </style>
+</head>
+<body>
+    <%- include('../' + partialsBase + '/topbar', { user, branding }) %>
+    <%- include('../' + partialsBase + '/sidebar') %>
+
+    <main class="main report-workspace">
+        <div class="container-fluid py-4">
+            <div class="d-flex justify-content-between align-items-start mb-4 d-print-none">
+                <div>
+                    <h1 class="h3 mb-1"><%= title %></h1>
+                    <p class="text-muted mb-0">Generate a branded NASSIT or gratuity balance statement for all staff or one PFNo.</p>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4 d-print-none report-filter-card">
+                <div class="card-body">
+                    <form method="GET" target="_blank" class="row g-3 align-items-end">
+                        <input type="hidden" name="run" value="1" />
+                        <div class="col-md-3">
+                            <label class="form-label">Statement Type</label>
+                            <select class="form-select" name="statementType" required>
+                                <option value="NASSIT" <%= pageData.filters.statementType === 'NASSIT' ? 'selected' : '' %>>NASSIT</option>
+                                <option value="GRATUITY" <%= pageData.filters.statementType === 'GRATUITY' ? 'selected' : '' %>>Gratuity</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Staff Scope</label>
+                            <select class="form-select" name="staffScope" id="staffScope">
+                                <option value="ALL" <%= pageData.filters.staffScope === 'ALL' ? 'selected' : '' %>>All Staff</option>
+                                <option value="SINGLE" <%= pageData.filters.staffScope === 'SINGLE' ? 'selected' : '' %>>Single Staff</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">PFNo</label>
+                            <input class="form-control" name="pfNo" id="pfNo" value="<%= pageData.filters.pfNo %>" placeholder="Enter PFNo for single-staff mode" />
+                            <% if (pageData.selectedStaff) { %>
+                                <div class="form-text"><%= pageData.selectedStaff.SName %></div>
+                            <% } %>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">As At Date</label>
+                            <input type="date" class="form-control" name="asAtDate" value="<%= pageData.filters.asAtDate %>" required />
+                        </div>
+                        <div class="col-12 d-flex gap-2 flex-wrap">
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-file-earmark-text me-2"></i>Generate Statement</button>
+                            <a href="<%= path %>" class="btn btn-outline-secondary">Change Filters</a>
+                            <button type="button" class="btn btn-outline-dark" id="printButton" <%= !pageData.report.generated ? 'disabled' : '' %>>Print</button>
+                            <button type="button" class="btn btn-danger" id="pdfButton" <%= !pageData.report.generated ? 'disabled' : '' %>>Download PDF</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <% if (pageData.report.generated) { %>
+                <div class="card shadow-sm mb-3 d-print-none report-toolbar">
+                    <div class="card-body">
+                        <div class="viewer-nav">
+                            <button type="button" class="btn btn-outline-secondary" data-report-prev>Previous</button>
+                            <div class="viewer-meta" data-report-indicator>Page 1 of 1</div>
+                            <button type="button" class="btn btn-outline-secondary" data-report-next>Next</button>
+                        </div>
+                        <div class="text-muted small text-center flex-grow-1" data-report-detail></div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-dark" id="toolbarPrintButton">Print</button>
+                            <button type="button" class="btn btn-danger" id="toolbarPdfButton">Download PDF</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="statementPrintable" class="report-printable" data-report-viewer>
+                    <% pageData.pages.forEach((page) => { %>
+                        <section class="report-page" data-report-page data-page-label="<%= page.rows.length ? `Rows ${page.rows[0].RowNo}-${page.rows[page.rows.length - 1].RowNo}` : 'No matching balances' %>">
+                            <div class="report-branding">
+                                <% if (pageData.company.LogoPath) { %>
+                                    <div class="report-logo-wrap">
+                                        <img src="<%= pageData.company.LogoPath %>" alt="Company Logo" class="report-logo" />
+                                    </div>
+                                <% } %>
+                                <div class="report-company"><%= pageData.company.Com_Name %></div>
+                                <% if (pageData.company.fullAddress) { %>
+                                    <div class="report-address"><%= pageData.company.fullAddress %></div>
+                                <% } %>
+                                <div class="report-title"><%= pageData.report.title %></div>
+                                <div class="report-subtitle"><%= pageData.report.subtitle %></div>
+                            </div>
+
+                            <table class="table table-bordered report-table align-middle mb-3">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 6%">No.</th>
+                                        <th style="width: 14%">Emp-ID / PFNo</th>
+                                        <% if (pageData.report.statementType === 'NASSIT') { %>
+                                            <th style="width: 18%">NASSIT No.</th>
+                                        <% } %>
+                                        <th>Name</th>
+                                        <th class="text-end" style="width: 18%">Balance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% if (!page.rows.length) { %>
+                                        <tr>
+                                            <td colspan="<%= pageData.report.statementType === 'NASSIT' ? 5 : 4 %>" class="text-center text-muted py-5">
+                                                No <%= pageData.report.statementType === 'NASSIT' ? 'NASSIT' : 'gratuity' %> records found for the selected criteria.
+                                            </td>
+                                        </tr>
+                                    <% } %>
+                                    <% page.rows.forEach((row) => { %>
+                                        <tr>
+                                            <td class="text-center"><%= row.RowNo %></td>
+                                            <td><%= row.PFNo %></td>
+                                            <% if (pageData.report.statementType === 'NASSIT') { %>
+                                                <td><%= row.AccountReference || '-' %></td>
+                                            <% } %>
+                                            <td><%= row.SName || '-' %></td>
+                                            <td class="text-end"><%= Number(row.Balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        </tr>
+                                    <% }) %>
+                                    <% if (page.totalBalance != null) { %>
+                                        <tr class="fw-semibold">
+                                            <td colspan="<%= pageData.report.statementType === 'NASSIT' ? 4 : 3 %>" class="text-end">Total Balance</td>
+                                            <td class="text-end"><%= Number(page.totalBalance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        </tr>
+                                    <% } %>
+                                </tbody>
+                            </table>
+
+                            <div class="report-page-footer">
+                                <span><%= pageData.report.printDateLabel %></span>
+                                <span>Page <%= page.pageNumber %> of <%= page.totalPages %></span>
+                            </div>
+                        </section>
+                    <% }) %>
+                </div>
+            <% } %>
+        </div>
+    </main>
+
+    <script src="/vendor/bootstrap.bundle.min.js"></script>
+    <script src="/js/report-viewer.js"></script>
+    <script>
+        const staffScope = document.getElementById('staffScope');
+        const pfNoInput = document.getElementById('pfNo');
+        const printButton = document.getElementById('printButton');
+        const pdfButton = document.getElementById('pdfButton');
+        const toolbarPrintButton = document.getElementById('toolbarPrintButton');
+        const toolbarPdfButton = document.getElementById('toolbarPdfButton');
+        const printable = document.getElementById('statementPrintable');
+        const viewer = printable ? window.initializeReportViewer() : null;
+
+        function syncStaffScope() {
+            if (!staffScope || !pfNoInput) return;
+            const single = staffScope.value === 'SINGLE';
+            pfNoInput.disabled = !single;
+            if (!single) {
+                pfNoInput.value = '';
+            }
+        }
+
+        async function downloadPdf() {
+            if (!printable || !viewer) return;
+            await viewer.withAllPages(async () => {
+                const opt = {
+                    margin: [10, 8, 16, 8],
+                    filename: <%- JSON.stringify(pageData.filenames.pdf) %>,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                    pagebreak: { mode: ['css', 'legacy'] }
+                };
+
+                const worker = html2pdf().set(opt).from(printable).toPdf();
+                const pdf = await worker.get('pdf');
+                const totalPages = pdf.internal.getNumberOfPages();
+                const footerDate = <%- JSON.stringify(pageData.report.printDateLabel) %>;
+                for (let page = 1; page <= totalPages; page += 1) {
+                    pdf.setPage(page);
+                    const width = pdf.internal.pageSize.getWidth();
+                    const height = pdf.internal.pageSize.getHeight();
+                    pdf.setFontSize(9);
+                    pdf.text(footerDate, 10, height - 6);
+                    pdf.text(`Page ${page} of ${totalPages}`, width - 10, height - 6, { align: 'right' });
+                }
+                await worker.save();
+            });
+        }
+
+        function printAllPages() {
+            window.print();
+        }
+
+        if (staffScope) {
+            staffScope.addEventListener('change', syncStaffScope);
+            syncStaffScope();
+        }
+        [printButton, toolbarPrintButton].forEach((button) => {
+            if (button) button.addEventListener('click', printAllPages);
+        });
+        [pdfButton, toolbarPdfButton].forEach((button) => {
+            if (button) button.addEventListener('click', downloadPdf);
+        });
+    </script>
+</body>
+</html>

@@ -9,8 +9,8 @@
     <link href="/css/styles.css" rel="stylesheet" />
 </head>
 <body>
-    <%- include('../../data_entry/partials/topbar', { user }) %>
-    <%- include('../../data_entry/partials/sidebar') %>
+    <%- include('../../' + partialsBase + '/topbar', { user }) %>
+    <%- include('../../' + partialsBase + '/sidebar') %>
 
     <main class="main">
         <div class="container-fluid py-3">
@@ -20,9 +20,9 @@
                     <p class="text-muted mb-0">Batch #<%= batch.id %> for <%= batch.activity_code %> - <%= batch.activity_name %>.</p>
                     <nav aria-label="breadcrumb">
                         <ol class="breadcrumb mt-2 mb-0">
-                            <li class="breadcrumb-item"><a class="text-decoration-none" href="/data-entry/dashboard">Home</a></li>
+                            <li class="breadcrumb-item"><a class="text-decoration-none" href="<%= homePath %>">Home</a></li>
                             <li class="breadcrumb-item">Payroll</li>
-                            <li class="breadcrumb-item"><a class="text-decoration-none" href="/data-entry/payroll/process-emoluments">Process Emoluments</a></li>
+                            <li class="breadcrumb-item"><a class="text-decoration-none" href="<%= processUrl %>">Process Emoluments</a></li>
                             <li class="breadcrumb-item"><a class="text-decoration-none" href="<%= historyUrl %>">History</a></li>
                             <li class="breadcrumb-item active" aria-current="page">Batch #<%= batch.id %></li>
                         </ol>
@@ -152,7 +152,7 @@
             </div>
 
             <footer class="mt-4 py-3 text-center text-muted border-top">
-                <%- include('../../data_entry/partials/footer') %>
+                <%- include('../../' + partialsBase + '/footer') %>
             </footer>
         </div>
     </main>

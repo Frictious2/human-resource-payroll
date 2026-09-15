@@ -1,0 +1,50 @@
+CREATE TABLE IF NOT EXISTS record_workflow_items (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    CompanyID INT NOT NULL,
+    Module VARCHAR(60) NOT NULL,
+    SourceTable VARCHAR(100) NOT NULL,
+    RecordReference VARCHAR(255) NOT NULL,
+    Status VARCHAR(40) NOT NULL,
+    SubmittedBy INT NULL,
+    SubmittedAt DATETIME NULL,
+    ManagerEndorsedBy INT NULL,
+    ManagerEndorsedAt DATETIME NULL,
+    ManagerComments TEXT NULL,
+    FinalApprovedBy INT NULL,
+    FinalApprovedAt DATETIME NULL,
+    EntityHeadComments TEXT NULL,
+    RejectedBy INT NULL,
+    RejectedAt DATETIME NULL,
+    RejectionReason TEXT NULL,
+    RecordSnapshot LONGTEXT NULL,
+    RecordChecksum VARCHAR(128) NULL,
+    CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UpdatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_record_workflow_item (CompanyID, Module, SourceTable, RecordReference),
+    KEY idx_record_workflow_status (CompanyID, Status, Module),
+    KEY idx_record_workflow_module (CompanyID, Module, SourceTable)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS record_workflow_actions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    WorkflowItemID BIGINT UNSIGNED NOT NULL,
+    CompanyID INT NOT NULL,
+    Module VARCHAR(60) NOT NULL,
+    SourceTable VARCHAR(100) NOT NULL,
+    RecordReference VARCHAR(255) NOT NULL,
+    Action VARCHAR(60) NOT NULL,
+    FromStatus VARCHAR(40) NULL,
+    ToStatus VARCHAR(40) NOT NULL,
+    ActionBy INT NOT NULL,
+    ActionAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    Comments TEXT NULL,
+    Metadata LONGTEXT NULL,
+    Result VARCHAR(20) NOT NULL DEFAULT 'SUCCESS',
+    PRIMARY KEY (id),
+    KEY idx_record_workflow_actions_item (WorkflowItemID, ActionAt),
+    KEY idx_record_workflow_actions_module (CompanyID, Module, ActionAt),
+    CONSTRAINT fk_record_workflow_actions_item
+        FOREIGN KEY (WorkflowItemID) REFERENCES record_workflow_items(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

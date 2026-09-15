@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <%- include('../partials/head') %>
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+    <main class="main">
+        <div class="container-fluid py-4">
+            <h1 class="h3 mb-1">Payroll Reopen Final Approval #<%= detail.request.id %></h1>
+            <p class="text-muted mb-4"><%= String(detail.request.PMonth).padStart(2, '0') %>/<%= detail.request.PYear %> · <%= detail.request.PType %> · Gen <%= detail.request.OriginalGenerationNo %> → Gen <%= detail.request.ProposedGenerationNo %></p>
+            <% if (successMessage) { %><div class="alert alert-success"><%= successMessage %></div><% } %>
+            <% if (errorMessage) { %><div class="alert alert-danger"><%= errorMessage %></div><% } %>
+            <div class="row g-4">
+                <div class="col-12 col-xl-7">
+                    <div class="card shadow-sm mb-4"><div class="card-header"><span class="fw-semibold">Final Approval Summary</span></div><div class="card-body">
+                        <div class="mb-2"><strong>Status:</strong> <span class="badge <%= getStatusBadgeClass(detail.request.Status) %>"><%= detail.request.Status %></span></div>
+                        <div class="mb-2"><strong>Reopen Reason:</strong> <%= detail.request.Reason %></div>
+                        <div class="mb-2"><strong>Original Workflow:</strong> #<%= detail.originalBatch.id %> · <%= detail.originalBatch.Status %> · Gen <%= detail.originalBatch.GenerationNo || 1 %></div>
+                        <div class="mb-2"><strong>Reversal Request:</strong> #<%= detail.reversalDetail.request.id %> · <%= detail.reversalDetail.request.Status %></div>
+                        <div class="mb-0"><strong>Proposed Generation:</strong> <%= detail.request.ProposedGenerationNo %></div>
+                    </div></div>
+                    <div class="card shadow-sm"><div class="card-header"><span class="fw-semibold">History</span></div><div class="card-body p-0">
+                        <div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Action</th><th>Status</th><th>Actor</th><th>Date</th><th>Comments</th></tr></thead><tbody>
+                            <% if (!detail.actions.length) { %><tr><td colspan="5" class="text-center text-muted py-3">No reopen actions recorded yet.</td></tr><% } %>
+                            <% detail.actions.forEach((action) => { %><tr><td><%= action.Action %></td><td><small><%= action.FromStatus || 'N/A' %> → <%= action.ToStatus %></small></td><td><%= action.ActionBy %></td><td><%= action.ActionAt ? new Date(action.ActionAt).toLocaleString('en-GB') : 'N/A' %></td><td><%= action.Comments || '—' %></td></tr><% }) %>
+                        </tbody></table></div>
+                    </div></div>
+                </div>
+                <div class="col-12 col-xl-5">
+                    <% if (detail.request.Status === 'SUBMITTED_TO_ENTITY_HEAD') { %>
+                        <div class="card shadow-sm mb-4"><div class="card-header"><span class="fw-semibold">Approve Reopen</span></div><div class="card-body">
+                            <form method="post" action="/entity-head/payroll/reopen/<%= detail.request.id %>/approve">
+                                <div class="mb-3"><label class="form-label">Approval Comments</label><textarea class="form-control" name="comments" rows="4" placeholder="Optional approval note."></textarea></div>
+                                <button type="submit" class="btn btn-primary">Approve and Mark Ready</button>
+                            </form>
+                        </div></div>
+                        <div class="card shadow-sm mb-4"><div class="card-header"><span class="fw-semibold">Return to Finance</span></div><div class="card-body">
+                            <form method="post" action="/entity-head/payroll/reopen/<%= detail.request.id %>/return">
+                                <div class="mb-3"><label class="form-label">Reason for Return</label><textarea class="form-control" name="comments" rows="4" required></textarea></div>
+                                <button type="submit" class="btn btn-outline-warning">Return Request</button>
+                            </form>
+                        </div></div>
+                        <div class="card shadow-sm"><div class="card-header"><span class="fw-semibold">Reject Reopen</span></div><div class="card-body">
+                            <form method="post" action="/entity-head/payroll/reopen/<%= detail.request.id %>/reject">
+                                <div class="mb-3"><label class="form-label">Reason for Rejection</label><textarea class="form-control" name="comments" rows="4" required></textarea></div>
+                                <button type="submit" class="btn btn-outline-danger">Reject Request</button>
+                            </form>
+                        </div></div>
+                    <% } else { %>
+                        <div class="alert alert-info">This reopen request is currently read-only for final approval.</div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

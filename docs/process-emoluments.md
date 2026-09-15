@@ -57,14 +57,24 @@ The service:
 - `tblmedical` contributes payroll-month medical deductions.
 - `tblsurcharge` contributes date-range surcharge deductions based on `StarDate` and `ExpDate`.
 
-## Extending Other Activities
+## Post to Accounts Scope
 
-The service is scaffolded so the remaining activity codes can be added on the same direct-schema pattern:
+Process Emoluments activity definitions are broader than the currently approved GL posting scope.
 
-- `02 = Rent Allowance`
-- `05 = Inducement`
-- `07 = Backlog / Arrears`
-- `08 = EOS Benefits`
-- `09 = Bonus`
-- `13 = Leave Allowance`
-- `15 = Long Service`
+As of Friday, August 21, 2026:
+
+- `01 = Salary` is the only activity fully supported for Post to Accounts.
+- `13 = Leave Allowance` is handled through salary-side support tables and is not a standalone GL posting activity.
+- `14 = Acting` is a salary component (`Allw14`) and is not a standalone GL posting activity.
+- `02`, `04`, `05`, `07`, `08`, `09`, and `15` have legacy processing evidence but remain blocked from Post to Accounts until their debit/credit rules are explicitly confirmed.
+- `06`, `33`, `40`, `41`, `42`, `00`, and `99` are not currently approved for operational GL posting.
+
+## Extending Other Activities Safely
+
+Do not generalize salary posting logic to other activities. Any future enablement must first verify:
+
+- the source tables and row lifecycle,
+- the approved debit and credit accounts,
+- grouping and narration rules,
+- whether the activity posts through `tblPayroll`, `tblExport`, `tblGLTrans`, or another legacy path,
+- whether the activity is monthly, yearly, ad hoc, or event-driven.

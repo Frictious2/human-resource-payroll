@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · HR & Payroll</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user, entityScope }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
+                <div>
+                    <h2 class="mb-1">Parameter Changes Awaiting Final Approval</h2>
+                    <div class="text-muted">Review the current live values against the Administrator’s proposed changes before applying them.</div>
+                </div>
+                <a href="/work-queue" class="btn btn-outline-primary">Open unified work queue</a>
+            </div>
+
+            <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+            <% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <form class="row g-3" method="get" action="/entity-head/parameter-changes">
+                        <div class="col-md-4">
+                            <label class="form-label">Module</label>
+                            <select name="module" class="form-select">
+                                <option value="">All modules</option>
+                                <% moduleOptions.forEach((option) => { %>
+                                    <option value="<%= option.value %>" <%= filters.module === option.value ? 'selected' : '' %>><%= option.label %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Status</label>
+                            <select name="status" class="form-select">
+                                <% statusOptions.forEach((status) => { %>
+                                    <option value="<%= status %>" <%= filters.status === status ? 'selected' : '' %>><%= status %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end gap-2">
+                            <button type="submit" class="btn btn-primary">Apply Filters</button>
+                            <a href="/entity-head/parameter-changes" class="btn btn-outline-secondary">Reset</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">Approval Queue</span>
+                    <span class="text-muted small"><%= items.length %> request(s)</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Module</th>
+                                    <th>Change</th>
+                                    <th>Reference</th>
+                                    <th>Status</th>
+                                    <th>Submitted</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% if (!items.length) { %>
+                                    <tr><td colspan="6" class="text-center text-muted py-4">No parameter changes match the current queue filters.</td></tr>
+                                <% } %>
+                                <% items.forEach((item) => { %>
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold"><%= item.moduleLabel %></div>
+                                            <div class="small text-muted"><%= item.classification %></div>
+                                        </td>
+                                        <td><span class="badge bg-light text-dark border"><%= item.ChangeType %></span></td>
+                                        <td><code><%= item.RecordReference %></code></td>
+                                        <td><span class="badge <%= item.badgeClass %>"><%= item.Status %></span></td>
+                                        <td><%= item.SubmittedAt ? new Date(item.SubmittedAt).toLocaleString('en-GB') : 'N/A' %></td>
+                                        <td class="text-end"><a href="/entity-head/parameter-changes/<%= item.id %>" class="btn btn-sm btn-outline-primary">Review</a></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

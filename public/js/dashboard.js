@@ -1,28 +1,4 @@
 (function () {
-    // Theme persistence
-    const html = document.documentElement;
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    html.setAttribute('data-bs-theme', savedTheme);
-
-    const themeIcon = document.getElementById('themeIcon');
-    const themeToggleBtn = document.getElementById('themeToggleBtn');
-
-    function syncIcon(theme) {
-        if (!themeIcon) return;
-        themeIcon.className = theme === 'dark' ? 'bi bi-moon-stars-fill' : 'bi bi-sun-fill';
-    }
-    syncIcon(savedTheme);
-
-    if (themeToggleBtn) {
-        themeToggleBtn.addEventListener('click', () => {
-            const current = html.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light';
-            const next = current === 'dark' ? 'light' : 'dark';
-            html.setAttribute('data-bs-theme', next);
-            localStorage.setItem('theme', next);
-            syncIcon(next);
-        });
-    }
-
     // Footer year
     const footerYearEl = document.getElementById('footerYear');
     if (footerYearEl) {

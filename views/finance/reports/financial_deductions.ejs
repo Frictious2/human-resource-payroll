@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · Finance</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+    <main class="main">
+        <div class="container-fluid py-3">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <div>
+                    <h2 class="mb-1"><%= title %></h2>
+                    <div class="text-muted">Read-only visibility into final-approved deduction records that can affect payroll.</div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <form method="GET" action="/finance/reports/financial-deductions" class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">Payroll Date</label>
+                            <input type="date" class="form-control" name="payrollDate" value="<%= filters.payrollDate %>" />
+                        </div>
+                        <div class="col-md-3 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Refresh</button>
+                            <a href="/finance/reports/financial-deductions" class="btn btn-outline-secondary">Reset</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-md-4"><div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">Active Loan Monthly Repayment</div><div class="fs-4 fw-semibold"><%= Number(pageData.totals.activeLoanMonthlyRepayment || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div></div></div></div>
+                <div class="col-md-4"><div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">Final-Approved Medical for Month</div><div class="fs-4 fw-semibold"><%= Number(pageData.totals.medicalCurrentMonth || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div></div></div></div>
+                <div class="col-md-4"><div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">Active Surcharge Amount</div><div class="fs-4 fw-semibold"><%= Number(pageData.totals.activeSurchargeAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div></div></div></div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header fw-semibold">Approved Active Loans</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light"><tr><th>PFNo</th><th>Name</th><th>Department</th><th>Type</th><th class="text-end">Amount</th><th class="text-end">Balance</th><th class="text-end">Monthly Repayment</th><th>Start</th><th>Expiry</th><th>Workflow</th></tr></thead>
+                            <tbody>
+                                <% if (!pageData.loans.length) { %><tr><td colspan="10" class="text-center text-muted py-4">No approved loan records found.</td></tr><% } %>
+                                <% pageData.loans.forEach((row) => { %>
+                                    <tr>
+                                        <td><%= row.PFNo %></td><td><%= row.SName || '-' %></td><td><%= row.DeptName || '-' %></td><td><%= row.LoanTypeName || '-' %></td>
+                                        <td class="text-end"><%= Number(row.Amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td class="text-end"><%= Number(row.LoanBal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td class="text-end"><%= Number(row.MonthlyRepayment || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td><%= row.StartDate ? new Date(row.StartDate).toLocaleDateString('en-GB') : '-' %></td>
+                                        <td><%= row.ExpDate ? new Date(row.ExpDate).toLocaleDateString('en-GB') : '-' %></td>
+                                        <td><%= row.WorkflowStatus || 'FINAL_APPROVED' %></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header fw-semibold">Final-Approved Medical Recoveries</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light"><tr><th>Entry Date</th><th>PFNo</th><th>Name</th><th>Department</th><th>Transaction</th><th>Beneficiary</th><th class="text-end">Amount</th><th>Workflow</th></tr></thead>
+                            <tbody>
+                                <% if (!pageData.medical.length) { %><tr><td colspan="8" class="text-center text-muted py-4">No final-approved medical recoveries found.</td></tr><% } %>
+                                <% pageData.medical.forEach((row) => { %>
+                                    <tr>
+                                        <td><%= row.EntryDate ? new Date(row.EntryDate).toLocaleDateString('en-GB') : '-' %></td>
+                                        <td><%= row.PFNo %></td>
+                                        <td><%= row.SName || '-' %></td>
+                                        <td><%= row.DeptName || '-' %></td>
+                                        <td><%= row.MedicalDescription || row.MCode || '-' %></td>
+                                        <td><%= row.Dependant || '-' %></td>
+                                        <td class="text-end"><%= Number(row.Amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td><%= row.WorkflowStatus || 'FINAL_APPROVED' %></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header fw-semibold">Approved Surcharges</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light"><tr><th>PFNo</th><th>Name</th><th>Department</th><th>Type</th><th class="text-end">Amount</th><th>Start</th><th>Expiry</th><th>Workflow</th></tr></thead>
+                            <tbody>
+                                <% if (!pageData.surcharges.length) { %><tr><td colspan="8" class="text-center text-muted py-4">No approved surcharge records found.</td></tr><% } %>
+                                <% pageData.surcharges.forEach((row) => { %>
+                                    <tr>
+                                        <td><%= row.PFNo %></td>
+                                        <td><%= row.SName || '-' %></td>
+                                        <td><%= row.DeptName || '-' %></td>
+                                        <td><%= row.SurchargeTypeName || row.SType || '-' %></td>
+                                        <td class="text-end"><%= Number(row.SAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td><%= row.StarDate ? new Date(row.StarDate).toLocaleDateString('en-GB') : '-' %></td>
+                                        <td><%= row.ExpDate ? new Date(row.ExpDate).toLocaleDateString('en-GB') : '-' %></td>
+                                        <td><%= row.WorkflowStatus || 'FINAL_APPROVED' %></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="mt-4 py-3 text-center text-muted border-top">
+                <%- include('../partials/footer') %>
+            </footer>
+        </div>
+    </main>
+    <script src="/vendor/bootstrap.bundle.min.js"></script>
+</body>
+</html>

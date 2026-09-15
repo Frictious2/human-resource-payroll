@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Entity Attendance Summary · HR & Payroll</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('partials/topbar', { user, entityScope }) %>
+    <%- include('partials/sidebar') %>
+    <main class="main">
+        <div class="container-fluid">
+            <div class="mb-4"><h2 class="mb-1">Attendance Summary</h2><div class="text-muted">Attendance records for <strong><%= entityScope.scopeLabel || entityScope.deptName %></strong>.</div></div>
+            <div class="row g-3 mb-4">
+                <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><div class="text-muted">Total Rows</div><div class="fs-4 fw-semibold"><%= totals.TotalRows || 0 %></div></div></div></div>
+                <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><div class="text-muted">Approved Rows</div><div class="fs-4 fw-semibold"><%= totals.ApprovedRows || 0 %></div></div></div></div>
+                <div class="col-md-4"><div class="card shadow-sm"><div class="card-body"><div class="text-muted">Pending Rows</div><div class="fs-4 fw-semibold"><%= totals.PendingRows || 0 %></div></div></div></div>
+            </div>
+            <div class="card shadow-sm mb-4"><div class="card-body">
+                <form class="row g-3" method="get" action="/entity-head/attendance">
+                    <div class="col-md-3"><label class="form-label">PF No</label><input class="form-control" name="pfNo" value="<%= filters.pfNo %>"></div>
+                    <div class="col-md-3"><label class="form-label">Work Status</label><select class="form-select" name="workStatus"><option value="">All</option><% statuses.forEach((status) => { %><option value="<%= status %>" <%= filters.workStatus === status ? 'selected' : '' %>><%= status %></option><% }) %></select></div>
+                    <div class="col-md-2"><label class="form-label">Date From</label><input class="form-control" type="date" name="dateFrom" value="<%= filters.dateFrom %>"></div>
+                    <div class="col-md-2"><label class="form-label">Date To</label><input class="form-control" type="date" name="dateTo" value="<%= filters.dateTo %>"></div>
+                    <div class="col-md-2 d-flex align-items-end gap-2"><button class="btn btn-primary" type="submit">Filter</button><a class="btn btn-outline-secondary" href="/entity-head/attendance">Reset</a></div>
+                </form>
+            </div></div>
+            <div class="card shadow-sm"><div class="card-body p-0"><div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light"><tr><th>PF No</th><th>Staff</th><th>Date</th><th>Status</th><th>Time In</th><th>Time Out</th><th>Approval</th></tr></thead>
+                    <tbody>
+                        <% if (!rows.length) { %><tr><td colspan="7" class="text-center text-muted py-4">No attendance records matched the current filter.</td></tr><% } %>
+                        <% rows.forEach((row) => { %>
+                            <tr>
+                                <td class="fw-semibold"><%= row.PFNo %></td>
+                                <td><%= row.SName %></td>
+                                <td><%= row.Work_Day ? new Date(row.Work_Day).toLocaleDateString('en-GB') : 'N/A' %></td>
+                                <td><%= row.Work_Status || 'N/A' %></td>
+                                <td><%= row.Time_in ? new Date(row.Time_in).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : 'N/A' %></td>
+                                <td><%= row.Time_out ? new Date(row.Time_out).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : 'N/A' %></td>
+                                <td><span class="badge text-bg-<%= Number(row.Approved || 0) === 0 ? 'warning' : 'success' %>"><%= Number(row.Approved || 0) === 0 ? 'Pending' : 'Approved' %></span></td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div></div></div>
+            <% if (pagination && pagination.totalPages > 1) { %>
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mt-3">
+                    <div class="text-muted small">Showing page <%= pagination.page %> of <%= pagination.totalPages %> (<%= pagination.totalRows %> records)</div>
+                    <nav aria-label="Attendance pagination">
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item <%= pagination.hasPrevious ? '' : 'disabled' %>">
+                                <a class="page-link" href="?pfNo=<%= encodeURIComponent(filters.pfNo || '') %>&workStatus=<%= encodeURIComponent(filters.workStatus || '') %>&dateFrom=<%= encodeURIComponent(filters.dateFrom || '') %>&dateTo=<%= encodeURIComponent(filters.dateTo || '') %>&page=<%= pagination.previousPage %>&pageSize=<%= pagination.pageSize %>">Previous</a>
+                            </li>
+                            <li class="page-item disabled"><span class="page-link"><%= pagination.page %> / <%= pagination.totalPages %></span></li>
+                            <li class="page-item <%= pagination.hasNext ? '' : 'disabled' %>">
+                                <a class="page-link" href="?pfNo=<%= encodeURIComponent(filters.pfNo || '') %>&workStatus=<%= encodeURIComponent(filters.workStatus || '') %>&dateFrom=<%= encodeURIComponent(filters.dateFrom || '') %>&dateTo=<%= encodeURIComponent(filters.dateTo || '') %>&page=<%= pagination.nextPage %>&pageSize=<%= pagination.pageSize %>">Next</a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            <% } %>
+            <footer class="mt-4 py-3 text-center text-muted border-top"><%- include('partials/footer') %></footer>
+        </div>
+    </main>
+    <script src="/vendor/bootstrap.bundle.min.js"></script>
+</body>
+</html>

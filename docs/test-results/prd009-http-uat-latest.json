@@ -1,0 +1,514 @@
+{
+  "executedAt": "2026-08-28T23:30:17.248Z",
+  "baseUrl": "http://localhost:3001",
+  "fixture": {
+    "companyId": 2,
+    "month": 11,
+    "year": 2098,
+    "activity": "01",
+    "staffCount": 2
+  },
+  "roles": {
+    "admin": {
+      "login": "PASS",
+      "redirect": "/admin/dashboard",
+      "routes": [
+        {
+          "route": "/admin/dashboard",
+          "status": 200,
+          "bytes": 51396
+        },
+        {
+          "route": "/admin/finance-managers",
+          "status": 200,
+          "bytes": 15854
+        },
+        {
+          "route": "/admin/parameters/departments",
+          "status": 200,
+          "bytes": 31576
+        },
+        {
+          "route": "/admin/parameters/pay-types",
+          "status": 200,
+          "bytes": 30495
+        },
+        {
+          "route": "/admin/parameter-changes",
+          "status": 200,
+          "bytes": 29809
+        },
+        {
+          "route": "/profile",
+          "status": 200,
+          "bytes": 17840
+        },
+        {
+          "route": "/notifications",
+          "status": 200,
+          "bytes": 16609
+        },
+        {
+          "route": "/work-queue",
+          "status": 200,
+          "bytes": 16264
+        }
+      ]
+    },
+    "dataEntry": {
+      "login": "PASS",
+      "redirect": "/data-entry/dashboard",
+      "routes": [
+        {
+          "route": "/data-entry/dashboard",
+          "status": 200,
+          "bytes": 38114
+        },
+        {
+          "route": "/data-entry/staff/new-edit",
+          "status": 200,
+          "bytes": 167821
+        },
+        {
+          "route": "/data-entry/staff/dependants",
+          "status": 200,
+          "bytes": 27526
+        },
+        {
+          "route": "/data-entry/reports/bio-data",
+          "status": 200,
+          "bytes": 24388
+        },
+        {
+          "route": "/data-entry/reports/nassit-grats-statement",
+          "status": 200,
+          "bytes": 24400
+        },
+        {
+          "route": "/profile",
+          "status": 200,
+          "bytes": 19081
+        },
+        {
+          "route": "/notifications",
+          "status": 200,
+          "bytes": 17828
+        },
+        {
+          "route": "/work-queue",
+          "status": 200,
+          "bytes": 20668
+        }
+      ]
+    },
+    "finance": {
+      "login": "PASS",
+      "redirect": "/finance/dashboard",
+      "routes": [
+        {
+          "route": "/finance/dashboard",
+          "status": 200,
+          "bytes": 28565
+        },
+        {
+          "route": "/finance/payroll/workflow",
+          "status": 200,
+          "bytes": 20817
+        },
+        {
+          "route": "/finance/payroll/reversals",
+          "status": 200,
+          "bytes": 18696
+        },
+        {
+          "route": "/finance/payroll/reopen",
+          "status": 200,
+          "bytes": 14716
+        },
+        {
+          "route": "/finance/payroll/yearly-payments",
+          "status": 200,
+          "bytes": 18676
+        },
+        {
+          "route": "/finance/payroll/post-to-accounts",
+          "status": 200,
+          "bytes": 60505
+        },
+        {
+          "route": "/finance/reports/journal",
+          "status": 200,
+          "bytes": 16101
+        },
+        {
+          "route": "/finance/reports/payslip",
+          "status": 200,
+          "bytes": 21532
+        },
+        {
+          "route": "/finance/reports/end-of-service",
+          "status": 200,
+          "bytes": 18037
+        },
+        {
+          "route": "/finance/reports/payroll-liabilities",
+          "status": 200,
+          "bytes": 27021
+        },
+        {
+          "route": "/profile",
+          "status": 200,
+          "bytes": 18240
+        },
+        {
+          "route": "/notifications",
+          "status": 200,
+          "bytes": 25990
+        },
+        {
+          "route": "/work-queue",
+          "status": 200,
+          "bytes": 16648
+        }
+      ]
+    },
+    "financeManager": {
+      "login": "PASS",
+      "redirect": "/finance-manager/dashboard",
+      "routes": [
+        {
+          "route": "/finance-manager/dashboard",
+          "status": 200,
+          "bytes": 21709
+        },
+        {
+          "route": "/finance-manager/payroll/workflow",
+          "status": 200,
+          "bytes": 13396
+        },
+        {
+          "route": "/finance-manager/payroll/yearly-payments",
+          "status": 200,
+          "bytes": 12005
+        },
+        {
+          "route": "/finance-manager/payroll/reversals",
+          "status": 200,
+          "bytes": 8978
+        },
+        {
+          "route": "/finance-manager/payroll/reopen",
+          "status": 200,
+          "bytes": 9570
+        },
+        {
+          "route": "/finance-manager/reports/journal",
+          "status": 200,
+          "bytes": 11395
+        },
+        {
+          "route": "/finance-manager/reports/payslip",
+          "status": 200,
+          "bytes": 16826
+        },
+        {
+          "route": "/finance-manager/reports/general-ledger",
+          "status": 200,
+          "bytes": 17157
+        },
+        {
+          "route": "/finance-manager/reports/end-of-service",
+          "status": 200,
+          "bytes": 13344
+        },
+        {
+          "route": "/finance-manager/reports/payroll-liabilities",
+          "status": 200,
+          "bytes": 22339
+        },
+        {
+          "route": "/profile",
+          "status": 200,
+          "bytes": 19071
+        },
+        {
+          "route": "/notifications",
+          "status": 200,
+          "bytes": 12268
+        }
+      ]
+    },
+    "manager": {
+      "login": "PASS",
+      "redirect": "/manager/dashboard",
+      "routes": [
+        {
+          "route": "/manager/dashboard",
+          "status": 200,
+          "bytes": 64486
+        },
+        {
+          "route": "/manager/record-workflow",
+          "status": 200,
+          "bytes": 20036
+        },
+        {
+          "route": "/manager/payroll/endorsement",
+          "status": 200,
+          "bytes": 22173
+        },
+        {
+          "route": "/manager/payroll/reversals",
+          "status": 200,
+          "bytes": 20576
+        },
+        {
+          "route": "/manager/payroll/reopen",
+          "status": 200,
+          "bytes": 18261
+        },
+        {
+          "route": "/manager/yearly-payments",
+          "status": 200,
+          "bytes": 18521
+        },
+        {
+          "route": "/manager/reports/bio-data",
+          "status": 200,
+          "bytes": 28022
+        },
+        {
+          "route": "/manager/reports/nassit-grats",
+          "status": 200,
+          "bytes": 28024
+        },
+        {
+          "route": "/profile",
+          "status": 200,
+          "bytes": 22566
+        },
+        {
+          "route": "/notifications",
+          "status": 200,
+          "bytes": 29355
+        },
+        {
+          "route": "/work-queue",
+          "status": 200,
+          "bytes": 20990
+        }
+      ]
+    },
+    "auditor": {
+      "login": "PASS",
+      "redirect": "/auditor/dashboard",
+      "routes": [
+        {
+          "route": "/auditor/dashboard",
+          "status": 200,
+          "bytes": 43666
+        },
+        {
+          "route": "/auditor/payroll/review",
+          "status": 200,
+          "bytes": 14609
+        },
+        {
+          "route": "/auditor/payroll/reversals",
+          "status": 200,
+          "bytes": 10593
+        },
+        {
+          "route": "/auditor/payroll/reopen",
+          "status": 200,
+          "bytes": 10912
+        },
+        {
+          "route": "/auditor/yearly-payments",
+          "status": 200,
+          "bytes": 11160
+        },
+        {
+          "route": "/auditor/audit-trail",
+          "status": 200,
+          "bytes": 52837
+        },
+        {
+          "route": "/profile",
+          "status": 200,
+          "bytes": 15197
+        },
+        {
+          "route": "/notifications",
+          "status": 200,
+          "bytes": 21918
+        },
+        {
+          "route": "/work-queue",
+          "status": 200,
+          "bytes": 13621
+        }
+      ]
+    },
+    "entityHead": {
+      "login": "PASS",
+      "redirect": "/entity-head/dashboard",
+      "routes": [
+        {
+          "route": "/entity-head/dashboard",
+          "status": 200,
+          "bytes": 25751
+        },
+        {
+          "route": "/entity-head/parameter-changes",
+          "status": 200,
+          "bytes": 16227
+        },
+        {
+          "route": "/entity-head/record-workflow",
+          "status": 200,
+          "bytes": 12468
+        },
+        {
+          "route": "/entity-head/payroll/approvals",
+          "status": 200,
+          "bytes": 14564
+        },
+        {
+          "route": "/entity-head/payroll/reversals",
+          "status": 200,
+          "bytes": 10570
+        },
+        {
+          "route": "/entity-head/payroll/reopen",
+          "status": 200,
+          "bytes": 10891
+        },
+        {
+          "route": "/entity-head/yearly-payments",
+          "status": 200,
+          "bytes": 11127
+        },
+        {
+          "route": "/profile",
+          "status": 200,
+          "bytes": 15171
+        },
+        {
+          "route": "/notifications",
+          "status": 200,
+          "bytes": 19916
+        },
+        {
+          "route": "/work-queue",
+          "status": 200,
+          "bytes": 13591
+        }
+      ]
+    }
+  },
+  "security": [
+    {
+      "actor": "financeManager",
+      "route": "/finance/payroll/workflow/1/submit-to-manager",
+      "status": 403,
+      "location": null
+    },
+    {
+      "actor": "dataEntry",
+      "route": "/finance/payroll/reversals/1/execute",
+      "status": 403,
+      "location": null
+    },
+    {
+      "actor": "finance",
+      "route": "/manager/payroll/endorsement/1/endorse",
+      "status": 403,
+      "location": null
+    },
+    {
+      "actor": "manager",
+      "route": "/auditor/payroll/review/1/endorse",
+      "status": 403,
+      "location": null
+    },
+    {
+      "actor": "auditor",
+      "route": "/entity-head/payroll/approvals/1/approve",
+      "status": 403,
+      "location": null
+    },
+    {
+      "actor": "entityHead",
+      "route": "/finance/payroll/reversals/1/execute",
+      "status": 403,
+      "location": null
+    },
+    {
+      "actor": "manager",
+      "route": "/finance/dashboard",
+      "status": 403
+    },
+    {
+      "actor": "finance",
+      "route": "liability:WHT",
+      "status": 400
+    },
+    {
+      "actor": "finance",
+      "route": "liability:LEAVE_TAX",
+      "status": 400
+    }
+  ],
+  "reports": [
+    {
+      "actor": "finance",
+      "route": "/finance/reports/payroll-liabilities/preview?liabilityType=PAYE&fromDate=2098-11-01&toDate=2098-11-30",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "bytes": 27110
+    },
+    {
+      "actor": "finance",
+      "route": "/finance/reports/payroll-liabilities/pdf?liabilityType=PAYE&fromDate=2098-11-01&toDate=2098-11-30",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "bytes": 27109
+    },
+    {
+      "actor": "finance",
+      "route": "/finance/reports/payroll-liabilities/excel?liabilityType=PAYE&fromDate=2098-11-01&toDate=2098-11-30",
+      "status": 200,
+      "contentType": "application/vnd.ms-excel; charset=utf-8",
+      "bytes": 1640
+    },
+    {
+      "actor": "financeManager",
+      "route": "/finance-manager/reports/payroll-liabilities/preview?liabilityType=PAYE&fromDate=2098-11-01&toDate=2098-11-30",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "bytes": 22396
+    }
+  ],
+  "assets": [
+    {
+      "route": "/images/nra-logo.jpg",
+      "status": 200,
+      "bytes": 21806,
+      "contentType": "image/jpeg"
+    },
+    {
+      "route": "/js/report-viewer.js",
+      "status": 200,
+      "bytes": 4598,
+      "contentType": "text/javascript; charset=utf-8"
+    }
+  ],
+  "session": {
+    "invalidPassword": "PASS",
+    "logoutDestruction": "PASS"
+  },
+  "limitations": [
+    "Visual browser, print-preview, responsive-layout and screenshot acceptance require the in-app browser bridge."
+  ]
+}

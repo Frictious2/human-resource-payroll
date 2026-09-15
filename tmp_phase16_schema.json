@@ -1,0 +1,620 @@
+[
+  {
+    "table": "payroll_workflow_batches",
+    "exists": true,
+    "engine": "InnoDB",
+    "indexes": [
+      {
+        "key": "PRIMARY",
+        "col": "id",
+        "nonUnique": 0,
+        "seq": 1
+      },
+      {
+        "key": "uq_company_period_ptype_generation",
+        "col": "CompanyID",
+        "nonUnique": 0,
+        "seq": 1
+      },
+      {
+        "key": "uq_company_period_ptype_generation",
+        "col": "PMonth",
+        "nonUnique": 0,
+        "seq": 2
+      },
+      {
+        "key": "uq_company_period_ptype_generation",
+        "col": "PYear",
+        "nonUnique": 0,
+        "seq": 3
+      },
+      {
+        "key": "uq_company_period_ptype_generation",
+        "col": "PType",
+        "nonUnique": 0,
+        "seq": 4
+      },
+      {
+        "key": "uq_company_period_ptype_generation",
+        "col": "GenerationNo",
+        "nonUnique": 0,
+        "seq": 5
+      },
+      {
+        "key": "idx_payroll_workflow_status",
+        "col": "Status",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_workflow_period",
+        "col": "CompanyID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_workflow_period",
+        "col": "PYear",
+        "nonUnique": 1,
+        "seq": 2
+      },
+      {
+        "key": "idx_payroll_workflow_period",
+        "col": "PMonth",
+        "nonUnique": 1,
+        "seq": 3
+      },
+      {
+        "key": "idx_payroll_workflow_period",
+        "col": "PType",
+        "nonUnique": 1,
+        "seq": 4
+      },
+      {
+        "key": "idx_payroll_workflow_original_batch",
+        "col": "OriginalWorkflowBatchID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_workflow_reopen_request",
+        "col": "ReopenRequestID",
+        "nonUnique": 1,
+        "seq": 1
+      }
+    ]
+  },
+  {
+    "table": "payroll_workflow_actions",
+    "exists": true,
+    "engine": "InnoDB",
+    "indexes": [
+      {
+        "key": "PRIMARY",
+        "col": "id",
+        "nonUnique": 0,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_workflow_actions_batch",
+        "col": "WorkflowBatchID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_workflow_actions_period",
+        "col": "CompanyID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_workflow_actions_period",
+        "col": "PYear",
+        "nonUnique": 1,
+        "seq": 2
+      },
+      {
+        "key": "idx_payroll_workflow_actions_period",
+        "col": "PMonth",
+        "nonUnique": 1,
+        "seq": 3
+      },
+      {
+        "key": "idx_payroll_workflow_actions_period",
+        "col": "PType",
+        "nonUnique": 1,
+        "seq": 4
+      },
+      {
+        "key": "idx_payroll_workflow_actions_action",
+        "col": "Action",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_workflow_actions_action",
+        "col": "ActionAt",
+        "nonUnique": 1,
+        "seq": 2
+      }
+    ]
+  },
+  {
+    "table": "record_workflow_items",
+    "exists": true,
+    "engine": "InnoDB",
+    "indexes": [
+      {
+        "key": "PRIMARY",
+        "col": "id",
+        "nonUnique": 0,
+        "seq": 1
+      },
+      {
+        "key": "uq_record_workflow_item",
+        "col": "CompanyID",
+        "nonUnique": 0,
+        "seq": 1
+      },
+      {
+        "key": "uq_record_workflow_item",
+        "col": "Module",
+        "nonUnique": 0,
+        "seq": 2
+      },
+      {
+        "key": "uq_record_workflow_item",
+        "col": "SourceTable",
+        "nonUnique": 0,
+        "seq": 3
+      },
+      {
+        "key": "uq_record_workflow_item",
+        "col": "RecordReference",
+        "nonUnique": 0,
+        "seq": 4
+      },
+      {
+        "key": "idx_record_workflow_status",
+        "col": "CompanyID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_record_workflow_status",
+        "col": "Status",
+        "nonUnique": 1,
+        "seq": 2
+      },
+      {
+        "key": "idx_record_workflow_status",
+        "col": "Module",
+        "nonUnique": 1,
+        "seq": 3
+      },
+      {
+        "key": "idx_record_workflow_module",
+        "col": "CompanyID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_record_workflow_module",
+        "col": "Module",
+        "nonUnique": 1,
+        "seq": 2
+      },
+      {
+        "key": "idx_record_workflow_module",
+        "col": "SourceTable",
+        "nonUnique": 1,
+        "seq": 3
+      }
+    ]
+  },
+  {
+    "table": "record_workflow_actions",
+    "exists": true,
+    "engine": "InnoDB",
+    "indexes": [
+      {
+        "key": "PRIMARY",
+        "col": "id",
+        "nonUnique": 0,
+        "seq": 1
+      },
+      {
+        "key": "idx_record_workflow_actions_item",
+        "col": "WorkflowItemID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_record_workflow_actions_item",
+        "col": "ActionAt",
+        "nonUnique": 1,
+        "seq": 2
+      },
+      {
+        "key": "idx_record_workflow_actions_module",
+        "col": "CompanyID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_record_workflow_actions_module",
+        "col": "Module",
+        "nonUnique": 1,
+        "seq": 2
+      },
+      {
+        "key": "idx_record_workflow_actions_module",
+        "col": "ActionAt",
+        "nonUnique": 1,
+        "seq": 3
+      }
+    ]
+  },
+  {
+    "table": "workflow_notifications",
+    "exists": true,
+    "engine": "InnoDB",
+    "indexes": [
+      {
+        "key": "PRIMARY",
+        "col": "id",
+        "nonUnique": 0,
+        "seq": 1
+      },
+      {
+        "key": "uq_workflow_notifications_eventkey",
+        "col": "EventKey",
+        "nonUnique": 0,
+        "seq": 1
+      },
+      {
+        "key": "idx_workflow_notifications_recipient_read",
+        "col": "RecipientUserID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_workflow_notifications_recipient_read",
+        "col": "IsRead",
+        "nonUnique": 1,
+        "seq": 2
+      },
+      {
+        "key": "idx_workflow_notifications_company_role",
+        "col": "CompanyID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_workflow_notifications_company_role",
+        "col": "RecipientRole",
+        "nonUnique": 1,
+        "seq": 2
+      },
+      {
+        "key": "idx_workflow_notifications_created_at",
+        "col": "CreatedAt",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_workflow_notifications_module_reference",
+        "col": "Module",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_workflow_notifications_module_reference",
+        "col": "ReferenceID",
+        "nonUnique": 1,
+        "seq": 2
+      }
+    ]
+  },
+  {
+    "table": "parameter_change_requests",
+    "exists": true,
+    "engine": "InnoDB",
+    "indexes": [
+      {
+        "key": "PRIMARY",
+        "col": "id",
+        "nonUnique": 0,
+        "seq": 1
+      },
+      {
+        "key": "idx_parameter_change_company_status",
+        "col": "CompanyID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_parameter_change_company_status",
+        "col": "Status",
+        "nonUnique": 1,
+        "seq": 2
+      },
+      {
+        "key": "idx_parameter_change_module_status",
+        "col": "ParameterModule",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_parameter_change_module_status",
+        "col": "Status",
+        "nonUnique": 1,
+        "seq": 2
+      },
+      {
+        "key": "idx_parameter_change_source_reference",
+        "col": "SourceTable",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_parameter_change_source_reference",
+        "col": "RecordReference",
+        "nonUnique": 1,
+        "seq": 2
+      },
+      {
+        "key": "idx_parameter_change_submitted_at",
+        "col": "SubmittedAt",
+        "nonUnique": 1,
+        "seq": 1
+      }
+    ]
+  },
+  {
+    "table": "parameter_change_actions",
+    "exists": true,
+    "engine": "InnoDB",
+    "indexes": [
+      {
+        "key": "PRIMARY",
+        "col": "id",
+        "nonUnique": 0,
+        "seq": 1
+      },
+      {
+        "key": "idx_parameter_change_actions_request",
+        "col": "ChangeRequestID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_parameter_change_actions_company",
+        "col": "CompanyID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_parameter_change_actions_company",
+        "col": "ActionAt",
+        "nonUnique": 1,
+        "seq": 2
+      }
+    ]
+  },
+  {
+    "table": "payroll_reversal_requests",
+    "exists": true,
+    "engine": "InnoDB",
+    "indexes": [
+      {
+        "key": "PRIMARY",
+        "col": "id",
+        "nonUnique": 0,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_reversal_requests_batch_status",
+        "col": "WorkflowBatchID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_reversal_requests_batch_status",
+        "col": "Status",
+        "nonUnique": 1,
+        "seq": 2
+      },
+      {
+        "key": "idx_payroll_reversal_requests_company_period",
+        "col": "CompanyID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_reversal_requests_company_period",
+        "col": "PYear",
+        "nonUnique": 1,
+        "seq": 2
+      },
+      {
+        "key": "idx_payroll_reversal_requests_company_period",
+        "col": "PMonth",
+        "nonUnique": 1,
+        "seq": 3
+      },
+      {
+        "key": "idx_payroll_reversal_requests_company_period",
+        "col": "PType",
+        "nonUnique": 1,
+        "seq": 4
+      },
+      {
+        "key": "idx_payroll_reversal_requests_gl_batch",
+        "col": "GLPostingBatchID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_reversal_requests_requested_at",
+        "col": "RequestedAt",
+        "nonUnique": 1,
+        "seq": 1
+      }
+    ]
+  },
+  {
+    "table": "payroll_reversal_actions",
+    "exists": true,
+    "engine": "InnoDB",
+    "indexes": [
+      {
+        "key": "PRIMARY",
+        "col": "id",
+        "nonUnique": 0,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_reversal_actions_request",
+        "col": "ReversalRequestID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_reversal_actions_action",
+        "col": "Action",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_reversal_actions_action",
+        "col": "ActionAt",
+        "nonUnique": 1,
+        "seq": 2
+      }
+    ]
+  },
+  {
+    "table": "payroll_reopen_requests",
+    "exists": true,
+    "engine": "InnoDB",
+    "indexes": [
+      {
+        "key": "PRIMARY",
+        "col": "id",
+        "nonUnique": 0,
+        "seq": 1
+      },
+      {
+        "key": "uq_payroll_reopen_generation",
+        "col": "OriginalWorkflowBatchID",
+        "nonUnique": 0,
+        "seq": 1
+      },
+      {
+        "key": "uq_payroll_reopen_generation",
+        "col": "ProposedGenerationNo",
+        "nonUnique": 0,
+        "seq": 2
+      },
+      {
+        "key": "idx_payroll_reopen_company_status",
+        "col": "CompanyID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_reopen_company_status",
+        "col": "Status",
+        "nonUnique": 1,
+        "seq": 2
+      },
+      {
+        "key": "idx_payroll_reopen_reversal_request",
+        "col": "ReversalRequestID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_reopen_new_batch",
+        "col": "NewWorkflowBatchID",
+        "nonUnique": 1,
+        "seq": 1
+      }
+    ]
+  },
+  {
+    "table": "payroll_reopen_actions",
+    "exists": true,
+    "engine": "InnoDB",
+    "indexes": [
+      {
+        "key": "PRIMARY",
+        "col": "id",
+        "nonUnique": 0,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_reopen_actions_request",
+        "col": "ReopenRequestID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_reopen_actions_request",
+        "col": "ActionAt",
+        "nonUnique": 1,
+        "seq": 2
+      }
+    ]
+  },
+  {
+    "table": "payroll_reversed_row_archive",
+    "exists": true,
+    "engine": "InnoDB",
+    "indexes": [
+      {
+        "key": "PRIMARY",
+        "col": "id",
+        "nonUnique": 0,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_reversed_archive_batch",
+        "col": "OriginalWorkflowBatchID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_reversed_archive_period",
+        "col": "CompanyID",
+        "nonUnique": 1,
+        "seq": 1
+      },
+      {
+        "key": "idx_payroll_reversed_archive_period",
+        "col": "PMonth",
+        "nonUnique": 1,
+        "seq": 2
+      },
+      {
+        "key": "idx_payroll_reversed_archive_period",
+        "col": "PYear",
+        "nonUnique": 1,
+        "seq": 3
+      },
+      {
+        "key": "idx_payroll_reversed_archive_period",
+        "col": "PType",
+        "nonUnique": 1,
+        "seq": 4
+      },
+      {
+        "key": "idx_payroll_reversed_archive_reopen",
+        "col": "ReopenRequestID",
+        "nonUnique": 1,
+        "seq": 1
+      }
+    ]
+  }
+]

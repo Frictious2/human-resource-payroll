@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <%- include('../partials/head') %>
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+    <main class="main">
+        <div class="container-fluid py-4">
+            <h1 class="h3 mb-4">Payroll Reopen Queue</h1>
+            <% if (successMessage) { %><div class="alert alert-success"><%= successMessage %></div><% } %>
+            <% if (errorMessage) { %><div class="alert alert-danger"><%= errorMessage %></div><% } %>
+            <div class="card shadow-sm"><div class="card-body p-0"><div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light"><tr><th>Period</th><th>Generation</th><th>Status</th><th>Reason</th><th>Requested</th><th></th></tr></thead>
+                    <tbody>
+                        <% if (!requests.length) { %><tr><td colspan="6" class="text-center text-muted py-4">No payroll reopen requests found.</td></tr><% } %>
+                        <% requests.forEach((request) => { %>
+                            <tr>
+                                <td><%= String(request.PMonth).padStart(2, '0') %>/<%= request.PYear %> · <%= request.PType %></td>
+                                <td><span class="badge bg-light text-dark border">Gen <%= request.OriginalGenerationNo %> → Gen <%= request.ProposedGenerationNo %></span></td>
+                                <td><span class="badge <%= getStatusBadgeClass(request.Status) %>"><%= request.Status %></span></td>
+                                <td class="text-wrap" style="max-width: 320px;"><%= request.Reason %></td>
+                                <td><%= request.RequestedAt ? new Date(request.RequestedAt).toLocaleString('en-GB') : 'N/A' %></td>
+                                <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="/manager/payroll/reopen/<%= request.id %>">Review</a></td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div></div></div>
+        </div>
+    </main>
+</body>
+</html>

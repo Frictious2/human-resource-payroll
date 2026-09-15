@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Payroll Reports · Finance</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('partials/topbar', { user }) %>
+    <%- include('partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid py-3">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <div>
+                    <h2 class="mb-0"><%= title %></h2>
+                    <div class="text-muted">Finance-facing access to the existing payroll reports and supporting pages.</div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <% cards.forEach((card) => { %>
+                    <div class="col-12 col-md-6">
+                        <a href="<%= card.href %>" class="text-decoration-none">
+                            <div class="card shadow-sm h-100 hover-card">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <div>
+                                            <h5 class="card-title text-dark mb-1"><%= card.title %></h5>
+                                            <p class="text-muted mb-0"><%= card.description %></p>
+                                        </div>
+                                        <i class="bi <%= card.icon %> fs-2 text-primary"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                <% }) %>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <span class="fw-semibold">Quick Links</span>
+                </div>
+                <div class="list-group list-group-flush">
+                    <% quickLinks.forEach((link) => { %>
+                        <a href="<%= link.href %>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <span><%= link.label %></span>
+                            <i class="bi bi-arrow-right"></i>
+                        </a>
+                    <% }) %>
+                </div>
+            </div>
+
+            <footer class="mt-4 py-3 text-center text-muted border-top">
+                <%- include('partials/footer') %>
+            </footer>
+        </div>
+    </main>
+
+    <script src="/vendor/bootstrap.bundle.min.js"></script>
+</body>
+</html>

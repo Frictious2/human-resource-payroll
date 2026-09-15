@@ -1,12 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
+const parameterChangeController = require('../controllers/parameterChangeController');
 
 // Redirect /admin → /admin/dashboard
 router.get('/', (req, res) => res.redirect('/admin/dashboard'));
 
 // Dashboard
 router.get('/dashboard', adminController.renderDashboard);
+router.get('/parameter-changes', parameterChangeController.getAdminQueue);
+router.get('/parameter-changes/:requestId', parameterChangeController.getAdminDetail);
+router.post('/parameter-changes/:requestId/submit', parameterChangeController.postAdminSubmit);
+router.post('/parameter-changes/:requestId/cancel', parameterChangeController.postAdminCancel);
 
 // Admin subnav routes
 router.get('/admins', adminController.adminsListPage);
@@ -17,35 +22,63 @@ router.get('/admins/set-password', adminController.setPasswordPage);
 router.post('/admins/set-password', adminController.setPasswordSubmit);
 
 // Action APIs
-router.post('/api/admins/:pfno/resend-link', adminController.resendLink);
+router.post('/api/admins/:pfno/resend-link', adminController.resendAdminLink);
 router.delete('/api/admins/:pfno', adminController.deleteAdmin);
 
 router.get('/managers', adminController.managersListPage);
 router.get('/api/managers', adminController.managersListJson);
 router.get('/managers/new', adminController.managersNewPage);
 router.post('/managers', adminController.createManager);
-router.post('/api/managers/:pfno/resend-link', adminController.resendLink);
+router.post('/api/managers/:pfno/resend-link', adminController.resendManagerLink);
 router.delete('/api/managers/:pfno', adminController.deleteManager);
 
 router.get('/data-entry-officers', adminController.dataEntryListPage);
 router.get('/api/data-entry-officers', adminController.dataEntryListJson);
 router.get('/data-entry-officers/new', adminController.dataEntryNewPage);
 router.post('/data-entry-officers', adminController.createDataEntry);
-router.post('/api/data-entry-officers/:pfno/resend-link', adminController.resendLink);
+router.post('/api/data-entry-officers/:pfno/resend-link', adminController.resendDataEntryLink);
 router.delete('/api/data-entry-officers/:pfno', adminController.deleteDataEntry);
+
+router.get('/finance-officers', adminController.financeOfficersListPage);
+router.get('/api/finance-officers', adminController.financeOfficersListJson);
+router.get('/finance-officers/new', adminController.financeOfficersNewPage);
+router.post('/finance-officers', adminController.createFinanceOfficer);
+router.post('/api/finance-officers/:pfno/resend-link', adminController.resendFinanceOfficerLink);
+router.delete('/api/finance-officers/:pfno', adminController.deleteFinanceOfficer);
+router.get('/finance-managers', adminController.financeManagersListPage);
+router.get('/api/finance-managers', adminController.financeManagersListJson);
+router.get('/finance-managers/new', adminController.financeManagersNewPage);
+router.post('/finance-managers', adminController.createFinanceManager);
+router.post('/api/finance-managers/:pfno/resend-link', adminController.resendFinanceManagerLink);
+router.delete('/api/finance-managers/:pfno', adminController.deleteFinanceManager);
 
 router.get('/auditors', adminController.auditorsListPage);
 router.get('/api/auditors', adminController.auditorsListJson);
 router.get('/auditors/new', adminController.auditorsNewPage);
 router.post('/auditors', adminController.createAuditor);
-router.post('/api/auditors/:pfno/resend-link', adminController.resendLink);
+router.post('/api/auditors/:pfno/resend-link', adminController.resendAuditorLink);
 router.delete('/api/auditors/:pfno', adminController.deleteAuditor);
+
+router.get('/entity-heads', adminController.entityHeadsListPage);
+router.get('/api/entity-heads', adminController.entityHeadsListJson);
+router.get('/entity-heads/new', adminController.entityHeadsNewPage);
+router.post('/entity-heads', adminController.createEntityHead);
+router.post('/api/entity-heads/:pfno/resend-link', adminController.resendEntityHeadLink);
+router.delete('/api/entity-heads/:pfno', adminController.deleteEntityHead);
 
 router.get('/parameters/payroll-items', adminController.payrollItemsPage);
 router.get('/api/parameters/payroll-items', adminController.payrollItemsListJson);
 router.post('/api/parameters/payroll-items', adminController.createPayrollItem);
 router.patch('/api/parameters/payroll-items/:code', adminController.updatePayrollItem);
 router.delete('/api/parameters/payroll-items/:code', adminController.deletePayrollItem);
+router.get('/parameters/pay-types', adminController.payTypesPage);
+router.get('/parameters/pay-types/new', adminController.payTypesPage);
+router.get('/parameters/pay-types/:code/edit', adminController.payTypesPage);
+router.get('/api/parameters/pay-types', adminController.payTypesListJson);
+router.post('/parameters/pay-types', adminController.createPayType);
+router.post('/parameters/pay-types/:code', adminController.updatePayType);
+router.post('/parameters/pay-types/:code/deactivate', adminController.deactivatePayType);
+router.post('/parameters/pay-types/:code/delete', adminController.deletePayType);
 router.get('/parameters/departments', adminController.departmentsPage);
 router.get('/api/parameters/departments', adminController.departmentsListJson);
 router.post('/api/parameters/departments', adminController.createDepartment);
@@ -139,12 +172,6 @@ router.delete('/api/parameters/sponsors/:SCode', adminController.deleteSponsor);
 // Activities
 router.get('/activity/enquiry', adminController.enquiryPage);
 router.get('/api/activity/enquiry', adminController.getEnquiryData);
-router.get('/activity/import', adminController.comingSoon('Import', 'Activities'));
-router.get('/activity/discipline', adminController.comingSoon('Discipline', 'Activities'));
-
-router.get('/reports/voucher', adminController.comingSoon('Voucher', 'Reports'));
-router.get('/reports/payslip', adminController.comingSoon('Pay slip', 'Reports'));
-router.get('/reports/end-of-service', adminController.comingSoon('End of Service', 'Reports'));
 
 router.get('/company-info', adminController.getCompanyInfo);
 router.post('/company-info', adminController.upload.single('logo'), adminController.updateCompanyInfo);

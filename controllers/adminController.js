@@ -1,6 +1,9 @@
 function getViewUser(req, fallbackName = 'Admin') {
     return (req.session && req.session.user) || { name: fallbackName };
 }
+const adminDashboardService = require('../services/adminDashboardService');
+const workflowNotificationService = require('../services/workflowNotificationService');
+const parameterChangeService = require('../services/parameterChangeService');
 
 function getSessionCompanyId(req) {
     if (req.user && req.user.companyId) {
@@ -14,54 +17,83 @@ function getSessionCompanyId(req) {
     return null;
 }
 
+function getAdminActor(req) {
+    return (req.session && req.session.user) || req.user || { name: 'Admin', role: 'admin', id: 0 };
+}
+
+function getAdminCompanyId(req) {
+    return getSessionCompanyId(req) || 1;
+}
+
+function respondWithProposal(res, detail, message) {
+    res.json({
+        success: true,
+        pendingApproval: true,
+        message,
+        proposal: {
+            id: detail.request.id,
+            status: detail.request.Status,
+            module: detail.request.ParameterModule,
+            reference: detail.request.RecordReference,
+            detailUrl: `/admin/parameter-changes/${detail.request.id}`
+        },
+        item: detail.proposedValues || detail.oldValues || {}
+    });
+}
+
 const renderDashboard = async (req, res) => {
   try {
     const companyId = getSessionCompanyId(req);
-    const params = [];
-    let whereClause = '';
-
-    if (companyId) {
-      whereClause = 'WHERE d.CompanyID = ? OR d.CompanyID IS NULL';
-      params.push(companyId);
-    }
-
-    const [departmentRows] = await pool.query(
-      `
-        SELECT
-          d.Code,
-          d.Dept,
-          COUNT(s.PFNo) AS staffCount
-        FROM tbldept d
-        LEFT JOIN tblstaff s
-          ON s.CDept = d.Code
-          AND COALESCE(s.Redundant, 0) = 0
-          AND (
-            s.EmpStatus IS NULL
-            OR s.EmpStatus IN ('1', '01', 1)
-          )
-          ${companyId ? 'AND (s.CompanyID = ? OR s.CompanyID IS NULL)' : ''}
-        ${whereClause}
-        GROUP BY d.Code, d.Dept
-        ORDER BY d.Dept ASC
-      `,
-      companyId ? [companyId, ...params] : params
-    );
+    const user = getViewUser(req, 'Admin');
+    const [dashboardData, unreadNotifications] = await Promise.all([
+      adminDashboardService.getAdminDashboardData({ companyId: companyId || 1 }),
+      workflowNotificationService.getUnreadCount(user.id || 0, companyId || 1)
+    ]);
+    const parameterChangeCounts = await parameterChangeService.getCountsByStatus(companyId || 1);
 
     res.render('admin/admin-dashboard', {
-      user: getViewUser(req, 'Admin'),
-      departmentChart: {
-        labels: departmentRows.map((row) => row.Dept || row.Code || 'Unknown Department'),
-        values: departmentRows.map((row) => Number(row.staffCount) || 0)
-      }
+      user,
+      error: null,
+      unreadNotifications,
+      parameterChangeCounts,
+      ...dashboardData
     });
   } catch (error) {
     console.error('Admin dashboard error:', error);
     res.render('admin/admin-dashboard', {
       user: getViewUser(req, 'Admin'),
+      error: 'Failed to load dashboard data',
+      unreadNotifications: 0,
+      parameterChangeCounts: {},
+      company: {},
       departmentChart: {
         labels: [],
-        values: []
-      }
+        values: [],
+        rows: []
+      },
+      metrics: {
+        activeDepartments: 0,
+        totalConfiguredDepartments: 0,
+        totalUsers: 0,
+        pendingPasswordSetup: 0,
+        configurationCompleteness: 0,
+        configurationWarnings: 0
+      },
+      userAccess: {
+        totalUsers: 0,
+        pendingPasswordSetup: 0,
+        roleCounts: [],
+        recentUsers: [],
+        pendingPasswordRows: []
+      },
+      configHealth: {
+        completenessPercent: 0,
+        warningsCount: 0,
+        items: [],
+        warnings: []
+      },
+      recentAdminChanges: [],
+      alerts: []
     });
   }
 };
@@ -83,14 +115,19 @@ const jwt = require('jsonwebtoken');
 const mailer = require('../config/mailer');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const lookupTableService = require('../services/lookupTableService');
 const controllerAuditHelper = require('../services/controllerAuditHelper');
+const brandingService = require('../services/brandingService');
 const RESET_SECRET = process.env.RESET_TOKEN_SECRET || process.env.JWT_SECRET || 'reset_secret';
 
 // Configure Multer for logo uploads
+const logoUploadDirectory = path.join(process.cwd(), 'public', 'uploads');
+fs.mkdirSync(logoUploadDirectory, { recursive: true });
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, './public/uploads/');
+        cb(null, logoUploadDirectory);
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -116,6 +153,10 @@ async function getCompanyInfo(req, res) {
     try {
         const [rows] = await pool.query('SELECT * FROM tblcominfo LIMIT 1');
         const company = rows[0] || {};
+        company.LogoPath = brandingService.normalizeLogoPath(company.LogoPath || company.Logopath);
+        if (!company.Logopath && company.LogoPath) {
+            company.Logopath = company.LogoPath;
+        }
         res.render('admin/company-info', { 
             title: 'Company Information',
             group: 'Company Info',
@@ -135,7 +176,7 @@ async function updateCompanyInfo(req, res) {
             AccNo, Phone, Bank, PayingBank, Email, Manager
         } = req.body;
 
-        const LogoPath = req.file ? '/uploads/' + req.file.filename : req.body.currentLogo;
+        const LogoPath = brandingService.normalizeLogoPath(req.file ? `/uploads/${req.file.filename}` : req.body.currentLogo);
 
         // Check if company record exists
         const [rows] = await pool.query('SELECT CompanyID FROM tblcominfo LIMIT 1');
@@ -186,18 +227,18 @@ async function updateCompanyInfo(req, res) {
 
 
 async function adminsListPage(req, res) {
-    res.render('admin/admins', { user: getViewUser(req, 'Admin') });
+    const rows = await getPortalUsersByLevel('Admin');
+    res.render('admin/admins', {
+        user: getViewUser(req, 'Admin'),
+        rows,
+        success: req.query.success || '',
+        warning: req.query.warning || ''
+    });
 }
 
 async function adminsListJson(req, res) {
     try {
-        const [rows] = await pool.execute(
-            `SELECT p.PFNo, p.Username, p.FullName, p.Email, p.CompanyID, p.DateCreated, c.Com_Name
-             FROM tblpassword p
-             LEFT JOIN tblcominfo c ON p.CompanyID = c.CompanyID
-             WHERE p.Level = 'Admin'
-             ORDER BY p.PFNo DESC`
-        );
+        const rows = await getPortalUsersByLevel('Admin');
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -206,13 +247,146 @@ async function adminsListJson(req, res) {
 }
 
 async function adminsNewPage(req, res) {
-    res.render('admin/admins-new', { user: getViewUser(req, 'Admin') });
+    res.render('admin/admins-new', {
+        user: getViewUser(req, 'Admin'),
+        success: req.query.success || '',
+        warning: req.query.warning || '',
+        error: req.query.error || ''
+    });
+}
+
+async function getPortalUsersByLevel(level) {
+    const [rows] = await pool.execute(
+        `
+            SELECT p.PFNo, p.Username, p.FullName, p.Email, p.CompanyID, p.DateCreated, c.Com_Name
+            FROM tblpassword p
+            LEFT JOIN tblcominfo c ON p.CompanyID = c.CompanyID
+            WHERE p.Level = ?
+            ORDER BY p.PFNo DESC
+        `,
+        [level]
+    );
+
+    return rows;
+}
+
+async function getEntityHeadAccounts(companyId) {
+    const [rows] = await pool.execute(
+        `
+            SELECT
+                p.PFNo,
+                p.Username,
+                p.FullName,
+                p.Email,
+                p.CompanyID,
+                p.DateCreated,
+                c.Com_Name,
+                s.PFNo AS StaffPFNo,
+                s.SName AS StaffName,
+                s.CDept,
+                d.Dept AS DeptName,
+                s.HOD,
+                s.HOD_SDate,
+                s.HOD_EDate
+            FROM tblpassword p
+            LEFT JOIN tblcominfo c
+                ON p.CompanyID = c.CompanyID
+            LEFT JOIN tblstaff s
+                ON (
+                    CAST(s.PFNo AS CHAR) = p.Username
+                    OR LOWER(COALESCE(s.Email, '')) = LOWER(COALESCE(p.Email, ''))
+                )
+               AND (s.CompanyID = p.CompanyID OR s.CompanyID IS NULL)
+            LEFT JOIN tbldept d
+                ON d.Code = s.CDept
+            WHERE p.Level = 'Entity Head'
+              AND (? IS NULL OR p.CompanyID = ?)
+            ORDER BY p.PFNo DESC
+        `,
+        [companyId, companyId]
+    );
+
+    return rows.map((row) => {
+        const isCurrentHod = row.HOD && String(row.HOD) !== '0';
+        return {
+            ...row,
+            ScopeStatus: row.StaffPFNo && row.CDept && isCurrentHod ? 'Active Scope' : 'Scope Needs Review'
+        };
+    });
+}
+
+async function ensurePortalAccountIdentityAvailable({ username, email }) {
+    const normalizedUsername = String(username || '').trim().toLowerCase();
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+
+    if (!normalizedUsername) {
+        throw new Error('Username is required');
+    }
+
+    if (!normalizedEmail) {
+        throw new Error('Email is required');
+    }
+
+    const [portalRows] = await pool.execute(
+        `
+            SELECT PFNo
+            FROM tblpassword
+            WHERE LOWER(COALESCE(Username, '')) = ?
+               OR LOWER(COALESCE(Email, '')) = ?
+            LIMIT 1
+        `,
+        [normalizedUsername, normalizedEmail]
+    );
+
+    if (portalRows.length) {
+        throw new Error('That username or email is already in use.');
+    }
+
+    const [developerRows] = await pool.execute(
+        `
+            SELECT ID
+            FROM developer
+            WHERE LOWER(COALESCE(username, '')) = ?
+               OR LOWER(COALESCE(email, '')) = ?
+            LIMIT 1
+        `,
+        [normalizedUsername, normalizedEmail]
+    );
+
+    if (developerRows.length) {
+        throw new Error('That username or email is already in use.');
+    }
+}
+
+function buildAccountSetupLink(req, pfno, email) {
+    const token = jwt.sign({ pfno, email }, RESET_SECRET, { expiresIn: '30m' });
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    return `${baseUrl}/admin/admins/set-password?token=${encodeURIComponent(token)}`;
+}
+
+async function sendAccountSetupEmail({ to, subject, html }) {
+    if (!to) {
+        return false;
+    }
+
+    await mailer.sendMail({
+        from: process.env.SMTP_USER || 'info@hrpayroll.davisasmedia.com',
+        to,
+        subject,
+        html
+    });
+
+    return true;
 }
 
 async function createPortalUser(req, res, { level, redirectPath, accountLabel }) {
     try {
-        const { Username, Email, FullName } = req.body;
+        const Username = String(req.body.Username || '').trim();
+        const Email = String(req.body.Email || '').trim();
+        const FullName = String(req.body.FullName || '').trim();
         const companyId = getSessionCompanyId(req);
+        await ensurePortalAccountIdentityAvailable({ username: Username, email: Email });
+
         const [result] = await pool.execute(
             `INSERT INTO tblpassword (DateCreated, Level, Username, FullName, Pword, Email, CompanyID)
              VALUES (NOW(), ?, ?, ?, NULL, ?, ?)`,
@@ -220,9 +394,7 @@ async function createPortalUser(req, res, { level, redirectPath, accountLabel })
         );
         const pfno = result.insertId;
 
-        const token = jwt.sign({ pfno, email: Email }, RESET_SECRET, { expiresIn: '30m' });
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-        const link = `${baseUrl}/admin/admins/set-password?token=${encodeURIComponent(token)}`;
+        const link = buildAccountSetupLink(req, pfno, Email);
 
         const subject = `Set up your HR Payroll ${accountLabel} password`;
         const html = `
@@ -233,19 +405,17 @@ async function createPortalUser(req, res, { level, redirectPath, accountLabel })
             <p>If you did not request this, please ignore this email.</p>
             <p>Regards,<br/>HR Payroll Team</p>
         `;
-        if (Email) {
-            await mailer.sendMail({
-                from: process.env.SMTP_USER || 'info@hrpayroll.davisasmedia.com',
-                to: Email,
-                subject,
-                html
-            });
-        }
 
-        res.redirect(redirectPath);
+        try {
+            await sendAccountSetupEmail({ to: Email, subject, html });
+            return res.redirect(`${redirectPath}?success=${encodeURIComponent(`${accountLabel} account created successfully.`)}`);
+        } catch (mailError) {
+            console.error(`Failed to send ${accountLabel} setup email:`, mailError);
+            return res.redirect(`${redirectPath}?warning=${encodeURIComponent(`${accountLabel} account was created, but the password email could not be sent.`)}`);
+        }
     } catch (err) {
         console.error(err);
-        res.status(500).send(`Error creating ${accountLabel}`);
+        res.redirect(`${redirectPath}/new?error=${encodeURIComponent(err.message || `Error creating ${accountLabel}`)}`);
     }
 }
 
@@ -308,19 +478,93 @@ async function resendLink(req, res) {
     }
 }
 
-async function deleteAdmin(req, res) {
+async function resendPortalLinkForLevel(req, res, { level, accountLabel }) {
     const { pfno } = req.params;
     try {
-        await pool.execute(`DELETE FROM tblpassword WHERE PFNo = ?`, [pfno]);
+        const [[account]] = await pool.execute(
+            `SELECT Email, Username, FullName FROM tblpassword WHERE PFNo = ? AND Level = ?`,
+            [pfno, level]
+        );
+        if (!account) {
+            return res.status(404).json({ ok: false, message: `${accountLabel} account not found` });
+        }
+        const token = jwt.sign({ pfno, email: account.Email }, RESET_SECRET, { expiresIn: '30m' });
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const link = `${baseUrl}/admin/admins/set-password?token=${encodeURIComponent(token)}`;
+        const subject = `Set up your HR Payroll ${accountLabel} password`;
+        const html = `
+            <p>Dear ${account.FullName || account.Username},</p>
+            <p>Please click the link below to set your password. The link expires in 30 minutes:</p>
+            <p><a href="${link}" target="_blank" rel="noopener">Set Password</a></p>
+            <p>Regards,<br/>HR Payroll Team</p>
+        `;
+        await mailer.sendMail({
+            from: process.env.SMTP_USER || 'info@hrpayroll.davisasmedia.com',
+            to: account.Email,
+            subject,
+            html
+        });
         res.json({ ok: true });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ ok: false, error: 'Failed to delete admin' });
+        res.status(500).json({ ok: false, error: `Failed to resend ${accountLabel} link` });
     }
 }
 
+async function deletePortalUserForLevel(req, res, { level, accountLabel }) {
+    const { pfno } = req.params;
+    try {
+        const [result] = await pool.execute(
+            `DELETE FROM tblpassword WHERE PFNo = ? AND Level = ?`,
+            [pfno, level]
+        );
+        if (!result.affectedRows) {
+            return res.status(404).json({ ok: false, error: `${accountLabel} account not found` });
+        }
+        res.json({ ok: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ ok: false, error: `Failed to delete ${accountLabel}` });
+    }
+}
+
+async function resendAdminLink(req, res) {
+    return resendPortalLinkForLevel(req, res, { level: 'Admin', accountLabel: 'admin' });
+}
+
+async function resendManagerLink(req, res) {
+    return resendPortalLinkForLevel(req, res, { level: 'Manager', accountLabel: 'manager' });
+}
+
+async function resendDataEntryLink(req, res) {
+    return resendPortalLinkForLevel(req, res, { level: 'Data Entry', accountLabel: 'data entry officer' });
+}
+
+async function resendFinanceOfficerLink(req, res) {
+    return resendPortalLinkForLevel(req, res, { level: 'Finance Officer', accountLabel: 'finance officer' });
+}
+
+async function resendFinanceManagerLink(req, res) {
+    return resendPortalLinkForLevel(req, res, { level: 'Finance Manager', accountLabel: 'finance manager' });
+}
+
+async function resendAuditorLink(req, res) {
+    return resendPortalLinkForLevel(req, res, { level: 'Auditor', accountLabel: 'auditor' });
+}
+
+async function resendEntityHeadLink(req, res) {
+    return resendPortalLinkForLevel(req, res, { level: 'Entity Head', accountLabel: 'entity head' });
+}
+
+async function deleteAdmin(req, res) {
+    return deletePortalUserForLevel(req, res, { level: 'Admin', accountLabel: 'admin' });
+}
+
 async function managersNewPage(req, res) {
-    res.render('admin/managers-new', { user: getViewUser(req, 'Admin') });
+    res.render('admin/managers-new', {
+        user: getViewUser(req, 'Admin'),
+        error: req.query.error || ''
+    });
 }
 
 async function createManager(req, res) {
@@ -332,18 +576,18 @@ async function createManager(req, res) {
 }
 
 async function managersListPage(req, res) {
-    res.render('admin/managers', { user: getViewUser(req, 'Admin') });
+    const rows = await getPortalUsersByLevel('Manager');
+    res.render('admin/managers', {
+        user: getViewUser(req, 'Admin'),
+        rows,
+        success: req.query.success || '',
+        warning: req.query.warning || ''
+    });
 }
 
 async function managersListJson(req, res) {
     try {
-        const [rows] = await pool.execute(
-            `SELECT p.PFNo, p.Username, p.FullName, p.Email, p.CompanyID, p.DateCreated, c.Com_Name
-             FROM tblpassword p
-             LEFT JOIN tblcominfo c ON p.CompanyID = c.CompanyID
-             WHERE p.Level = 'Manager'
-             ORDER BY p.PFNo DESC`
-        );
+        const rows = await getPortalUsersByLevel('Manager');
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -352,18 +596,58 @@ async function managersListJson(req, res) {
 }
 
 async function dataEntryListPage(req, res) {
-    res.render('admin/data-entry-officers', { user: getViewUser(req, 'Admin') });
+    const rows = await getPortalUsersByLevel('Data Entry');
+    res.render('admin/data-entry-officers', {
+        user: getViewUser(req, 'Admin'),
+        rows,
+        success: req.query.success || '',
+        warning: req.query.warning || ''
+    });
+}
+
+async function financeOfficersListPage(req, res) {
+    const rows = await getPortalUsersByLevel('Finance Officer');
+    res.render('admin/finance-officers', {
+        user: getViewUser(req, 'Admin'),
+        rows,
+        success: req.query.success || '',
+        warning: req.query.warning || ''
+    });
+}
+
+async function financeOfficersListJson(req, res) {
+    try {
+        const rows = await getPortalUsersByLevel('Finance Officer');
+        res.json({ data: rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ data: [], error: 'Failed to load finance officers' });
+    }
+}
+
+async function financeManagersListPage(req, res) {
+    const rows = await getPortalUsersByLevel('Finance Manager');
+    res.render('admin/finance-managers', {
+        user: getViewUser(req, 'Admin'),
+        rows,
+        success: req.query.success || '',
+        warning: req.query.warning || ''
+    });
+}
+
+async function financeManagersListJson(req, res) {
+    try {
+        const rows = await getPortalUsersByLevel('Finance Manager');
+        res.json({ data: rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ data: [], error: 'Failed to load finance managers' });
+    }
 }
 
 async function dataEntryListJson(req, res) {
     try {
-        const [rows] = await pool.execute(
-            `SELECT p.PFNo, p.Username, p.FullName, p.Email, p.CompanyID, p.DateCreated, c.Com_Name
-             FROM tblpassword p
-             LEFT JOIN tblcominfo c ON p.CompanyID = c.CompanyID
-             WHERE p.Level = 'Data Entry'
-             ORDER BY p.PFNo DESC`
-        );
+        const rows = await getPortalUsersByLevel('Data Entry');
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -372,7 +656,24 @@ async function dataEntryListJson(req, res) {
 }
 
 async function dataEntryNewPage(req, res) {
-    res.render('admin/data-entry-new', { user: getViewUser(req, 'Admin') });
+    res.render('admin/data-entry-new', {
+        user: getViewUser(req, 'Admin'),
+        error: req.query.error || ''
+    });
+}
+
+async function financeOfficersNewPage(req, res) {
+    res.render('admin/finance-officers-new', {
+        user: getViewUser(req, 'Admin'),
+        error: req.query.error || ''
+    });
+}
+
+async function financeManagersNewPage(req, res) {
+    res.render('admin/finance-managers-new', {
+        user: getViewUser(req, 'Admin'),
+        error: req.query.error || ''
+    });
 }
 
 async function createDataEntry(req, res) {
@@ -383,19 +684,35 @@ async function createDataEntry(req, res) {
     });
 }
 
+async function createFinanceOfficer(req, res) {
+    return createPortalUser(req, res, {
+        level: 'Finance Officer',
+        redirectPath: '/admin/finance-officers',
+        accountLabel: 'finance officer'
+    });
+}
+
+async function createFinanceManager(req, res) {
+    return createPortalUser(req, res, {
+        level: 'Finance Manager',
+        redirectPath: '/admin/finance-managers',
+        accountLabel: 'finance manager'
+    });
+}
+
 async function auditorsListPage(req, res) {
-    res.render('admin/auditors', { user: getViewUser(req, 'Admin') });
+    const rows = await getPortalUsersByLevel('Auditor');
+    res.render('admin/auditors', {
+        user: getViewUser(req, 'Admin'),
+        rows,
+        success: req.query.success || '',
+        warning: req.query.warning || ''
+    });
 }
 
 async function auditorsListJson(req, res) {
     try {
-        const [rows] = await pool.execute(
-            `SELECT p.PFNo, p.Username, p.FullName, p.Email, p.CompanyID, p.DateCreated, c.Com_Name
-             FROM tblpassword p
-             LEFT JOIN tblcominfo c ON p.CompanyID = c.CompanyID
-             WHERE p.Level = 'Auditor'
-             ORDER BY p.PFNo DESC`
-        );
+        const rows = await getPortalUsersByLevel('Auditor');
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -404,7 +721,10 @@ async function auditorsListJson(req, res) {
 }
 
 async function auditorsNewPage(req, res) {
-    res.render('admin/auditors-new', { user: getViewUser(req, 'Admin') });
+    res.render('admin/auditors-new', {
+        user: getViewUser(req, 'Admin'),
+        error: req.query.error || ''
+    });
 }
 
 async function createAuditor(req, res) {
@@ -415,40 +735,310 @@ async function createAuditor(req, res) {
     });
 }
 
-async function deleteManager(req, res) {
-    const { pfno } = req.params;
+async function getCurrentHodCandidates(companyId) {
+    const [rows] = await pool.query(
+        `
+            SELECT
+                s.PFNo,
+                s.SName,
+                s.Email,
+                s.CDept,
+                d.Dept AS DeptName,
+                s.HOD,
+                s.HOD_SDate,
+                s.HOD_EDate
+            FROM tblstaff s
+            LEFT JOIN tbldept d
+                ON d.Code = s.CDept
+            WHERE (s.CompanyID = ? OR s.CompanyID IS NULL)
+              AND COALESCE(CAST(s.HOD AS CHAR), '') NOT IN ('', '0')
+              AND COALESCE(s.Redundant, 0) = 0
+              AND (
+                    s.EmpStatus IS NULL
+                    OR CAST(COALESCE(s.EmpStatus, '') AS CHAR) IN ('1', '01', '3', '03', '4', '04')
+                  )
+              AND (s.HOD_SDate IS NULL OR DATE(s.HOD_SDate) <= CURDATE())
+              AND (s.HOD_EDate IS NULL OR DATE(s.HOD_EDate) >= CURDATE())
+              AND s.CDept IS NOT NULL
+              AND s.CDept <> ''
+            ORDER BY d.Dept ASC, s.SName ASC, s.PFNo ASC
+        `,
+        [companyId]
+    );
+
+    return rows;
+}
+
+async function entityHeadsListPage(req, res) {
+    const companyId = getSessionCompanyId(req);
+    const rows = await getEntityHeadAccounts(companyId);
+    res.render('admin/entity-heads', {
+        user: getViewUser(req, 'Admin'),
+        rows,
+        success: req.query.success || '',
+        warning: req.query.warning || ''
+    });
+}
+
+async function entityHeadsListJson(req, res) {
     try {
-        await pool.execute(`DELETE FROM tblpassword WHERE PFNo = ?`, [pfno]);
-        res.json({ ok: true });
+        const companyId = getSessionCompanyId(req);
+        const rows = await getEntityHeadAccounts(companyId);
+        res.json({ data: rows });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ ok: false, error: 'Failed to delete manager' });
+        res.status(500).json({ data: [], error: 'Failed to load entity heads' });
     }
+}
+
+async function entityHeadsNewPage(req, res) {
+    try {
+        const companyId = getSessionCompanyId(req) || 1;
+        const candidates = await getCurrentHodCandidates(companyId);
+        res.render('admin/entity-heads-new', {
+            user: getViewUser(req, 'Admin'),
+            candidates,
+            error: req.query.error || ''
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+}
+
+async function createEntityHead(req, res) {
+    try {
+        const companyId = getSessionCompanyId(req) || 1;
+        const staffPfNo = String(req.body.StaffPFNo || '').trim();
+        const email = String(req.body.Email || '').trim();
+
+        if (!staffPfNo) {
+            return res.status(400).send('Staff PFNo is required');
+        }
+
+        if (!email) {
+            return res.status(400).send('Email is required');
+        }
+
+        const [staffRows] = await pool.query(
+            `
+                SELECT
+                    s.PFNo,
+                    s.SName,
+                    s.Email,
+                    s.CDept,
+                    d.Dept AS DeptName
+                FROM tblstaff s
+                LEFT JOIN tbldept d
+                    ON d.Code = s.CDept
+                WHERE (s.CompanyID = ? OR s.CompanyID IS NULL)
+                  AND s.PFNo = ?
+                  AND COALESCE(CAST(s.HOD AS CHAR), '') NOT IN ('', '0')
+                  AND COALESCE(s.Redundant, 0) = 0
+                  AND (
+                        s.EmpStatus IS NULL
+                        OR CAST(COALESCE(s.EmpStatus, '') AS CHAR) IN ('1', '01', '3', '03', '4', '04')
+                      )
+                  AND (s.HOD_SDate IS NULL OR DATE(s.HOD_SDate) <= CURDATE())
+                  AND (s.HOD_EDate IS NULL OR DATE(s.HOD_EDate) >= CURDATE())
+                  AND s.CDept IS NOT NULL
+                  AND s.CDept <> ''
+                LIMIT 1
+            `,
+            [companyId, staffPfNo]
+        );
+
+        if (!staffRows.length) {
+            return res.status(400).send('Selected staff is not a current active HOD with a department assignment.');
+        }
+
+        const staff = staffRows[0];
+        const username = String(staff.PFNo);
+        const fullName = staff.SName;
+
+        await ensurePortalAccountIdentityAvailable({ username, email });
+
+        const [existingRows] = await pool.query(
+            `
+                SELECT PFNo
+                FROM tblpassword
+                WHERE CompanyID = ?
+                  AND Level = 'Entity Head'
+                  AND (Username = ? OR LOWER(COALESCE(Email, '')) = LOWER(?))
+                LIMIT 1
+            `,
+            [companyId, username, email]
+        );
+
+        if (existingRows.length > 0) {
+            return res.status(400).send('An Entity Head account already exists for this staff PFNo or email.');
+        }
+
+        const [result] = await pool.execute(
+            `
+                INSERT INTO tblpassword (DateCreated, Level, Username, FullName, Pword, Email, CompanyID)
+                VALUES (NOW(), ?, ?, ?, NULL, ?, ?)
+            `,
+            ['Entity Head', username, fullName, email, companyId]
+        );
+
+        const pfno = result.insertId;
+        const link = buildAccountSetupLink(req, pfno, email);
+
+        try {
+            await sendAccountSetupEmail({
+                to: email,
+                subject: 'Set up your HR Payroll Entity Head password',
+                html: `
+                    <p>Dear ${fullName || username},</p>
+                    <p>An Entity Head account has been created for you on HR Payroll for <strong>${staff.DeptName || staff.CDept}</strong>.</p>
+                    <p>Please click the link below to set your password. The link expires in 30 minutes:</p>
+                    <p><a href="${link}" target="_blank" rel="noopener">Set Password</a></p>
+                    <p>Regards,<br/>HR Payroll Team</p>
+                `
+            });
+            res.redirect('/admin/entity-heads?success=' + encodeURIComponent('Entity Head account created successfully.'));
+        } catch (mailError) {
+            console.error('Failed to send Entity Head setup email:', mailError);
+            res.redirect('/admin/entity-heads?warning=' + encodeURIComponent('Entity Head account was created, but the password email could not be sent.'));
+        }
+    } catch (err) {
+        console.error(err);
+        res.redirect('/admin/entity-heads/new?error=' + encodeURIComponent(err.message || 'Error creating Entity Head'));
+    }
+}
+
+async function deleteManager(req, res) {
+    return deletePortalUserForLevel(req, res, { level: 'Manager', accountLabel: 'manager' });
 }
 
 async function deleteDataEntry(req, res) {
-    const { pfno } = req.params;
-    try {
-        await pool.execute(`DELETE FROM tblpassword WHERE PFNo = ?`, [pfno]);
-        res.json({ ok: true });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ ok: false, error: 'Failed to delete data entry officer' });
-    }
+    return deletePortalUserForLevel(req, res, { level: 'Data Entry', accountLabel: 'data entry officer' });
+}
+
+async function deleteFinanceOfficer(req, res) {
+    return deletePortalUserForLevel(req, res, { level: 'Finance Officer', accountLabel: 'finance officer' });
+}
+
+async function deleteFinanceManager(req, res) {
+    return deletePortalUserForLevel(req, res, { level: 'Finance Manager', accountLabel: 'finance manager' });
 }
 
 async function deleteAuditor(req, res) {
-    const { pfno } = req.params;
-    try {
-        await pool.execute(`DELETE FROM tblpassword WHERE PFNo = ?`, [pfno]);
-        res.json({ ok: true });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ ok: false, error: 'Failed to delete auditor' });
-    }
+    return deletePortalUserForLevel(req, res, { level: 'Auditor', accountLabel: 'auditor' });
+}
+
+async function deleteEntityHead(req, res) {
+    return deletePortalUserForLevel(req, res, { level: 'Entity Head', accountLabel: 'entity head' });
 }
 
 // --- Payroll Items Controller Methods ---
+
+const payTypesPage = async (req, res) => {
+    try {
+        res.render('admin/parameters/pay-types', {
+            title: 'Payroll Activities / Pay Types',
+            group: 'Parameters',
+            user: getViewUser(req, 'Admin'),
+            createMode: req.path.endsWith('/new'),
+            editCode: req.params.code || req.query.edit || ''
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server Error');
+    }
+};
+
+const normalizePayTypeCode = (value) => String(value || '').trim().toUpperCase();
+const isValidPayTypeCode = (value) => /^[A-Z0-9]{2}$/.test(normalizePayTypeCode(value));
+
+const payTypesListJson = async (req, res) => {
+    try {
+        const data = await parameterChangeService.listPayTypeRows(getAdminCompanyId(req));
+        res.json({ data });
+    } catch (err) {
+        console.error(err);
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to fetch payroll activities' });
+    }
+};
+
+const createPayType = async (req, res) => {
+    try {
+        const { Code, PayType, reason } = req.body;
+        if (!Code) return res.status(400).json({ error: 'Activity code is required' });
+        if (!isValidPayTypeCode(Code)) {
+            return res.status(400).json({ error: 'Activity code must be exactly 2 letters or digits.' });
+        }
+        if (!PayType) return res.status(400).json({ error: 'Activity name is required' });
+
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'pay-types',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.CREATE,
+            payload: { Code: normalizePayTypeCode(Code), PayType: String(PayType).trim() },
+            reason: reason || `Proposed creation of payroll activity ${Code} - ${PayType}.`,
+            user: getAdminActor(req)
+        });
+
+        respondWithProposal(res, detail, 'Payroll activity proposal saved. The live activity list remains unchanged until final approval.');
+    } catch (err) {
+        console.error(err);
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to create payroll activity proposal' });
+    }
+};
+
+const updatePayType = async (req, res) => {
+    try {
+        const { code } = req.params;
+        const { PayType, reason } = req.body;
+        if (!isValidPayTypeCode(code)) {
+            return res.status(400).json({ error: 'Activity code is invalid.' });
+        }
+        if (!PayType) return res.status(400).json({ error: 'Activity name is required' });
+
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'pay-types',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.UPDATE,
+            payload: { Code: normalizePayTypeCode(code), PayType: String(PayType).trim() },
+            reason: reason || `Proposed update to payroll activity ${code}.`,
+            user: getAdminActor(req)
+        });
+
+        respondWithProposal(res, detail, 'Payroll activity update proposed successfully. The live activity remains unchanged until final approval.');
+    } catch (err) {
+        console.error(err);
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to update payroll activity proposal' });
+    }
+};
+
+const deactivatePayType = async (req, res) => {
+    res.status(409).json({
+        error: 'tblpaytype does not contain an active or inactive field. Deactivation is not supported in the live legacy schema, so direct deactivation cannot be proposed in this phase.'
+    });
+};
+
+const deletePayType = async (req, res) => {
+    try {
+        const { code } = req.params;
+        if (!isValidPayTypeCode(code)) {
+            return res.status(400).json({ error: 'Activity code is invalid.' });
+        }
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'pay-types',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.DELETE,
+            payload: { Code: normalizePayTypeCode(code) },
+            reason: req.body.reason || `Proposed deletion of payroll activity ${code}.`,
+            user: getAdminActor(req)
+        });
+
+        respondWithProposal(res, detail, 'Payroll activity deletion proposal saved. The live activity remains unchanged until final approval.');
+    } catch (err) {
+        console.error(err);
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to propose payroll activity deletion' });
+    }
+};
 
 const payrollItemsPage = (req, res) => {
     res.render('admin/parameters/payroll-items', {
@@ -470,36 +1060,31 @@ const payrollItemsListJson = async (req, res) => {
 
 const createPayrollItem = async (req, res) => {
     try {
-        const nextCode = await lookupTableService.getNextCode('tblpayrollitems', {
-            startCode: '01',
-            padLength: 2
-        });
-
         const { Income, Taxable, Threshhold, TPercent, TPercentage, TAmount, Mode, Fixed, Percent, Freq } = req.body;
-
         if (!Income) return res.status(400).json({ error: 'Description (Income) is required' });
-
-        await lookupTableService.insertRow('tblpayrollitems', {
-            Code: nextCode,
-            Income,
-            Taxable: Taxable ? 1 : 0,
-            Threshhold: Threshhold ? 1 : 0,
-            TPercent: TPercent ? 1 : 0,
-            TPercentage: TPercentage || 0,
-            TAmount: TAmount || 0,
-            Mode: Mode || '',
-            Fixed: Fixed ? 1 : 0,
-            Percent: Percent || 0,
-            Freq: Freq || '',
-            CompanyID: 1
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'payroll-items',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.CREATE,
+            payload: {
+                Income,
+                Taxable: Taxable ? 1 : 0,
+                Threshhold: Threshhold ? 1 : 0,
+                TPercent: TPercent ? 1 : 0,
+                TPercentage: TPercentage || 0,
+                TAmount: TAmount || 0,
+                Mode: Mode || '',
+                Fixed: Fixed ? 1 : 0,
+                Percent: Percent || 0,
+                Freq: Freq || ''
+            },
+            reason: req.body.reason || `Proposed creation of payroll item ${Income}.`,
+            user: getAdminActor(req)
         });
-
-        const newRow = await lookupTableService.getRowById('tblpayrollitems', 'Code', nextCode);
-        res.json({ success: true, item: newRow });
-
+        respondWithProposal(res, detail, 'Payroll item proposal saved. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to create payroll item' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to create payroll item proposal' });
     }
 };
 
@@ -517,24 +1102,36 @@ const updatePayrollItem = async (req, res) => {
         if (['Taxable', 'Threshhold', 'TPercent', 'Fixed'].includes(field)) {
             sqlValue = (value === 'true' || value === true || value == 1) ? 1 : 0;
         }
-
-        await lookupTableService.updateRow('tblpayrollitems', 'Code', code, { [field]: sqlValue });
-        
-        res.json({ success: true });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'payroll-items',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.UPDATE,
+            payload: { Code: code, [field]: sqlValue },
+            reason: req.body.reason || `Proposed update to payroll item ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Payroll item update proposed successfully. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to update payroll item' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to update payroll item proposal' });
     }
 };
 
 const deletePayrollItem = async (req, res) => {
     const { code } = req.params;
     try {
-        await lookupTableService.deleteRow('tblpayrollitems', 'Code', code);
-        res.json({ success: true });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'payroll-items',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.DELETE,
+            payload: { Code: code },
+            reason: req.body.reason || `Proposed deletion of payroll item ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Payroll item deletion proposal saved. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to delete payroll item' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to propose payroll item deletion' });
     }
 };
 
@@ -544,64 +1141,86 @@ const departmentsPage = (req, res) => {
     res.render('admin/parameters/departments', {
         title: 'Department',
         group: 'Parameters',
-        user: { name: 'David' }
+        user: getViewUser(req, 'Admin')
     });
 };
 
 const departmentsListJson = async (req, res) => {
     try {
-        const rows = await lookupTableService.listRows('tbldept');
-        res.json({ data: rows });
+        const data = await parameterChangeService.listLookupModuleRows(getAdminCompanyId(req), 'departments');
+        res.json({ data });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to fetch departments' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to fetch departments' });
     }
 };
 
 const createDepartment = async (req, res) => {
     try {
-        const nextCode = await lookupTableService.getNextCode('tbldept', {
-            startCode: '001',
-            padLength: 3
-        });
-
-        const { Dept } = req.body;
+        const { Code, Dept, reason } = req.body;
         if (!Dept) return res.status(400).json({ error: 'Department Name is required' });
-
-        await lookupTableService.insertRow('tbldept', { Code: nextCode, Dept, CompanyID: 1 });
-
-        const newRow = await lookupTableService.getRowById('tbldept', 'Code', nextCode);
-        res.json({ success: true, item: newRow });
-
+        if (!String(reason || '').trim()) {
+            return res.status(400).json({ error: 'Reason for change is required.' });
+        }
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'departments',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.CREATE,
+            payload: Code ? { Code, Dept } : { Dept },
+            reason: reason || `Proposed creation of department ${Dept}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Department proposal saved. The live department list remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to create department' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to create department proposal' });
     }
 };
 
 const updateDepartment = async (req, res) => {
     const { code } = req.params;
-    const { Dept } = req.body;
+    const { Dept, reason } = req.body;
 
     if (!Dept) return res.status(400).json({ error: 'Department Name is required' });
+    if (!String(reason || '').trim()) {
+        return res.status(400).json({ error: 'Reason for change is required.' });
+    }
 
     try {
-        await lookupTableService.updateRow('tbldept', 'Code', code, { Dept });
-        res.json({ success: true });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'departments',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.UPDATE,
+            payload: { Code: code, Dept },
+            reason: reason || `Proposed update to department ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Department update proposed successfully. The live department remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to update department' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to update department proposal' });
     }
 };
 
 const deleteDepartment = async (req, res) => {
     const { code } = req.params;
+    const { reason } = req.body;
+    if (!String(reason || '').trim()) {
+        return res.status(400).json({ error: 'Reason for change is required.' });
+    }
     try {
-        await lookupTableService.deleteRow('tbldept', 'Code', code);
-        res.json({ success: true });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'departments',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.DELETE,
+            payload: { Code: code },
+            reason: reason || `Proposed deletion of department ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Department deletion proposal saved. The live department remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to delete department' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to propose department deletion' });
     }
 };
 
@@ -627,22 +1246,20 @@ const jobTitlesListJson = async (req, res) => {
 
 const createJobTitle = async (req, res) => {
     try {
-        const nextCode = await lookupTableService.getNextCode('tbljobtitle', {
-            startCode: '0001',
-            padLength: 4
-        });
-
         const { JobTitle } = req.body;
         if (!JobTitle) return res.status(400).json({ error: 'Job Title is required' });
-
-        await lookupTableService.insertRow('tbljobtitle', { Code: nextCode, JobTitle, CompanyID: 1 });
-
-        const newRow = await lookupTableService.getRowById('tbljobtitle', 'Code', nextCode);
-        res.json({ success: true, item: newRow });
-
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'job-titles',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.CREATE,
+            payload: { JobTitle },
+            reason: req.body.reason || `Proposed creation of job title ${JobTitle}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Job title proposal saved. The live job-title setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to create job title' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to create job title proposal' });
     }
 };
 
@@ -653,22 +1270,36 @@ const updateJobTitle = async (req, res) => {
     if (!JobTitle) return res.status(400).json({ error: 'Job Title is required' });
 
     try {
-        await lookupTableService.updateRow('tbljobtitle', 'Code', code, { JobTitle });
-        res.json({ success: true });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'job-titles',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.UPDATE,
+            payload: { Code: code, JobTitle },
+            reason: req.body.reason || `Proposed update to job title ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Job title update proposed successfully. The live job title remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to update job title' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to update job title proposal' });
     }
 };
 
 const deleteJobTitle = async (req, res) => {
     const { code } = req.params;
     try {
-        await lookupTableService.deleteRow('tbljobtitle', 'Code', code);
-        res.json({ success: true });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'job-titles',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.DELETE,
+            payload: { Code: code },
+            reason: req.body.reason || `Proposed deletion of job title ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Job title deletion proposal saved. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to delete job title' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to propose job title deletion' });
     }
 };
 
@@ -707,37 +1338,22 @@ const gradesListJson = async (req, res) => {
 
 const createGrade = async (req, res) => {
     try {
-        const [lastItem] = await pool.query('SELECT GradeCode FROM tblgrade ORDER BY GradeCode DESC LIMIT 1');
-        let nextCode = '0001';
-        if (lastItem.length > 0) {
-            const lastCodeInt = parseInt(lastItem[0].GradeCode, 10);
-            if (!isNaN(lastCodeInt)) {
-                nextCode = (lastCodeInt + 1).toString().padStart(4, '0');
-            }
-        }
-
         const { Grade, JobTitle, LDays, Medical, Confirm, NotchIncr, Notice, PromPeriod } = req.body;
         
         if (!Grade) return res.status(400).json({ error: 'Grade Name is required' });
         if (!JobTitle) return res.status(400).json({ error: 'Job Title is required' });
-
-        const sql = `INSERT INTO tblgrade (GradeCode, Grade, JobTitle, LDays, Medical, Confirm, NotchIncr, Notice, PromPeriod, CompanyID) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-        await pool.query(sql, [nextCode, Grade, JobTitle, LDays || 0, Medical || 0, Confirm || 0, NotchIncr || 0, Notice || 0, PromPeriod || 0, 1]);
-        
-        // Return the new row with JobTitle name
-        const fetchSql = `
-            SELECT g.GradeCode, g.Grade, g.JobTitle AS JobTitleCode, j.JobTitle AS JobTitleName,
-                   g.LDays, g.Medical, g.Confirm, g.NotchIncr, g.Notice, g.PromPeriod
-            FROM tblgrade g 
-            LEFT JOIN tbljobtitle j ON g.JobTitle = j.Code 
-            WHERE g.GradeCode = ?
-        `;
-        const [newRow] = await pool.query(fetchSql, [nextCode]);
-        res.json({ success: true, item: newRow[0] });
-
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'grades',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.CREATE,
+            payload: { Grade, JobTitle, LDays: LDays || 0, Medical: Medical || 0, Confirm: Confirm || 0, NotchIncr: NotchIncr || 0, Notice: Notice || 0, PromPeriod: PromPeriod || 0 },
+            reason: req.body.reason || `Proposed creation of salary grade ${Grade}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Grade proposal saved. The live grade setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to create grade' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to create grade proposal' });
     }
 };
 
@@ -746,51 +1362,39 @@ const updateGrade = async (req, res) => {
     const { Grade, JobTitle, LDays, Medical, Confirm, NotchIncr, Notice, PromPeriod } = req.body;
 
     try {
-        // Build dynamic update query
-        const fields = [];
-        const values = [];
-
-        if (Grade !== undefined) { fields.push('Grade = ?'); values.push(Grade); }
-        if (JobTitle !== undefined) { fields.push('JobTitle = ?'); values.push(JobTitle); }
-        if (LDays !== undefined) { fields.push('LDays = ?'); values.push(LDays); }
-        if (Medical !== undefined) { fields.push('Medical = ?'); values.push(Medical); }
-        if (Confirm !== undefined) { fields.push('Confirm = ?'); values.push(Confirm); }
-        if (NotchIncr !== undefined) { fields.push('NotchIncr = ?'); values.push(NotchIncr); }
-        if (Notice !== undefined) { fields.push('Notice = ?'); values.push(Notice); }
-        if (PromPeriod !== undefined) { fields.push('PromPeriod = ?'); values.push(PromPeriod); }
-
-        if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
-
-        const sql = `UPDATE tblgrade SET ${fields.join(', ')} WHERE GradeCode = ?`;
-        values.push(code);
-
-        await pool.query(sql, values);
-        
-        // Fetch updated row to return correct data
-        const fetchSql = `
-            SELECT g.GradeCode, g.Grade, g.JobTitle AS JobTitleCode, j.JobTitle AS JobTitleName,
-                   g.LDays, g.Medical, g.Confirm, g.NotchIncr, g.Notice, g.PromPeriod
-            FROM tblgrade g 
-            LEFT JOIN tbljobtitle j ON g.JobTitle = j.Code 
-            WHERE g.GradeCode = ?
-        `;
-        const [updatedRow] = await pool.query(fetchSql, [code]);
-        
-        res.json({ success: true, item: updatedRow[0] });
+        if ([Grade, JobTitle, LDays, Medical, Confirm, NotchIncr, Notice, PromPeriod].every((value) => value === undefined)) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'grades',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.UPDATE,
+            payload: { GradeCode: code, Grade, JobTitle, LDays, Medical, Confirm, NotchIncr, Notice, PromPeriod },
+            reason: req.body.reason || `Proposed update to salary grade ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Grade update proposed successfully. The live grade remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to update grade' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to update grade proposal' });
     }
 };
 
 const deleteGrade = async (req, res) => {
     const { code } = req.params;
     try {
-        await pool.query('DELETE FROM tblgrade WHERE GradeCode = ?', [code]);
-        res.json({ success: true });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'grades',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.DELETE,
+            payload: { GradeCode: code },
+            reason: req.body.reason || `Proposed deletion of salary grade ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Grade deletion proposal saved. The live grade remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to delete grade' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to propose grade deletion' });
     }
 };
 
@@ -815,31 +1419,27 @@ const banksListJson = async (req, res) => {
 
 const createBank = async (req, res) => {
     try {
-        const nextCode = await lookupTableService.getNextCode('tblbanks', {
-            startCode: '01',
-            padLength: 2
-        });
-
         const { Bank, Short, BankCode, Street_Address, Town_Address } = req.body;
         
         if (!Bank) return res.status(400).json({ error: 'Bank Name is required' });
-
-        await lookupTableService.insertRow('tblbanks', {
-            Code: nextCode,
-            Bank,
-            Short: Short || null,
-            BankCode: BankCode || null,
-            Street_Address: Street_Address || null,
-            Town_Address: Town_Address || null,
-            CompanyID: 1
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'banks',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.CREATE,
+            payload: {
+                Bank,
+                Short: Short || null,
+                BankCode: BankCode || null,
+                Street_Address: Street_Address || null,
+                Town_Address: Town_Address || null
+            },
+            reason: req.body.reason || `Proposed creation of bank ${Bank}.`,
+            user: getAdminActor(req)
         });
-
-        const newRow = await lookupTableService.getRowById('tblbanks', 'Code', nextCode);
-        res.json({ success: true, item: newRow });
-
+        respondWithProposal(res, detail, 'Bank proposal saved. The live bank list remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to create bank' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to create bank proposal' });
     }
 };
 
@@ -848,36 +1448,39 @@ const updateBank = async (req, res) => {
     const { Bank, Short, BankCode, Street_Address, Town_Address } = req.body;
 
     try {
-        const fields = [];
-        const values = [];
-
-        if (Bank !== undefined) { fields.push('Bank = ?'); values.push(Bank); }
-        if (Short !== undefined) { fields.push('Short = ?'); values.push(Short); }
-        if (BankCode !== undefined) { fields.push('BankCode = ?'); values.push(BankCode); }
-        if (Street_Address !== undefined) { fields.push('Street_Address = ?'); values.push(Street_Address); }
-        if (Town_Address !== undefined) { fields.push('Town_Address = ?'); values.push(Town_Address); }
-
-        if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
-
-        const updateData = Object.fromEntries(fields.map((field, index) => [field.replace(' = ?', ''), values[index]]));
-        await lookupTableService.updateRow('tblbanks', 'Code', code, updateData);
-
-        const updatedRow = await lookupTableService.getRowById('tblbanks', 'Code', code);
-        res.json({ success: true, item: updatedRow });
+        if ([Bank, Short, BankCode, Street_Address, Town_Address].every((value) => value === undefined)) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'banks',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.UPDATE,
+            payload: { Code: code, Bank, Short, BankCode, Street_Address, Town_Address },
+            reason: req.body.reason || `Proposed update to bank ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Bank update proposed successfully. The live bank remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to update bank' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to update bank proposal' });
     }
 };
 
 const deleteBank = async (req, res) => {
     const { code } = req.params;
     try {
-        await lookupTableService.deleteRow('tblbanks', 'Code', code);
-        res.json({ success: true });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'banks',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.DELETE,
+            payload: { Code: code },
+            reason: req.body.reason || `Proposed deletion of bank ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Bank deletion proposal saved. The live bank remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to delete bank' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to propose bank deletion' });
     }
 };
 
@@ -909,29 +1512,25 @@ const companyBBANListJson = async (req, res) => {
 
 const createCompanyBBAN = async (req, res) => {
     try {
-        const nextCode = await lookupTableService.getNextCode('tblpayingbank', {
-            startCode: '01',
-            padLength: 2
-        });
-
         const { Bank, BBAN, Short } = req.body;
         
         if (!Bank) return res.status(400).json({ error: 'Bank Name is required' });
-
-        await lookupTableService.insertRow('tblpayingbank', {
-            Code: nextCode,
-            Bank,
-            BBAN: BBAN || null,
-            Short: Short || null,
-            CompanyID: 1
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'company-bban',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.CREATE,
+            payload: {
+                Bank,
+                BBAN: BBAN || null,
+                Short: Short || null
+            },
+            reason: req.body.reason || `Proposed creation of company BBAN for ${Bank}.`,
+            user: getAdminActor(req)
         });
-
-        const newRow = await lookupTableService.getRowById('tblpayingbank', 'Code', nextCode);
-        res.json({ success: true, item: newRow });
-
+        respondWithProposal(res, detail, 'Company BBAN proposal saved. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to create company bban' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to create company BBAN proposal' });
     }
 };
 
@@ -940,34 +1539,39 @@ const updateCompanyBBAN = async (req, res) => {
     const { Bank, BBAN, Short } = req.body;
 
     try {
-        const fields = [];
-        const values = [];
-
-        if (Bank !== undefined) { fields.push('Bank = ?'); values.push(Bank); }
-        if (BBAN !== undefined) { fields.push('BBAN = ?'); values.push(BBAN); }
-        if (Short !== undefined) { fields.push('Short = ?'); values.push(Short); }
-
-        if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
-
-        const updateData = Object.fromEntries(fields.map((field, index) => [field.replace(' = ?', ''), values[index]]));
-        await lookupTableService.updateRow('tblpayingbank', 'Code', code, updateData);
-
-        const updatedRow = await lookupTableService.getRowById('tblpayingbank', 'Code', code);
-        res.json({ success: true, item: updatedRow });
+        if ([Bank, BBAN, Short].every((value) => value === undefined)) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'company-bban',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.UPDATE,
+            payload: { Code: code, Bank, BBAN, Short },
+            reason: req.body.reason || `Proposed update to company BBAN ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Company BBAN update proposed successfully. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to update company bban' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to update company BBAN proposal' });
     }
 };
 
 const deleteCompanyBBAN = async (req, res) => {
     const { code } = req.params;
     try {
-        await lookupTableService.deleteRow('tblpayingbank', 'Code', code);
-        res.json({ success: true });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'company-bban',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.DELETE,
+            payload: { Code: code },
+            reason: req.body.reason || `Proposed deletion of company BBAN ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Company BBAN deletion proposal saved. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to delete company bban' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to propose company BBAN deletion' });
     }
 };
 
@@ -997,29 +1601,24 @@ const glAccountsListJson = async (req, res) => {
 
 const createGLAccount = async (req, res) => {
     try {
-        const nextCode = await lookupTableService.getNextCode('tblglaccounts', {
-            codeColumn: 'GLNo',
-            startCode: '01',
-            padLength: 2
-        });
-
         const { AccountsHead, Code } = req.body;
         
         if (!AccountsHead) return res.status(400).json({ error: 'Account Head is required' });
-
-        await lookupTableService.insertRow('tblglaccounts', {
-            GLNo: nextCode,
-            AccountsHead,
-            Code: Code || null,
-            CompanyID: 1
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'gl-accounts',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.CREATE,
+            payload: {
+                AccountsHead,
+                Code: Code || null
+            },
+            reason: req.body.reason || `Proposed creation of GL account ${AccountsHead}.`,
+            user: getAdminActor(req)
         });
-
-        const newRow = await lookupTableService.getRowById('tblglaccounts', 'GLNo', nextCode);
-        res.json({ success: true, item: newRow });
-
+        respondWithProposal(res, detail, 'GL account proposal saved. The live mapping setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to create gl account' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to create GL account proposal' });
     }
 };
 
@@ -1028,33 +1627,39 @@ const updateGLAccount = async (req, res) => {
     const { AccountsHead, Code } = req.body;
 
     try {
-        const fields = [];
-        const values = [];
-
-        if (AccountsHead !== undefined) { fields.push('AccountsHead = ?'); values.push(AccountsHead); }
-        if (Code !== undefined) { fields.push('Code = ?'); values.push(Code); }
-
-        if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
-
-        const updateData = Object.fromEntries(fields.map((field, index) => [field.replace(' = ?', ''), values[index]]));
-        await lookupTableService.updateRow('tblglaccounts', 'GLNo', glNo, updateData);
-
-        const updatedRow = await lookupTableService.getRowById('tblglaccounts', 'GLNo', glNo);
-        res.json({ success: true, item: updatedRow });
+        if (AccountsHead === undefined && Code === undefined) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'gl-accounts',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.UPDATE,
+            payload: { GLNo: glNo, AccountsHead, Code },
+            reason: req.body.reason || `Proposed update to GL account ${glNo}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'GL account update proposed successfully. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to update gl account' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to update GL account proposal' });
     }
 };
 
 const deleteGLAccount = async (req, res) => {
     const { glNo } = req.params;
     try {
-        await lookupTableService.deleteRow('tblglaccounts', 'GLNo', glNo);
-        res.json({ success: true });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'gl-accounts',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.DELETE,
+            payload: { GLNo: glNo },
+            reason: req.body.reason || `Proposed deletion of GL account ${glNo}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'GL account deletion proposal saved. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to delete gl account' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to propose GL account deletion' });
     }
 };
 
@@ -1084,21 +1689,20 @@ const disciplineReasonsListJson = async (req, res) => {
 
 const createDisciplineReason = async (req, res) => {
     try {
-        const nextCode = await lookupTableService.getNextCode('tblreason', {
-            codeColumn: 'ReasonCode',
-            startCode: '01',
-            padLength: 2
-        });
-
         const { Reason } = req.body;
         if (!Reason) return res.status(400).json({ error: 'Reason is required' });
-
-        await lookupTableService.insertRow('tblreason', { ReasonCode: nextCode, Reason, CompanyID: 1 });
-        const newRow = await lookupTableService.getRowById('tblreason', 'ReasonCode', nextCode);
-        res.json({ success: true, item: newRow });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'discipline-reasons',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.CREATE,
+            payload: { Reason },
+            reason: req.body.reason || `Proposed creation of discipline reason ${Reason}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Discipline reason proposal saved. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to create discipline reason' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to create discipline reason proposal' });
     }
 };
 
@@ -1106,23 +1710,36 @@ const updateDisciplineReason = async (req, res) => {
     const { code } = req.params;
     const { Reason } = req.body;
     try {
-        await lookupTableService.updateRow('tblreason', 'ReasonCode', code, { Reason });
-        const updatedRow = await lookupTableService.getRowById('tblreason', 'ReasonCode', code);
-        res.json({ success: true, item: updatedRow });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'discipline-reasons',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.UPDATE,
+            payload: { ReasonCode: code, Reason },
+            reason: req.body.reason || `Proposed update to discipline reason ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Discipline reason update proposed successfully. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to update discipline reason' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to update discipline reason proposal' });
     }
 };
 
 const deleteDisciplineReason = async (req, res) => {
     const { code } = req.params;
     try {
-        await lookupTableService.deleteRow('tblreason', 'ReasonCode', code);
-        res.json({ success: true });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'discipline-reasons',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.DELETE,
+            payload: { ReasonCode: code },
+            reason: req.body.reason || `Proposed deletion of discipline reason ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Discipline reason deletion proposal saved. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to delete discipline reason' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to propose discipline reason deletion' });
     }
 };
 
@@ -1152,20 +1769,20 @@ const queriesListJson = async (req, res) => {
 
 const createQuery = async (req, res) => {
     try {
-        const nextCode = await lookupTableService.getNextCode('tblqtype', {
-            startCode: '01',
-            padLength: 2
-        });
-
         const { QType } = req.body;
         if (!QType) return res.status(400).json({ error: 'Query Type is required' });
-
-        await lookupTableService.insertRow('tblqtype', { Code: nextCode, QType, CompanyID: 1 });
-        const newRow = await lookupTableService.getRowById('tblqtype', 'Code', nextCode);
-        res.json({ success: true, item: newRow });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'queries',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.CREATE,
+            payload: { QType },
+            reason: req.body.reason || `Proposed creation of query type ${QType}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Query-type proposal saved. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to create query' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to create query-type proposal' });
     }
 };
 
@@ -1173,23 +1790,36 @@ const updateQuery = async (req, res) => {
     const { code } = req.params;
     const { QType } = req.body;
     try {
-        await lookupTableService.updateRow('tblqtype', 'Code', code, { QType });
-        const updatedRow = await lookupTableService.getRowById('tblqtype', 'Code', code);
-        res.json({ success: true, item: updatedRow });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'queries',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.UPDATE,
+            payload: { Code: code, QType },
+            reason: req.body.reason || `Proposed update to query type ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Query-type update proposed successfully. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to update query' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to update query-type proposal' });
     }
 };
 
 const deleteQuery = async (req, res) => {
     const { code } = req.params;
     try {
-        await lookupTableService.deleteRow('tblqtype', 'Code', code);
-        res.json({ success: true });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'queries',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.DELETE,
+            payload: { Code: code },
+            reason: req.body.reason || `Proposed deletion of query type ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Query-type deletion proposal saved. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to delete query' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to propose query-type deletion' });
     }
 };
 
@@ -1218,20 +1848,20 @@ const disciplineOutcomesListJson = async (req, res) => {
 
 const createDisciplineOutcome = async (req, res) => {
     try {
-        const nextCode = await lookupTableService.getNextCode('tblmreaction', {
-            startCode: '01',
-            padLength: 2
-        });
-
         const { Reaction } = req.body;
         if (!Reaction) return res.status(400).json({ error: 'Reaction is required' });
-
-        await lookupTableService.insertRow('tblmreaction', { Code: nextCode, Reaction, CompanyID: 1 });
-        const newRow = await lookupTableService.getRowById('tblmreaction', 'Code', nextCode);
-        res.json({ success: true, item: newRow });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'discipline-outcomes',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.CREATE,
+            payload: { Reaction },
+            reason: req.body.reason || `Proposed creation of discipline outcome ${Reaction}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Discipline outcome proposal saved. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to create discipline outcome' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to create discipline outcome proposal' });
     }
 };
 
@@ -1239,23 +1869,36 @@ const updateDisciplineOutcome = async (req, res) => {
     const { code } = req.params;
     const { Reaction } = req.body;
     try {
-        await lookupTableService.updateRow('tblmreaction', 'Code', code, { Reaction });
-        const updatedRow = await lookupTableService.getRowById('tblmreaction', 'Code', code);
-        res.json({ success: true, item: updatedRow });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'discipline-outcomes',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.UPDATE,
+            payload: { Code: code, Reaction },
+            reason: req.body.reason || `Proposed update to discipline outcome ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Discipline outcome update proposed successfully. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to update discipline outcome' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to update discipline outcome proposal' });
     }
 };
 
 const deleteDisciplineOutcome = async (req, res) => {
     const { code } = req.params;
     try {
-        await lookupTableService.deleteRow('tblmreaction', 'Code', code);
-        res.json({ success: true });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'discipline-outcomes',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.DELETE,
+            payload: { Code: code },
+            reason: req.body.reason || `Proposed deletion of discipline outcome ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Discipline outcome deletion proposal saved. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to delete discipline outcome' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to propose discipline outcome deletion' });
     }
 };
 
@@ -1285,21 +1928,20 @@ const coursesListJson = async (req, res) => {
 
 const createCourse = async (req, res) => {
     try {
-        const nextCode = await lookupTableService.getNextCode('tblcoursetype', {
-            codeColumn: 'CourseCode',
-            startCode: '01',
-            padLength: 2
-        });
-
         const { CType } = req.body;
         if (!CType) return res.status(400).json({ error: 'Course Type is required' });
-
-        await lookupTableService.insertRow('tblcoursetype', { CourseCode: nextCode, CType, CompanyID: 1 });
-        const newRow = await lookupTableService.getRowById('tblcoursetype', 'CourseCode', nextCode);
-        res.json({ success: true, item: newRow });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'courses',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.CREATE,
+            payload: { CType },
+            reason: req.body.reason || `Proposed creation of course type ${CType}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Course-type proposal saved. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to create course' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to create course-type proposal' });
     }
 };
 
@@ -1307,23 +1949,36 @@ const updateCourse = async (req, res) => {
     const { code } = req.params;
     const { CType } = req.body;
     try {
-        await lookupTableService.updateRow('tblcoursetype', 'CourseCode', code, { CType });
-        const updatedRow = await lookupTableService.getRowById('tblcoursetype', 'CourseCode', code);
-        res.json({ success: true, item: updatedRow });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'courses',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.UPDATE,
+            payload: { CourseCode: code, CType },
+            reason: req.body.reason || `Proposed update to course type ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Course-type update proposed successfully. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to update course' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to update course-type proposal' });
     }
 };
 
 const deleteCourse = async (req, res) => {
     const { code } = req.params;
     try {
-        await lookupTableService.deleteRow('tblcoursetype', 'CourseCode', code);
-        res.json({ success: true });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'courses',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.DELETE,
+            payload: { CourseCode: code },
+            reason: req.body.reason || `Proposed deletion of course type ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Course-type deletion proposal saved. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to delete course' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to propose course-type deletion' });
     }
 };
 
@@ -1353,20 +2008,20 @@ const empStatusListJson = async (req, res) => {
 
 const createEmpStatus = async (req, res) => {
     try {
-        const nextCode = await lookupTableService.getNextCode('tblempstatus', {
-            startCode: '01',
-            padLength: 2
-        });
-
         const { EmpStatus } = req.body;
         if (!EmpStatus) return res.status(400).json({ error: 'Status is required' });
-
-        await lookupTableService.insertRow('tblempstatus', { Code: nextCode, EmpStatus, CompanyID: 1 });
-        const newRow = await lookupTableService.getRowById('tblempstatus', 'Code', nextCode);
-        res.json({ success: true, item: newRow });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'emp-status',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.CREATE,
+            payload: { EmpStatus },
+            reason: req.body.reason || `Proposed creation of employee status ${EmpStatus}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Employee-status proposal saved. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to create emp status' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to create employee-status proposal' });
     }
 };
 
@@ -1374,23 +2029,36 @@ const updateEmpStatus = async (req, res) => {
     const { code } = req.params;
     const { EmpStatus } = req.body;
     try {
-        await lookupTableService.updateRow('tblempstatus', 'Code', code, { EmpStatus });
-        const updatedRow = await lookupTableService.getRowById('tblempstatus', 'Code', code);
-        res.json({ success: true, item: updatedRow });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'emp-status',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.UPDATE,
+            payload: { Code: code, EmpStatus },
+            reason: req.body.reason || `Proposed update to employee status ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Employee-status update proposed successfully. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to update emp status' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to update employee-status proposal' });
     }
 };
 
 const deleteEmpStatus = async (req, res) => {
     const { code } = req.params;
     try {
-        await lookupTableService.deleteRow('tblempstatus', 'Code', code);
-        res.json({ success: true });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'emp-status',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.DELETE,
+            payload: { Code: code },
+            reason: req.body.reason || `Proposed deletion of employee status ${code}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Employee-status deletion proposal saved. The live setup remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to delete emp status' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to propose employee-status deletion' });
     }
 };
 
@@ -1420,111 +2088,18 @@ const getEOSBenefit = async (req, res) => {
 
 const saveEOSBenefit = async (req, res) => {
     try {
-        const {
-            EOSDate,
-            Y1, D1, R1,
-            Y2, D2, R2,
-            Y3, D3, R3,
-            Y4, D4, R4,
-            Y5, D5, R5,
-            E1, E2, B1,
-            E3, E4, B2,
-            MinAge,
-            Exemption, EOSTax,
-            LS1, L1Percent, L1_USD,
-            LS2, L2ercent, L2_USD,
-            LS3, L3Percent, L3_USD
-        } = req.body;
-
-        // Check if record exists
-        const [existing] = await pool.query('SELECT * FROM tbleoscalc LIMIT 1');
-
-        if (existing.length > 0) {
-            // Update logic
-            let whereClause = '';
-            let whereParams = [];
-            
-            if (existing[0].BankID) {
-                whereClause = ' WHERE BankID = ?';
-                whereParams = [existing[0].BankID];
-            } else if (existing[0].CompanyID) {
-                whereClause = ' WHERE CompanyID = ?';
-                whereParams = [existing[0].CompanyID];
-            }
-            
-            const sql = `UPDATE tbleoscalc SET 
-                EOSDate = ?, 
-                Y1 = ?, D1 = ?, R1 = ?,
-                Y2 = ?, D2 = ?, R2 = ?,
-                Y3 = ?, D3 = ?, R3 = ?,
-                Y4 = ?, D4 = ?, R4 = ?,
-                Y5 = ?, D5 = ?, R5 = ?,
-                E1 = ?, E2 = ?, B1 = ?,
-                E3 = ?, E4 = ?, B2 = ?,
-                MinAge = ?,
-                Exemption = ?, EOSTax = ?,
-                LS1 = ?, L1Percent = ?, L1_USD = ?,
-                LS2 = ?, L2ercent = ?, L2_USD = ?,
-                LS3 = ?, L3Percent = ?, L3_USD = ?` + whereClause;
-                
-            await pool.query(sql, [
-                EOSDate,
-                Y1, D1, R1,
-                Y2, D2, R2,
-                Y3, D3, R3,
-                Y4, D4, R4,
-                Y5, D5, R5,
-                E1, E2, B1,
-                E3, E4, B2,
-                MinAge,
-                Exemption, EOSTax,
-                LS1, L1Percent, L1_USD,
-                LS2, L2ercent, L2_USD,
-                LS3, L3Percent, L3_USD,
-                ...whereParams
-            ]);
-            
-            res.json({ success: true, message: 'Updated successfully' });
-        } else {
-            // Insert logic
-            const sql = `INSERT INTO tbleoscalc (
-                BankID, EOSDate, 
-                Y1, D1, R1,
-                Y2, D2, R2,
-                Y3, D3, R3,
-                Y4, D4, R4,
-                Y5, D5, R5,
-                E1, E2, B1,
-                E3, E4, B2,
-                MinAge,
-                Exemption, EOSTax,
-                LS1, L1Percent, L1_USD,
-                LS2, L2ercent, L2_USD,
-                LS3, L3Percent, L3_USD,
-                CompanyID
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-            
-            await pool.query(sql, [
-                '0001', EOSDate,
-                Y1, D1, R1,
-                Y2, D2, R2,
-                Y3, D3, R3,
-                Y4, D4, R4,
-                Y5, D5, R5,
-                E1, E2, B1,
-                E3, E4, B2,
-                MinAge,
-                Exemption, EOSTax,
-                LS1, L1Percent, L1_USD,
-                LS2, L2ercent, L2_USD,
-                LS3, L3Percent, L3_USD,
-                1
-            ]);
-            res.json({ success: true, message: 'Created successfully' });
-        }
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'end-of-service-benefit',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.UPDATE,
+            payload: req.body,
+            reason: req.body.reason || 'Proposed update to End of Service benefit parameters.',
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'End of Service benefit proposal saved. The live calculation parameters remain unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to save EOS data' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to save EOS parameter proposal' });
     }
 };
 
@@ -1554,79 +2129,18 @@ const getGlobalParams = async (req, res) => {
 
 const saveGlobalParams = async (req, res) => {
     try {
-        const {
-            SeqNo, RegNo,
-            NDate, NRate, NORate,
-            GDate, GRate, GORate,
-            RetireAge, ConfirmDays, ChildAge,
-            EmpAge, Management, UnionDues,
-            Max_Dependants, RetireNotice, AdvanceInt,
-            QueryLimit, ClockIn, LoanDuration,
-            HOD, Dept, DeptName,
-            VPolicy
-        } = req.body;
-
-        const [existing] = await pool.query('SELECT * FROM tblparams1 LIMIT 1');
-        
-        if (existing.length > 0) {
-            // Update
-            const sql = `UPDATE tblparams1 SET 
-                SeqNo=?, RegNo=?, 
-                NDate=?, NRate=?, NORate=?, 
-                GDate=?, GRate=?, GORate=?, 
-                RetireAge=?, ConfirmDays=?, ChildAge=?, 
-                EmpAge=?, Management=?, UnionDues=?, 
-                Max_Dependants=?, RetireNotice=?, AdvanceInt=?, 
-                QueryLimit=?, ClockIn=?, 
-                HOD=?, Dept=?, DeptName=?, 
-                VPolicy=?`;
-                
-            const params = [
-                SeqNo, RegNo,
-                NDate, NRate, NORate,
-                GDate, GRate, GORate,
-                RetireAge, ConfirmDays, ChildAge,
-                EmpAge, Management, UnionDues,
-                Max_Dependants, RetireNotice, AdvanceInt,
-                QueryLimit, ClockIn,
-                HOD, Dept, DeptName,
-                VPolicy
-            ];
-            
-            await pool.query(sql, params);
-            res.json({ success: true, message: 'Updated successfully' });
-        } else {
-            // Insert
-            const sql = `INSERT INTO tblparams1 (
-                SeqNo, RegNo, 
-                NDate, NRate, NORate, 
-                GDate, GRate, GORate, 
-                RetireAge, ConfirmDays, ChildAge, 
-                EmpAge, Management, UnionDues, 
-                Max_Dependants, RetireNotice, AdvanceInt, 
-                QueryLimit, ClockIn, 
-                HOD, Dept, DeptName, 
-                VPolicy, CompanyID
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-            
-            const params = [
-                SeqNo, RegNo,
-                NDate, NRate, NORate,
-                GDate, GRate, GORate,
-                RetireAge, ConfirmDays, ChildAge,
-                EmpAge, Management, UnionDues,
-                Max_Dependants, RetireNotice, AdvanceInt,
-                QueryLimit, ClockIn,
-                HOD, Dept, DeptName,
-                VPolicy, 1
-            ];
-            
-            await pool.query(sql, params);
-            res.json({ success: true, message: 'Created successfully' });
-        }
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'global-params',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.UPDATE,
+            payload: req.body,
+            reason: req.body.reason || 'Proposed update to global payroll parameters.',
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Global parameter proposal saved. The live system parameters remain unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to save Global Params' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to save global-parameter proposal' });
     }
 };
 
@@ -1656,35 +2170,18 @@ const getWorkDays = async (req, res) => {
 
 const saveWorkDays = async (req, res) => {
     try {
-        const days = req.body; // Expecting an array of objects
-        
-        // We'll use a transaction to ensure all updates succeed or fail together
-        const connection = await pool.getConnection();
-        await connection.beginTransaction();
-
-        try {
-            for (const day of days) {
-                const { DayNo, WDayNo, WorkDay } = day;
-                // WorkDay should be -1 for true, 0 for false based on schema observation
-                // But let's trust what the frontend sends if we normalize it there.
-                // Or normalize here.
-                
-                await connection.query(
-                    'UPDATE tblweek SET WDayNo = ?, WorkDay = ? WHERE DayNo = ?',
-                    [WDayNo, WorkDay, DayNo]
-                );
-            }
-            await connection.commit();
-            res.json({ success: true, message: 'Work days updated successfully' });
-        } catch (error) {
-            await connection.rollback();
-            throw error;
-        } finally {
-            connection.release();
-        }
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'work-days',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.UPDATE,
+            payload: req.body,
+            reason: req.body.reason || 'Proposed update to work-day configuration.',
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Work-day proposal saved. The live work schedule remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to save Work Days' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to save work-day proposal' });
     }
 };
 
@@ -1720,17 +2217,18 @@ const savePublicHoliday = async (req, res) => {
     }
 
     try {
-        const sql = `INSERT INTO tblpublic_holidays (Pub_Date, Pub_Year, Pub_Name, HDate, Approved, CompanyID, DateKeyedIn) VALUES (?, ?, ?, ?, ?, ?, NOW())`;
-        await pool.query(sql, [Pub_Date || null, Pub_Year, Pub_Name, HDate, Approved || 0, 1]);
-        
-        const [rows] = await pool.query('SELECT * FROM tblpublic_holidays WHERE Pub_Year = ? AND Pub_Name = ?', [Pub_Year, Pub_Name]);
-        res.json({ success: true, item: rows[0] });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'public-holidays',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.CREATE,
+            payload: { Pub_Date, Pub_Year, Pub_Name, HDate, Approved: Approved || 0 },
+            reason: req.body.reason || `Proposed creation of public holiday ${Pub_Name} (${Pub_Year}).`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Public holiday proposal saved. The live holiday calendar remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        if (err.code === 'ER_DUP_ENTRY') {
-            return res.status(400).json({ error: 'Holiday with this Year and Name already exists' });
-        }
-        res.status(500).json({ error: 'Failed to create public holiday' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to create public holiday proposal' });
     }
 };
 
@@ -1739,41 +2237,36 @@ const updatePublicHoliday = async (req, res) => {
     const { Pub_Date, Pub_Year, Pub_Name, HDate, Approved } = req.body;
     
     try {
-        const fields = [];
-        const values = [];
-        
-        if (Pub_Date !== undefined) { fields.push('Pub_Date = ?'); values.push(Pub_Date || null); }
-        if (Pub_Year !== undefined) { fields.push('Pub_Year = ?'); values.push(Pub_Year); }
-        if (Pub_Name !== undefined) { fields.push('Pub_Name = ?'); values.push(Pub_Name); }
-        if (HDate !== undefined) { fields.push('HDate = ?'); values.push(HDate); }
-        if (Approved !== undefined) { fields.push('Approved = ?'); values.push(Approved); }
-        
-        if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
-        
-        const sql = `UPDATE tblpublic_holidays SET ${fields.join(', ')} WHERE Pub_Year = ? AND Pub_Name = ?`;
-        values.push(year, name);
-        
-        await pool.query(sql, values);
-        
-        const newYear = Pub_Year !== undefined ? Pub_Year : year;
-        const newName = Pub_Name !== undefined ? Pub_Name : name;
-        
-        const [rows] = await pool.query('SELECT * FROM tblpublic_holidays WHERE Pub_Year = ? AND Pub_Name = ?', [newYear, newName]);
-        res.json({ success: true, item: rows[0] });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'public-holidays',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.UPDATE,
+            payload: { year, name, Pub_Date, Pub_Year, Pub_Name, HDate, Approved },
+            reason: req.body.reason || `Proposed update to public holiday ${name} (${year}).`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Public holiday update proposed successfully. The live holiday calendar remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to update public holiday' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to update public holiday proposal' });
     }
 };
 
 const deletePublicHoliday = async (req, res) => {
     const { year, name } = req.params;
     try {
-        await pool.query('DELETE FROM tblpublic_holidays WHERE Pub_Year = ? AND Pub_Name = ?', [year, name]);
-        res.json({ success: true });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'public-holidays',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.DELETE,
+            payload: { year, name },
+            reason: req.body.reason || `Proposed deletion of public holiday ${name} (${year}).`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Public holiday deletion proposal saved. The live holiday calendar remains unchanged until final approval.');
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to delete public holiday' });
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to propose public holiday deletion' });
     }
 };
 
@@ -1804,14 +2297,18 @@ const getSponsors = async (req, res) => {
 const addSponsor = async (req, res) => {
     const { SCode, Sponsor } = req.body;
     try {
-        await pool.query(
-            'INSERT INTO tblCourseSponsor (SCode, Sponsor, CompanyID) VALUES (?, ?, ?)',
-            [SCode, Sponsor, 1] // Assuming CompanyID 1 for now
-        );
-        res.status(201).json({ message: 'Sponsor added successfully' });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'sponsors',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.CREATE,
+            payload: { SCode, Sponsor },
+            reason: req.body.reason || `Proposed creation of sponsor ${Sponsor}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Sponsor proposal saved. The live sponsor list remains unchanged until final approval.');
     } catch (error) {
         console.error('Error adding sponsor:', error);
-        res.status(500).json({ message: 'Error adding sponsor' });
+        res.status(error.statusCode || 500).json({ message: error.message || 'Error adding sponsor proposal' });
     }
 };
 
@@ -1819,25 +2316,53 @@ const updateSponsor = async (req, res) => {
     const { SCode } = req.params;
     const { Sponsor } = req.body;
     try {
-        await pool.query(
-            'UPDATE tblCourseSponsor SET Sponsor = ? WHERE SCode = ?',
-            [Sponsor, SCode]
-        );
-        res.json({ message: 'Sponsor updated successfully' });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'sponsors',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.UPDATE,
+            payload: { SCode, Sponsor },
+            reason: req.body.reason || `Proposed update to sponsor ${SCode}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Sponsor update proposed successfully. The live sponsor list remains unchanged until final approval.');
     } catch (error) {
         console.error('Error updating sponsor:', error);
-        res.status(500).json({ message: 'Error updating sponsor' });
+        res.status(error.statusCode || 500).json({ message: error.message || 'Error updating sponsor proposal' });
     }
 };
 
 const deleteSponsor = async (req, res) => {
     const { SCode } = req.params;
     try {
-        await pool.query('DELETE FROM tblCourseSponsor WHERE SCode = ?', [SCode]);
-        res.json({ message: 'Sponsor deleted successfully' });
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'sponsors',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.DELETE,
+            payload: { SCode },
+            reason: req.body.reason || `Proposed deletion of sponsor ${SCode}.`,
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Sponsor deletion proposal saved. The live sponsor list remains unchanged until final approval.');
     } catch (error) {
         console.error('Error deleting sponsor:', error);
-        res.status(500).json({ message: 'Error deleting sponsor' });
+        res.status(error.statusCode || 500).json({ message: error.message || 'Error deleting sponsor proposal' });
+    }
+};
+
+const saveTaxTable = async (req, res) => {
+    try {
+        const detail = await parameterChangeService.createParameterChangeDraft({
+            companyId: getAdminCompanyId(req),
+            module: 'tax-table',
+            changeType: parameterChangeService.PARAMETER_CHANGE_TYPES.UPDATE,
+            payload: req.body,
+            reason: req.body.reason || 'Proposed update to tax parameters.',
+            user: getAdminActor(req)
+        });
+        respondWithProposal(res, detail, 'Tax-table proposal saved. The live tax setup remains unchanged until final approval.');
+    } catch (err) {
+        console.error(err);
+        res.status(err.statusCode || 500).json({ error: err.message || 'Failed to save tax-table proposal' });
     }
 };
 
@@ -1864,86 +2389,6 @@ const getTaxTable = async (req, res) => {
     }
 };
 
-const saveTaxTable = async (req, res) => {
-    const { 
-        TaxDate, 
-        R1, R1Tax, 
-        R2, R2Tax, 
-        R3, R3Tax, 
-        R4, R4Tax, 
-        R5, R5Tax, 
-        R6, R6Tax, 
-        R7, R7Tax, 
-        RentThreshold, AllwThreshold, Withholding_Tax 
-    } = req.body;
-
-    try {
-        // Check if record exists
-        const [rows] = await pool.query('SELECT * FROM tbltax WHERE CompanyID = 1');
-        
-        if (rows.length > 0) {
-            // Update
-            const sql = `UPDATE tbltax SET 
-                TaxDate = ?, 
-                R1 = ?, R1Tax = ?, 
-                R2 = ?, R2Tax = ?, 
-                R3 = ?, R3Tax = ?, 
-                R4 = ?, R4Tax = ?, 
-                R5 = ?, R5Tax = ?, 
-                R6 = ?, R6Tax = ?, 
-                R7 = ?, R7Tax = ?, 
-                RentThreshold = ?, AllwThreshold = ?, Withholding_Tax = ?
-                WHERE CompanyID = 1`;
-            
-            const values = [
-                TaxDate, 
-                R1, R1Tax, 
-                R2, R2Tax, 
-                R3, R3Tax, 
-                R4, R4Tax, 
-                R5, R5Tax, 
-                R6, R6Tax, 
-                R7, R7Tax, 
-                RentThreshold, AllwThreshold, Withholding_Tax
-            ];
-            
-            await pool.query(sql, values);
-        } else {
-            // Insert
-            const sql = `INSERT INTO tbltax (
-                TaxDate, 
-                R1, R1Tax, 
-                R2, R2Tax, 
-                R3, R3Tax, 
-                R4, R4Tax, 
-                R5, R5Tax, 
-                R6, R6Tax, 
-                R7, R7Tax, 
-                RentThreshold, AllwThreshold, Withholding_Tax, 
-                CompanyID
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`;
-            
-            const values = [
-                TaxDate, 
-                R1, R1Tax, 
-                R2, R2Tax, 
-                R3, R3Tax, 
-                R4, R4Tax, 
-                R5, R5Tax, 
-                R6, R6Tax, 
-                R7, R7Tax, 
-                RentThreshold, AllwThreshold, Withholding_Tax
-            ];
-            
-            await pool.query(sql, values);
-        }
-        
-        res.json({ success: true });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Failed to save tax table' });
-    }
-};
 
 const enquiryPage = async (req, res) => {
     try {
@@ -2194,7 +2639,13 @@ module.exports = {
   createAdmin,
   setPasswordPage,
   setPasswordSubmit,
-  resendLink,
+  resendAdminLink,
+  resendManagerLink,
+  resendDataEntryLink,
+  resendFinanceOfficerLink,
+  resendFinanceManagerLink,
+  resendAuditorLink,
+  resendEntityHeadLink,
   deleteAdmin,
   managersNewPage,
   createManager,
@@ -2203,14 +2654,35 @@ module.exports = {
   deleteManager,
   dataEntryListPage,
   dataEntryListJson,
+  financeOfficersListPage,
+  financeOfficersListJson,
+  financeManagersListPage,
+  financeManagersListJson,
   dataEntryNewPage,
+  financeOfficersNewPage,
+  financeManagersNewPage,
   createDataEntry,
+  createFinanceOfficer,
+  createFinanceManager,
   deleteDataEntry,
+  deleteFinanceOfficer,
+  deleteFinanceManager,
   auditorsListPage,
   auditorsListJson,
   auditorsNewPage,
   createAuditor,
   deleteAuditor,
+  entityHeadsListPage,
+  entityHeadsListJson,
+  entityHeadsNewPage,
+  createEntityHead,
+  deleteEntityHead,
+  payTypesPage,
+  payTypesListJson,
+  createPayType,
+  updatePayType,
+  deactivatePayType,
+  deletePayType,
   payrollItemsPage,
   payrollItemsListJson,
   createPayrollItem,

@@ -1,0 +1,97 @@
+CREATE TABLE IF NOT EXISTS payroll_reversal_requests (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    WorkflowBatchID BIGINT UNSIGNED NOT NULL,
+    GLPostingBatchID BIGINT UNSIGNED NULL,
+    CompanyID INT NOT NULL,
+    PMonth TINYINT NOT NULL,
+    PYear SMALLINT NOT NULL,
+    PType VARCHAR(10) NOT NULL,
+    Status VARCHAR(50) NOT NULL,
+    Reason TEXT NOT NULL,
+    RequestedBy INT NOT NULL,
+    RequestedAt DATETIME NOT NULL,
+    ManagerEndorsedBy INT NULL,
+    ManagerEndorsedAt DATETIME NULL,
+    ManagerComments TEXT NULL,
+    AuditorEndorsedBy INT NULL,
+    AuditorEndorsedAt DATETIME NULL,
+    AuditorComments TEXT NULL,
+    FinalApprovedBy INT NULL,
+    FinalApprovedAt DATETIME NULL,
+    EntityHeadComments TEXT NULL,
+    ExecutedBy INT NULL,
+    ExecutedAt DATETIME NULL,
+    ReversalBatchReference VARCHAR(100) NULL,
+    OriginalPayrollChecksum VARCHAR(128) NOT NULL,
+    OriginalPayrollSnapshot LONGTEXT NULL,
+    OriginalGLSnapshot LONGTEXT NULL,
+    CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UpdatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_payroll_reversal_requests_batch_status (WorkflowBatchID, Status),
+    KEY idx_payroll_reversal_requests_company_period (CompanyID, PYear, PMonth, PType),
+    KEY idx_payroll_reversal_requests_gl_batch (GLPostingBatchID),
+    KEY idx_payroll_reversal_requests_requested_at (RequestedAt)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS payroll_reversal_actions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    ReversalRequestID BIGINT UNSIGNED NOT NULL,
+    Action VARCHAR(50) NOT NULL,
+    FromStatus VARCHAR(50) NULL,
+    ToStatus VARCHAR(50) NOT NULL,
+    ActionBy INT NOT NULL,
+    ActionAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    Comments TEXT NULL,
+    Metadata LONGTEXT NULL,
+    Result VARCHAR(20) NOT NULL DEFAULT 'SUCCESS',
+    PRIMARY KEY (id),
+    KEY idx_payroll_reversal_actions_request (ReversalRequestID),
+    KEY idx_payroll_reversal_actions_action (Action, ActionAt)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS payroll_gl_reversal_batches (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    ReversalRequestID BIGINT UNSIGNED NOT NULL,
+    OriginalGLPostingBatchID BIGINT UNSIGNED NOT NULL,
+    CompanyID INT NOT NULL,
+    ActivityCode VARCHAR(10) NOT NULL,
+    PostingMonth SMALLINT NOT NULL,
+    PostingYear SMALLINT NOT NULL,
+    Status VARCHAR(20) NOT NULL DEFAULT 'reversed',
+    TotalLines INT NOT NULL DEFAULT 0,
+    TotalDebit DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+    TotalCredit DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+    ExecutedBy VARCHAR(100) NOT NULL,
+    ExecutedAt DATETIME NOT NULL,
+    Remarks VARCHAR(255) NULL,
+    CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UpdatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_payroll_gl_reversal_batches_request (ReversalRequestID),
+    KEY idx_payroll_gl_reversal_batches_original (OriginalGLPostingBatchID),
+    KEY idx_payroll_gl_reversal_batches_period (CompanyID, PostingYear, PostingMonth, ActivityCode)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS payroll_gl_reversal_lines (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    ReversalBatchID BIGINT UNSIGNED NOT NULL,
+    OriginalLineID BIGINT UNSIGNED NULL,
+    CompanyID INT NOT NULL,
+    ActivityCode VARCHAR(10) NOT NULL,
+    EmployeeID VARCHAR(20) NULL,
+    GLAccountCode VARCHAR(50) NOT NULL,
+    GLAccountName VARCHAR(255) NOT NULL,
+    DebitAmount DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+    CreditAmount DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+    Narration VARCHAR(255) NULL,
+    SourceTable VARCHAR(100) NULL,
+    SourceRecordID VARCHAR(100) NULL,
+    CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_payroll_gl_reversal_lines_batch (ReversalBatchID),
+    KEY idx_payroll_gl_reversal_lines_original (OriginalLineID)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE payroll_gl_posting_batches ENGINE=InnoDB;
+ALTER TABLE payroll_gl_posting_lines ENGINE=InnoDB;

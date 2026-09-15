@@ -11,119 +11,308 @@
           crossorigin="anonymous" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
           rel="stylesheet" />
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/main.min.css"
-          rel="stylesheet" />
     <link href="/css/styles.css" rel="stylesheet" />
 </head>
 <body>
-    <!-- Top Navbar -->
     <%- include('partials/topbar', { user }) %>
-
-    <!-- Sidebar -->
     <%- include('partials/sidebar') %>
 
-    <!-- Main content -->
     <main class="main">
         <div class="container-fluid">
-            <div class="d-flex align-items-center justify-content-between mb-4">
+            <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
                 <div>
-                    <h2 class="mb-0">Overview</h2>
-                    <div class="text-muted">Quick stats and recent activity</div>
+                    <h2 class="mb-1">Admin Overview</h2>
+                    <div class="text-muted">
+                        Configuration health, access management, and setup control for <%= company.Com_Name || 'your company' %>.
+                    </div>
+                </div>
+                <div class="text-muted small">
+                    This dashboard focuses on setup completeness and user administration rather than day-to-day HR transactions.
+                </div>
+            </div>
+
+            <% if (error) { %>
+                <div class="alert alert-danger shadow-sm"><%= error %></div>
+            <% } %>
+
+            <div class="row g-4 mb-4">
+                <div class="col-12 col-md-6 col-xxl-3">
+                    <a href="/notifications" class="card shadow-sm h-100 text-decoration-none text-reset">
+                        <div class="card-body">
+                            <div class="text-muted">Unread Notifications</div>
+                            <div class="fs-3 fw-semibold"><%= unreadNotifications %></div>
+                            <div class="small text-muted">Account and workflow visibility alerts</div>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-12 col-md-6 col-xxl-3">
+                    <a href="/admin/parameter-changes" class="card shadow-sm h-100 text-decoration-none text-reset">
+                        <div class="card-body">
+                            <div class="text-muted">Draft Parameter Changes</div>
+                            <div class="fs-3 fw-semibold"><%= parameterChangeCounts.DRAFT || 0 %></div>
+                            <div class="small text-muted"><%= parameterChangeCounts.SUBMITTED_TO_ENTITY_HEAD || 0 %> awaiting Entity Head/HNO approval</div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-12 col-md-6 col-xxl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted">Configured Departments</div>
+                            <div class="fs-3 fw-semibold"><%= metrics.totalConfiguredDepartments %></div>
+                            <div class="small text-muted"><%= metrics.activeDepartments %> currently have active staff</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6 col-xxl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted">Managed Portal Users</div>
+                            <div class="fs-3 fw-semibold"><%= metrics.totalUsers %></div>
+                            <div class="small text-muted"><%= metrics.pendingPasswordSetup %> pending password setup</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6 col-xxl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted">Configuration Completeness</div>
+                            <div class="fs-3 fw-semibold"><%= metrics.configurationCompleteness %>%</div>
+                            <div class="small text-muted">Across core admin setup areas</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6 col-xxl-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="text-muted">Configuration Warnings</div>
+                            <div class="fs-3 fw-semibold"><%= metrics.configurationWarnings %></div>
+                            <div class="small text-muted">Items needing admin attention</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-12 col-xl-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header">
+                            <span class="fw-semibold">System Alerts</span>
+                        </div>
+                        <div class="card-body">
+                            <% if (!alerts.length) { %>
+                                <div class="text-muted">No admin alerts right now.</div>
+                            <% } %>
+                            <% alerts.forEach((alert) => { %>
+                                <div class="alert alert-<%= alert.tone %> mb-3">
+                                    <div class="fw-semibold mb-1"><%= alert.title %></div>
+                                    <div class="small mb-2"><%= alert.message %></div>
+                                    <a href="<%= alert.route %>" class="small text-decoration-none">Open related page</a>
+                                </div>
+                            <% }) %>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-8">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="fw-semibold">Configuration Health</span>
+                            <a href="/admin/parameters/global-params" class="small text-decoration-none">Open parameters</a>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Setup Area</th>
+                                            <th class="text-end">Records</th>
+                                            <th>Status</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% configHealth.items.forEach((item) => { %>
+                                            <tr>
+                                                <td><%= item.label %></td>
+                                                <td class="text-end fw-semibold"><%= item.count %></td>
+                                                <td>
+                                                    <span class="badge text-bg-<%= item.count > 0 ? 'success' : 'warning' %>">
+                                                        <%= item.count > 0 ? 'Configured' : 'Needs Setup' %>
+                                                    </span>
+                                                </td>
+                                                <td class="text-end">
+                                                    <a href="<%= item.route %>" class="btn btn-sm btn-outline-primary">Open</a>
+                                                </td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-12 col-xl-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="fw-semibold">Managed Users By Role</span>
+                            <a href="/admin/admins" class="small text-decoration-none">Manage users</a>
+                        </div>
+                        <div class="card-body">
+                            <% if (!userAccess.roleCounts.length) { %>
+                                <div class="text-muted">No managed portal users found.</div>
+                            <% } %>
+                            <div class="list-group list-group-flush">
+                                <% userAccess.roleCounts.forEach((row) => { %>
+                                    <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                        <span><%= row.Level || 'Unspecified' %></span>
+                                        <span class="badge bg-primary-subtle text-primary-emphasis rounded-pill"><%= row.total %></span>
+                                    </div>
+                                <% }) %>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="fw-semibold">Recent Managed User Creation</span>
+                            <a href="/admin/managers" class="small text-decoration-none">View user lists</a>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>User</th>
+                                            <th>Role</th>
+                                            <th>Email</th>
+                                            <th>Created</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% if (!userAccess.recentUsers.length) { %>
+                                            <tr>
+                                                <td colspan="4" class="text-center text-muted py-4">No managed users have been created yet.</td>
+                                            </tr>
+                                        <% } %>
+                                        <% userAccess.recentUsers.forEach((row) => { %>
+                                            <tr>
+                                                <td>
+                                                    <div class="fw-semibold"><%= row.FullName || row.Username %></div>
+                                                    <div class="small text-muted"><%= row.Username %></div>
+                                                </td>
+                                                <td><%= row.Level || 'N/A' %></td>
+                                                <td><%= row.Email || 'No email' %></td>
+                                                <td><%= row.DateCreated ? new Date(row.DateCreated).toLocaleDateString('en-GB') : 'N/A' %></td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-12 col-xl-7">
+                    <div class="card shadow-sm">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="fw-semibold">Employees By Department</span>
+                            <span class="text-muted small">Current active headcount</span>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="barChart" height="170"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-5">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="fw-semibold">Pending Password Setup</span>
+                            <a href="/admin/admins" class="small text-decoration-none">Resend links</a>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>User</th>
+                                            <th>Role</th>
+                                            <th>Created</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% if (!userAccess.pendingPasswordRows.length) { %>
+                                            <tr>
+                                                <td colspan="3" class="text-center text-muted py-4">All managed portal users have password hashes set.</td>
+                                            </tr>
+                                        <% } %>
+                                        <% userAccess.pendingPasswordRows.forEach((row) => { %>
+                                            <tr>
+                                                <td>
+                                                    <div class="fw-semibold"><%= row.FullName || row.Username %></div>
+                                                    <div class="small text-muted"><%= row.Email || 'No email' %></div>
+                                                </td>
+                                                <td><%= row.Level || 'N/A' %></td>
+                                                <td><%= row.DateCreated ? new Date(row.DateCreated).toLocaleDateString('en-GB') : 'N/A' %></td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <div class="row g-4">
-                <div class="col-12 col-md-6 col-xxl-3">
-                    <div class="card shadow-sm">
-                        <div class="card-body">
-                            <div class="d-flex align-items-center justify-content-between">
-                                <div>
-                                    <div class="text-muted">Employees</div>
-                                    <div class="fs-4 fw-semibold">128</div>
-                                </div>
-                                <i class="bi bi-people fs-2 text-primary"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12 col-md-6 col-xxl-3">
-                    <div class="card shadow-sm">
-                        <div class="card-body">
-                            <div class="d-flex align-items-center justify-content-between">
-                                <div>
-                                    <div class="text-muted">Monthly Payroll</div>
-                                    <div class="fs-4 fw-semibold">$84,250</div>
-                                </div>
-                                <i class="bi bi-cash-coin fs-2 text-success"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12 col-md-6 col-xxl-3">
-                    <div class="card shadow-sm">
-                        <div class="card-body">
-                            <div class="d-flex align-items-center justify-content-between">
-                                <div>
-                                    <div class="text-muted">Pending Approvals</div>
-                                    <div class="fs-4 fw-semibold">12</div>
-                                </div>
-                                <i class="bi bi-check2-square fs-2 text-warning"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12 col-md-6 col-xxl-3">
-                    <div class="card shadow-sm">
-                        <div class="card-body">
-                            <div class="d-flex align-items-center justify-content-between">
-                                <div>
-                                    <div class="text-muted">Staff to Retire</div>
-                                    <div class="fs-4 fw-semibold">3</div>
-                                </div>
-                                <i class="bi bi-hourglass-split fs-2 text-danger"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="row g-4 mt-1">
                 <div class="col-12">
                     <div class="card shadow-sm">
                         <div class="card-header d-flex justify-content-between align-items-center">
-                            <span class="fw-semibold">Payroll Trend</span>
-                            <span class="text-muted small">Last 6 months</span>
+                            <span class="fw-semibold">Recent Admin Changes</span>
+                            <a href="/admin/company-info" class="small text-decoration-none">Open admin area</a>
                         </div>
-                        <div class="card-body">
-                            <canvas id="lineChart" height="120"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="row g-4 mt-1">
-                <div class="col-12">
-                    <div class="card shadow-sm">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <span class="fw-semibold">Employees by Department (Bar)</span>
-                            <span class="text-muted small">Total headcount</span>
-                        </div>
-                        <div class="card-body">
-                            <canvas id="barChart" height="160"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="row g-4 mt-1">
-                <div class="col-12">
-                    <div class="card shadow-sm">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <span class="fw-semibold">Company Calendar</span>
-                            <span class="text-muted small">Leaves, retirements, meetings, holidays</span>
-                        </div>
-                        <div class="card-body">
-                            <div id="calendar"></div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>User</th>
+                                            <th>Form</th>
+                                            <th>Action</th>
+                                            <th>Field</th>
+                                            <th>Record</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% if (!recentAdminChanges.length) { %>
+                                            <tr>
+                                                <td colspan="6" class="text-center text-muted py-4">No recent admin-side changes found in the audit trail.</td>
+                                            </tr>
+                                        <% } %>
+                                        <% recentAdminChanges.forEach((entry) => { %>
+                                            <tr>
+                                                <td><%= entry.ChangeDate ? new Date(entry.ChangeDate).toLocaleString() : '' %></td>
+                                                <td><%= entry.UserName || 'System' %></td>
+                                                <td><%= entry.FormName || '-' %></td>
+                                                <td><span class="badge text-bg-light"><%= entry.Action || '-' %></span></td>
+                                                <td><%= entry.FieldName || '-' %></td>
+                                                <td><%= entry.RecordID || '-' %></td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -142,7 +331,6 @@
     </script>
     <script src="/vendor/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
     <script src="/js/dashboard.js"></script>
 </body>
 </html>

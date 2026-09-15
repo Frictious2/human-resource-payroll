@@ -127,7 +127,7 @@ async function getSupportedActivities(companyId) {
     return rows;
 }
 
-async function findExistingBatch(connection, { companyId, activityCode, postingMonth, postingYear }) {
+async function findExistingBatch(connection, { companyId, activityCode, postingMonth, postingYear, generationNo = 1 }) {
     const [rows] = await connection.query(
         `SELECT id, status
          FROM payroll_gl_posting_batches
@@ -135,8 +135,9 @@ async function findExistingBatch(connection, { companyId, activityCode, postingM
            AND activity_code = ?
            AND posting_month = ?
            AND posting_year = ?
+           AND generation_no = ?
          LIMIT 1`,
-        [companyId, activityCode, postingMonth, postingYear]
+        [companyId, activityCode, postingMonth, postingYear, generationNo]
     );
 
     return rows[0] || null;
@@ -217,14 +218,16 @@ async function getApprovedMonthlyPayrollRows(connection, { companyId, activityCo
 async function insertPostingBatch(connection, payload) {
     const [result] = await connection.query(
         `INSERT INTO payroll_gl_posting_batches
-        (company_id, activity_code, posting_date, posting_month, posting_year, status, total_lines, total_amount, posted_by, posted_at, remarks, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, NOW(), NOW())`,
+        (company_id, activity_code, posting_date, posting_month, posting_year, generation_no, workflow_batch_id, status, total_lines, total_amount, posted_by, posted_at, remarks, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, NOW(), NOW())`,
         [
             payload.companyId,
             payload.activityCode,
             formatSqlDate(payload.postingDate),
             payload.postingMonth,
             payload.postingYear,
+            Number(payload.generationNo || 1),
+            payload.workflowBatchId || null,
             payload.status,
             payload.totalLines,
             payload.totalAmount,
@@ -281,6 +284,31 @@ async function markPayrollRowsPosted(connection, { batchId, companyId, activityC
     return result.affectedRows || 0;
 }
 
+async function getPayrollPostingStatus(connection, { companyId, activityCode, postingMonth, postingYear }) {
+    const [rows] = await connection.query(
+        `
+            SELECT
+                COUNT(*) AS total_rows,
+                SUM(CASE WHEN COALESCE(posted_to_gl, 0) <> 0 THEN 1 ELSE 0 END) AS posted_rows,
+                MAX(gl_posted_batch_id) AS gl_posted_batch_id,
+                MAX(gl_posted_at) AS gl_posted_at
+            FROM tblpayroll
+            WHERE CompanyID = ?
+              AND PType = ?
+              AND PMonth = ?
+              AND PYear = ?
+        `,
+        [companyId, activityCode, postingMonth, postingYear]
+    );
+
+    return rows[0] || {
+        total_rows: 0,
+        posted_rows: 0,
+        gl_posted_batch_id: null,
+        gl_posted_at: null
+    };
+}
+
 async function insertAuditLog(connection, payload) {
     await connection.query(
         `INSERT INTO audit_logs
@@ -333,20 +361,33 @@ async function getPostingHistory({ companyId, activityCode, month, year, status,
 
     const [rows] = await pool.query(
         `SELECT
-            id,
-            activity_code,
-            posting_date,
-            posting_month,
-            posting_year,
-            total_lines,
-            total_amount,
-            status,
-            posted_by,
-            posted_at,
-            NULL AS source_record_count
+            payroll_gl_posting_batches.id,
+            payroll_gl_posting_batches.activity_code,
+            payroll_gl_posting_batches.posting_date,
+            payroll_gl_posting_batches.posting_month,
+            payroll_gl_posting_batches.posting_year,
+            payroll_gl_posting_batches.total_lines,
+            payroll_gl_posting_batches.total_amount,
+            payroll_gl_posting_batches.status,
+            payroll_gl_posting_batches.posted_by,
+            payroll_gl_posting_batches.posted_at,
+            NULL AS source_record_count,
+            wf.id AS workflow_batch_id,
+            wf.Status AS workflow_status,
+            wf.TotalStaff AS workflow_total_staff,
+            wf.TotalGross AS workflow_total_gross,
+            wf.TotalDeductions AS workflow_total_deductions,
+            wf.TotalNet AS workflow_total_net,
+            wf.FinalApprovedBy AS final_approved_by,
+            wf.FinalApprovedAt AS final_approved_at
          FROM payroll_gl_posting_batches
+         LEFT JOIN payroll_workflow_batches wf
+           ON wf.CompanyID = payroll_gl_posting_batches.company_id
+          AND wf.PType = payroll_gl_posting_batches.activity_code
+          AND wf.PMonth = payroll_gl_posting_batches.posting_month
+          AND wf.PYear = payroll_gl_posting_batches.posting_year
          WHERE ${whereClause}
-         ORDER BY posted_at DESC, id DESC
+         ORDER BY payroll_gl_posting_batches.posted_at DESC, payroll_gl_posting_batches.id DESC
          LIMIT ? OFFSET ?`,
         [...params, pageSize, offset]
     );
@@ -361,24 +402,40 @@ async function getPostingHistory({ companyId, activityCode, month, year, status,
     };
 }
 
-async function getPostingBatchDetail({ companyId, batchId }) {
-    const [batchRows] = await pool.query(
+async function getPostingBatchDetail({ companyId, batchId, connection = null }) {
+    const executor = connection || pool;
+    const [batchRows] = await executor.query(
         `SELECT
-            id,
-            company_id,
-            activity_code,
-            posting_date,
-            posting_month,
-            posting_year,
-            status,
-            total_lines,
-            total_amount,
+            payroll_gl_posting_batches.id,
+            payroll_gl_posting_batches.company_id,
+            payroll_gl_posting_batches.activity_code,
+            payroll_gl_posting_batches.posting_date,
+            payroll_gl_posting_batches.posting_month,
+            payroll_gl_posting_batches.posting_year,
+            payroll_gl_posting_batches.status,
+            payroll_gl_posting_batches.total_lines,
+            payroll_gl_posting_batches.total_amount,
             NULL AS source_record_count,
-            posted_by,
-            posted_at,
-            remarks
+            payroll_gl_posting_batches.posted_by,
+            payroll_gl_posting_batches.posted_at,
+            payroll_gl_posting_batches.remarks,
+            wf.id AS workflow_batch_id,
+            wf.Status AS workflow_status,
+            wf.TotalStaff AS workflow_total_staff,
+            wf.TotalGross AS workflow_total_gross,
+            wf.TotalDeductions AS workflow_total_deductions,
+            wf.TotalNet AS workflow_total_net,
+            wf.FinalApprovedBy AS final_approved_by,
+            wf.FinalApprovedAt AS final_approved_at,
+            wf.PostedToAccountsBy AS workflow_posted_by,
+            wf.PostedToAccountsAt AS workflow_posted_at
          FROM payroll_gl_posting_batches
-         WHERE company_id = ? AND id = ?
+         LEFT JOIN payroll_workflow_batches wf
+           ON wf.CompanyID = payroll_gl_posting_batches.company_id
+          AND wf.PType = payroll_gl_posting_batches.activity_code
+          AND wf.PMonth = payroll_gl_posting_batches.posting_month
+          AND wf.PYear = payroll_gl_posting_batches.posting_year
+         WHERE payroll_gl_posting_batches.company_id = ? AND payroll_gl_posting_batches.id = ?
          LIMIT 1`,
         [companyId, batchId]
     );
@@ -388,7 +445,7 @@ async function getPostingBatchDetail({ companyId, batchId }) {
         return null;
     }
 
-    const [lines] = await pool.query(
+    const [lines] = await executor.query(
         `SELECT
             id,
             batch_id,
@@ -429,6 +486,7 @@ module.exports = {
     getGlMappings,
     getPostingBatchDetail,
     getPostingHistory,
+    getPayrollPostingStatus,
     getSupportedActivities,
     insertAuditLog,
     insertPostingBatch,

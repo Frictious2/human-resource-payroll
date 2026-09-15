@@ -1,0 +1,38 @@
+{
+  "invalid_emp_status": [
+    {
+      "EmpStatus": "01",
+      "total": 133
+    },
+    {
+      "EmpStatus": "02",
+      "total": 6
+    }
+  ],
+  "payroll_without_rows": [
+    {
+      "total": 0
+    }
+  ],
+  "posted_without_gl_batch": [
+    {
+      "total": 0
+    }
+  ],
+  "reopen_without_reversed_source": [
+    {
+      "total": 0
+    }
+  ],
+  "reversal_without_source_batch": [
+    {
+      "total": 0
+    }
+  ],
+  "notifications_missing_users": [
+    {
+      "total": 0
+    }
+  ],
+  "duplicate_generation_keys": []
+}

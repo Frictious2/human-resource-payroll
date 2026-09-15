@@ -15,10 +15,16 @@
     <main class="main">
         <div class="container-fluid">
             <div class="d-flex align-items-center justify-content-between mb-4">
-                <h2 class="mb-0"><%= title %></h2>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#medicalModal">
-                    <i class="bi bi-plus-lg"></i> Add Medical
-                </button>
+                <div>
+                    <h2 class="mb-1"><%= title %></h2>
+                    <div class="text-muted">Medical recoveries stay out of payroll until final Entity Head/HNO approval.</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/data-entry/workflow/records?module=medical" class="btn btn-outline-secondary">Open Workflow Queue</a>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#medicalModal">
+                        <i class="bi bi-plus-lg"></i> Add Medical
+                    </button>
+                </div>
             </div>
 
             <!-- Search Section -->
@@ -59,12 +65,13 @@
                                     <th>Transaction</th>
                                     <th>Beneficiary</th>
                                     <th>Amount</th>
+                                    <th>Status</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody id="medicalTableBody">
                                 <tr>
-                                    <td colspan="7" class="text-center text-muted py-4">
+                                    <td colspan="8" class="text-center text-muted py-4">
                                         Enter Staff ID and click Load Data to view records
                                     </td>
                                 </tr>
@@ -228,9 +235,20 @@
                     medicalTableBody.innerHTML = '';
                     
                     if (data.records.length === 0) {
-                        medicalTableBody.innerHTML = '<tr><td colspan="7" class="text-center">No records found</td></tr>';
+                        medicalTableBody.innerHTML = '<tr><td colspan="8" class="text-center">No records found</td></tr>';
                     } else {
                         data.records.forEach(record => {
+                            const editableStatuses = ['DRAFT', 'RETURNED_BY_MANAGER', 'RETURNED_BY_ENTITY_HEAD', 'FINAL_REJECTED'];
+                            const status = record.WorkflowStatus || 'FINAL_APPROVED';
+                            const badgeClass = status === 'FINAL_APPROVED'
+                                ? 'bg-success'
+                                : status.includes('RETURNED')
+                                    ? 'bg-warning text-dark'
+                                    : status === 'SUBMITTED_TO_MANAGER' || status === 'SUBMITTED_TO_ENTITY_HEAD'
+                                        ? 'bg-info text-dark'
+                                        : status === 'FINAL_REJECTED'
+                                            ? 'bg-danger'
+                                            : 'bg-secondary';
                             const row = document.createElement('tr');
                             row.innerHTML = `
                                 <td>${record.EntryDate}</td>
@@ -239,13 +257,14 @@
                                 <td>${record.TransName || record.MCode || '-'}</td>
                                 <td>${record.Dependant}</td>
                                 <td>${parseFloat(record.Amount).toFixed(2)}</td>
+                                <td><span class="badge ${badgeClass}">${status}</span></td>
                                 <td>
                                     ${record.PicturePath ? `<a href="${record.PicturePath}" target="_blank" class="btn btn-sm btn-info me-1" title="View Proof"><i class="bi bi-file-earmark-image"></i></a>` : ''}
-                                    <button class="btn btn-sm btn-primary edit-btn" 
+                                    ${editableStatuses.includes(status) ? `<button class="btn btn-sm btn-primary edit-btn" 
                                         data-record='${JSON.stringify(record)}'
                                         data-staff-name="${data.staff.SName}">
                                         Edit
-                                    </button>
+                                    </button>` : `<span class="text-muted small">Read only</span>`}
                                 </td>
                             `;
                             medicalTableBody.appendChild(row);

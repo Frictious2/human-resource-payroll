@@ -1,4 +1,5 @@
 const authService = require('../services/authService');
+const { logSecurityEvent } = require('../services/securityEventService');
 
 function isJsonRequest(req) {
     const acceptHeader = req.get('accept') || '';
@@ -6,6 +7,7 @@ function isJsonRequest(req) {
 }
 
 function handleUnauthorized(req, res, message = 'Please sign in to continue.') {
+    logSecurityEvent('UNAUTHORIZED_ROUTE', req, { outcome: 'blocked', reason: 'authentication-required' });
     if (isJsonRequest(req)) {
         return res.status(401).json({
             success: false,
@@ -17,6 +19,7 @@ function handleUnauthorized(req, res, message = 'Please sign in to continue.') {
 }
 
 function handleForbidden(req, res, message = 'You are not authorized to access this page.') {
+    logSecurityEvent('FORBIDDEN_ROUTE', req, { outcome: 'blocked', reason: 'role-not-authorized' });
     if (isJsonRequest(req)) {
         return res.status(403).json({
             success: false,
@@ -24,12 +27,10 @@ function handleForbidden(req, res, message = 'You are not authorized to access t
         });
     }
 
-    return res.status(403).render('shared/coming-soon', {
-        role: req.user ? req.user.role : 'user',
+    return res.status(403).render('shared/error', {
         title: 'Access Denied',
-        group: 'Security',
-        user: req.user || { name: 'User' },
-        message
+        message,
+        backUrl: req.user ? '/dashboard' : '/login'
     });
 }
 

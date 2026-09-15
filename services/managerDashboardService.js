@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const staffStatusService = require('./staffStatusService');
 const payrollAuditService = require('./payrollAuditService');
+const managerPayrollWorkflowService = require('./managerPayrollWorkflowService');
 
 function resolveCompanyId(companyId) {
     return Number(companyId) || 1;
@@ -156,8 +157,20 @@ async function getPeopleSnapshot(companyId, retirementAge) {
         `
             SELECT COUNT(*) AS count
             FROM tblstaff s
+            LEFT JOIN (
+                SELECT
+                    f.PFNo,
+                    MAX(COALESCE(f.Reason, '')) AS FormerReason
+                FROM tblformer f
+                WHERE ${buildCompanyCondition('f', companyId)}
+                  AND COALESCE(f.Approved, 0) IN (-1, 1)
+                GROUP BY f.PFNo
+            ) former_status
+                ON former_status.PFNo = s.PFNo
             WHERE ${buildCompanyCondition('s', companyId)}
-              AND CAST(COALESCE(s.EmpStatus, '') AS CHAR) IN ('05', '5')
+              AND COALESCE(s.Redundant, 0) = 0
+              AND CAST(COALESCE(s.EmpStatus, '') AS CHAR) IN ('02', '2')
+              AND CAST(COALESCE(COALESCE(s.ReasonCode, former_status.FormerReason), '') AS CHAR) IN ('04', '05', '09')
         `,
         []
     );
@@ -166,8 +179,23 @@ async function getPeopleSnapshot(companyId, retirementAge) {
         `
             SELECT COUNT(*) AS count
             FROM tblstaff s
+            LEFT JOIN (
+                SELECT
+                    f.PFNo,
+                    MAX(COALESCE(f.Reason, '')) AS FormerReason
+                FROM tblformer f
+                WHERE ${buildCompanyCondition('f', companyId)}
+                  AND COALESCE(f.Approved, 0) IN (-1, 1)
+                GROUP BY f.PFNo
+            ) former_status
+                ON former_status.PFNo = s.PFNo
             WHERE ${buildCompanyCondition('s', companyId)}
+              AND COALESCE(s.Redundant, 0) = 0
               AND CAST(COALESCE(s.EmpStatus, '') AS CHAR) IN ('02', '2')
+              AND (
+                    COALESCE(COALESCE(s.ReasonCode, former_status.FormerReason), '') = ''
+                    OR CAST(COALESCE(COALESCE(s.ReasonCode, former_status.FormerReason), '') AS CHAR) NOT IN ('04', '05', '09')
+              )
         `,
         []
     );
@@ -403,17 +431,27 @@ async function getPayrollOversight(companyId) {
         companyId
     });
 
+    const workflowWidgets = await managerPayrollWorkflowService.getManagerDashboardWidgets(companyId);
+
     return {
         cards: {
             unpostedPayrollPeriods: unpostedPeriods.length,
             pendingYearlyPayments: yearlyPending.length,
             pendingPostingBatches: pendingBatches.length,
-            payrollExceptions: payrollAudit.totals.suspiciousGroups
+            payrollExceptions: payrollAudit.totals.suspiciousGroups,
+            awaitingEndorsement: workflowWidgets.cards.awaitingEndorsement,
+            endorsedToAuditor: workflowWidgets.cards.endorsedToAuditor,
+            returnedToFinance: workflowWidgets.cards.returnedToFinance,
+            returnedByAuditor: workflowWidgets.cards.returnedByAuditor,
+            auditorEndorsed: workflowWidgets.cards.auditorEndorsed,
+            finalApproved: workflowWidgets.cards.finalApproved,
+            finalRejected: workflowWidgets.cards.finalRejected
         },
         unpostedPeriods,
         yearlyPending,
         pendingBatches,
-        payrollAudit
+        payrollAudit,
+        recentWorkflowActions: workflowWidgets.recentActions
     };
 }
 
@@ -510,6 +548,15 @@ async function getAlerts(companyId, approvalQueue, peopleSnapshot, payrollOversi
             title: 'Exit approvals waiting',
             message: `${peopleSnapshot.cards.pendingExits} exit / former record(s) are still pending approval.`,
             route: '/manager/approve/exit'
+        });
+    }
+
+    if (payrollOversight.cards.awaitingEndorsement > 0) {
+        alerts.push({
+            tone: 'info',
+            title: 'Payroll awaiting Manager endorsement',
+            message: `${payrollOversight.cards.awaitingEndorsement} payroll batch(es) are waiting for Manager review.`,
+            route: '/manager/payroll/endorsement'
         });
     }
 

@@ -11,9 +11,80 @@ const enquiryReportsService = require('../services/enquiryReportsService');
 const journalReportService = require('../services/journalReportService');
 const staffStatusService = require('../services/staffStatusService');
 const dataEntryDashboardService = require('../services/dataEntryDashboardService');
+const recordWorkflowService = require('../services/recordWorkflowService');
+const workflowNotificationService = require('../services/workflowNotificationService');
+const workQueueService = require('../services/workQueueService');
+const { getWorkspaceContext } = require('../utils/workspaceContext');
 
 function roundCurrency(value) {
     return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function getViewUser(req, fallbackName = 'Data Entry Clerk') {
+    return req.session?.user || req.user || { name: fallbackName };
+}
+
+function getCompanyId(req) {
+    return req.user?.companyId
+        || req.user?.company_id
+        || req.session?.companyId
+        || req.session?.CompanyID
+        || 1;
+}
+
+function toWorkflowDateTime(value) {
+    if (!value) {
+        return '';
+    }
+
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return String(value).trim();
+    }
+
+    return date.toISOString();
+}
+
+function buildWorkflowReference(module, input) {
+    return recordWorkflowService.getModuleConfig(module).buildReferenceFromInput(input);
+}
+
+async function syncDraftWorkflowRecord(req, module, recordReference, record, previousReference = null, connection = null) {
+    return recordWorkflowService.ensureDraftItemForExistingRecord({
+        companyId: getCompanyId(req),
+        module,
+        recordReference,
+        record,
+        previousReference,
+        user: getViewUser(req),
+        connection
+    });
+}
+
+function getPayrollWorkspace(req) {
+    const workspace = getWorkspaceContext(req, 'data-entry');
+    const routeBase = workspace.isFinance ? '/finance' : '/data-entry';
+
+    return {
+        ...workspace,
+        routeBase,
+        payrollYearlyPaymentsUrl: `${routeBase}/payroll/yearly-payments`,
+        payrollSpecialPaymentsUrl: `${routeBase}/payroll/special-payments`,
+        masterPaySheetUrl: `${routeBase}/payroll/master-pay-sheet`,
+        yearlyPaymentsReportUrl: `${routeBase}/reports/yearly-payments`,
+        payrollReportsUrl: `${routeBase}/reports/payroll`,
+        bonusAwardsApiBaseUrl: `${routeBase}/api/payroll/bonus-awards`
+    };
+}
+
+async function getRecordWorkflowDashboard(companyId) {
+    await recordWorkflowService.ensureWorkflowTables();
+    await recordWorkflowService.syncAllDraftModules(companyId);
+
+    return {
+        counts: await recordWorkflowService.getWorkflowCountsByStatus(companyId),
+        recent: (await recordWorkflowService.listWorkflowItems(companyId, {})).slice(0, 6)
+    };
 }
 
 const JOURNAL_DEBIT_MAPPING = {
@@ -244,15 +315,24 @@ const dataEntryController = {
                 || req.session?.companyId
                 || req.session?.CompanyID
                 || 1;
+            const user = req.session.user || { name: 'Data Entry Clerk', role: 'data-entry' };
 
-            const dashboardData = await dataEntryDashboardService.getDataEntryDashboardData({ companyId });
+            const [dashboardData, recordWorkflow, unreadNotifications, workQueueData] = await Promise.all([
+                dataEntryDashboardService.getDataEntryDashboardData({ companyId }),
+                getRecordWorkflowDashboard(companyId),
+                workflowNotificationService.getUnreadCount(user.id || 0, companyId),
+                workQueueService.getRoleWorkQueue({ companyId, user, filters: {} })
+            ]);
 
             res.render('data_entry/dashboard', {
                 title: 'Data Entry Dashboard',
                 path: '/data-entry/dashboard',
-                user: req.session.user || { name: 'Data Entry Clerk' },
+                user,
                 error: null,
-                ...dashboardData
+                ...dashboardData,
+                recordWorkflow,
+                unreadNotifications,
+                workQueueSummary: workQueueData.summary
             });
         } catch (error) {
             console.error('Data Entry dashboard error:', error);
@@ -282,7 +362,13 @@ const dataEntryController = {
                 watchlist: {
                     upcomingLeaveRows: [],
                     yearlyPeriods: []
-                }
+                },
+                recordWorkflow: {
+                    counts: {},
+                    recent: []
+                },
+                unreadNotifications: 0,
+                workQueueSummary: { totalActionable: 0, payroll: 0, records: 0, byStatus: {} }
             });
         }
     },
@@ -355,11 +441,11 @@ const dataEntryController = {
             if (!grade) return res.json([]);
             const [rows] = await pool.query('SELECT * FROM tblallowance WHERE Grade = ? ORDER BY ScaleDate DESC', [grade]);
             res.json(rows);
-        } catch (error) {
-            console.error(error);
-            res.status(500).json({ error: 'Server error' });
-        }
-    },
+         } catch (error) {
+              console.error(error);
+              res.status(error.statusCode || 500).json({ error: error.message || 'Server error' });
+          }
+     },
  
     getIncomeSetupRecord: async (req, res) => {
         try {
@@ -923,6 +1009,7 @@ const dataEntryController = {
     // Bonus Awards
     getPayrollBonus: async (req, res) => {
         try {
+            const workspace = getPayrollWorkspace(req);
             // Company info for header if needed
             const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
             const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
@@ -930,8 +1017,12 @@ const dataEntryController = {
             res.render('data_entry/payroll/bonus', {
                 title: 'Bonus Awards',
                 group: 'Payroll',
-                path: '/data-entry/payroll/bonus',
-                user: req.session.user || { name: 'Data Entry Clerk' },
+                path: workspace.payrollSpecialPaymentsUrl,
+                user: getViewUser(req, workspace.isFinance ? 'Finance Officer' : 'Data Entry Clerk'),
+                partialsBase: workspace.partialsBase,
+                dashboardPath: workspace.dashboardPath,
+                workspaceLabel: workspace.workspaceLabel,
+                bonusApiBaseUrl: workspace.bonusAwardsApiBaseUrl,
                 companyName
             });
         } catch (error) {
@@ -1579,14 +1670,90 @@ const dataEntryController = {
 
     getPayrollReports: async (req, res) => {
         try {
+            const workspace = getPayrollWorkspace(req);
             const [staffRows] = await pool.query(
                 staffStatusService.getActiveStaffQuery({ orderBy: 'PFNo' })
             );
+            if (workspace.isFinance) {
+                return res.render('finance/reports', {
+                    title: 'Payroll Reports',
+                    path: workspace.payrollReportsUrl,
+                    user: getViewUser(req, 'Finance Officer'),
+                    partialsBase: workspace.partialsBase,
+                    dashboardPath: workspace.dashboardPath,
+                    workspaceLabel: workspace.workspaceLabel,
+                    cards: [
+                        {
+                            title: 'Master Pay Sheet',
+                            description: 'Review processed payroll rows by month, activity, and department.',
+                            href: workspace.masterPaySheetUrl,
+                            icon: 'bi-table'
+                        },
+                        {
+                            title: 'Yearly Payments',
+                            description: 'Maintain yearly and special payment rows from the payroll workspace.',
+                            href: workspace.payrollYearlyPaymentsUrl,
+                            icon: 'bi-calendar3'
+                        },
+                        {
+                            title: 'Special Payments',
+                            description: 'Manage bonus awards and special payment setup using the existing payroll page.',
+                            href: workspace.payrollSpecialPaymentsUrl,
+                            icon: 'bi-gift'
+                        },
+                        {
+                            title: 'Yearly Payments Report',
+                            description: 'Preview and print yearly payment rows for finance review.',
+                            href: workspace.yearlyPaymentsReportUrl,
+                            icon: 'bi-file-earmark-bar-graph'
+                        },
+                        {
+                            title: 'Journal',
+                            description: 'Open the General Ledger journal preview using existing posting data.',
+                            href: `${workspace.routeBase}/reports/journal`,
+                            icon: 'bi-journal-text'
+                        },
+                        {
+                            title: 'End of Service',
+                            description: 'Review End of Service and Ex-Gratia benefit previews in read-only Finance mode.',
+                            href: `${workspace.routeBase}/reports/end-of-service`,
+                            icon: 'bi-award'
+                        },
+                        {
+                            title: 'Payslip',
+                            description: 'Generate payslips against the active payroll generation without changing payroll data.',
+                            href: `${workspace.routeBase}/reports/payslip`,
+                            icon: 'bi-receipt'
+                        },
+                        {
+                            title: 'NASSIT / Gratuity Statement',
+                            description: 'Review cumulative NASSIT and gratuity balances from approved payroll contributions.',
+                            href: `${workspace.routeBase}/reports/nassit-gratuity`,
+                            icon: 'bi-file-earmark-text'
+                        }
+                    ],
+                    quickLinks: [
+                        {
+                            label: 'Processing History',
+                            href: `${workspace.routeBase}/payroll/process-emoluments/history`
+                        },
+                        {
+                            label: 'GL Posting History',
+                            href: `${workspace.routeBase}/payroll/post-to-accounts/history`
+                        },
+                        {
+                            label: 'Post to Accounts',
+                            href: `${workspace.routeBase}/payroll/post-to-accounts`
+                        }
+                    ],
+                    staffList: staffRows
+                });
+            }
             res.render('data_entry/reports/payroll', {
                 title: 'Payroll Reports',
                 group: 'Reports',
-                path: '/data-entry/reports/payroll',
-                user: { name: 'Data Entry Clerk' },
+                path: workspace.payrollReportsUrl,
+                user: getViewUser(req, 'Data Entry Clerk'),
                 staffList: staffRows
             });
         } catch (error) {
@@ -1597,6 +1764,10 @@ const dataEntryController = {
 
     getPayrollYearlyPayments: async (req, res) => {
         try {
+            const workspace = getPayrollWorkspace(req);
+            if (!workspace.isFinance) {
+                return res.redirect(`/data-entry/reports/yearly-payments?error=${encodeURIComponent('Yearly payment batch preparation now belongs to Finance Officer. Data Entry has read-only report access here.')}`);
+            }
             const pageData = await payrollPagesService.getYearlyPaymentsPageData({
                 companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
                 filters: req.query
@@ -1605,8 +1776,13 @@ const dataEntryController = {
             res.render('data_entry/payroll/yearly_payments', {
                 title: 'Yearly Payments',
                 group: 'Payroll',
-                path: '/data-entry/payroll/yearly-payments',
-                user: req.session.user || { name: 'Data Entry Clerk' },
+                path: workspace.payrollYearlyPaymentsUrl,
+                user: getViewUser(req, workspace.isFinance ? 'Finance Officer' : 'Data Entry Clerk'),
+                partialsBase: workspace.partialsBase,
+                dashboardPath: workspace.dashboardPath,
+                workspaceLabel: workspace.workspaceLabel,
+                formAction: workspace.payrollYearlyPaymentsUrl,
+                listUrl: workspace.payrollYearlyPaymentsUrl,
                 company: pageData.company,
                 payTypes: pageData.payTypes,
                 staffList: pageData.staffList,
@@ -1623,9 +1799,13 @@ const dataEntryController = {
 
     postPayrollYearlyPayments: async (req, res) => {
         try {
+            const workspace = getPayrollWorkspace(req);
+            if (!workspace.isFinance) {
+                return res.redirect(`/data-entry/reports/yearly-payments?error=${encodeURIComponent('Yearly payment batch preparation now belongs to Finance Officer.')}`);
+            }
             await payrollPagesService.saveYearlyPayment({
                 companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
-                operatorName: req.session.user?.name || 'Data Entry Clerk',
+                operatorName: getViewUser(req, workspace.isFinance ? 'Finance Officer' : 'Data Entry Clerk').name,
                 pDate: req.body.pDate,
                 pfNo: req.body.pfNo,
                 payType: req.body.payType,
@@ -1639,10 +1819,11 @@ const dataEntryController = {
                 selected: req.body.selected === '1' || req.body.selected === 'on'
             });
 
-            res.redirect('/data-entry/payroll/yearly-payments?success=Yearly payment saved successfully.');
+            res.redirect(`${workspace.payrollYearlyPaymentsUrl}?success=${encodeURIComponent('Yearly payment saved successfully.')}`);
         } catch (error) {
             console.error(error);
-            res.redirect(`/data-entry/payroll/yearly-payments?error=${encodeURIComponent(error.message || 'Failed to save yearly payment.')}`);
+            const workspace = getPayrollWorkspace(req);
+            res.redirect(`${workspace.payrollYearlyPaymentsUrl}?error=${encodeURIComponent(error.message || 'Failed to save yearly payment.')}`);
         }
     },
 
@@ -1815,6 +1996,7 @@ const dataEntryController = {
 
     getReportsMasterPaySheet: async (req, res) => {
         try {
+            const workspace = getPayrollWorkspace(req);
             const pageData = await payrollPagesService.getMasterPaySheetData({
                 companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
                 filters: req.query
@@ -1823,8 +2005,12 @@ const dataEntryController = {
             res.render('data_entry/reports/master_pay_sheet', {
                 title: 'Master Pay Sheet',
                 group: 'Reports',
-                path: '/data-entry/reports/master-pay-sheet',
-                user: req.session.user || { name: 'Data Entry Clerk' },
+                path: workspace.masterPaySheetUrl,
+                user: getViewUser(req, workspace.isFinance ? 'Finance Officer' : 'Data Entry Clerk'),
+                partialsBase: workspace.partialsBase,
+                dashboardPath: workspace.dashboardPath,
+                workspaceLabel: workspace.workspaceLabel,
+                formAction: workspace.masterPaySheetUrl,
                 company: pageData.company,
                 payTypes: pageData.payTypes,
                 departments: pageData.departments,
@@ -2139,8 +2325,12 @@ const dataEntryController = {
     getPayslipData: async (req, res) => {
         try {
             const { month, year, scope, pfno, yearly } = req.query;
+            const companyId = req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1;
 
-            const [comRows] = await pool.query('SELECT Com_Name, Address, LogoPath FROM tblcominfo LIMIT 1');
+            const [comRows] = await pool.query(
+                'SELECT Com_Name, Address, LogoPath FROM tblcominfo WHERE (CompanyID = ? OR CompanyID IS NULL) ORDER BY CompanyID DESC LIMIT 1',
+                [companyId]
+            );
             const company = comRows[0] || { Com_Name: '', Address: '', LogoPath: null };
 
             let query = `
@@ -2155,10 +2345,10 @@ const dataEntryController = {
                 LEFT JOIN tblstaff s ON p.PFNo = s.PFNo
                 LEFT JOIN tbldept d ON s.CDept = d.Code
                 LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code
-                WHERE p.PMonth = ? AND p.PYear = ?
+                WHERE p.CompanyID = ? AND p.PMonth = ? AND p.PYear = ?
             `;
 
-            const params = [month, year];
+            const params = [companyId, month, year];
 
             if (scope === 'staff' && pfno) {
                 query += ' AND p.PFNo = ?';
@@ -2177,9 +2367,9 @@ const dataEntryController = {
                     SUM(GratEmp) AS TotGratEmp,
                     SUM(GratInst) AS TotGratInst
                 FROM tblpayroll
-                WHERE PYear = ? AND PMonth <= ?
+                WHERE CompanyID = ? AND PYear = ? AND PMonth <= ?
             `;
-            const cumParams = [year, month];
+            const cumParams = [companyId, year, month];
             if (scope === 'staff' && pfno) {
                 cumSql += ' AND PFNo = ?';
                 cumParams.push(pfno);
@@ -2209,8 +2399,8 @@ const dataEntryController = {
 
                 // Get yearly Tax values from tblyearlypayments for the selected year (any month)
                 const [taxRows] = await pool.query(
-                    "SELECT PFNo, PType, Tax FROM tblyearlypayments WHERE PYear = ? AND PType IN ('02','05','13') ORDER BY PMonth DESC, PDate DESC",
-                    [year]
+                    "SELECT PFNo, PType, Tax FROM tblyearlypayments WHERE CompanyID = ? AND PYear = ? AND PType IN ('02','05','13') ORDER BY PMonth DESC, PDate DESC",
+                    [companyId, year]
                 );
                 const taxMap = {};
                 taxRows.forEach(tr => {
@@ -2378,7 +2568,7 @@ const dataEntryController = {
             });
         } catch (err) {
             console.error(err);
-            res.status(500).send('Server Error');
+            res.status(err.statusCode || 500).send(err.message || 'Server Error');
         }
     },
 
@@ -2647,7 +2837,7 @@ const dataEntryController = {
             res.redirect('/data-entry/staff/new-edit?success=Record saved successfully and sent for approval');
         } catch (err) {
             console.error(err);
-            res.status(500).send('Server Error');
+            res.status(err.statusCode || 500).send(err.message || 'Server Error');
         }
     },
 
@@ -2774,18 +2964,17 @@ const dataEntryController = {
 
     getWelfareMedical: async (req, res) => {
         try {
-            // Fetch Transaction Labels from tblMCode
-            const [mCodes] = await pool.query("SELECT TCode, TransName FROM tblMCode ORDER BY TransName");
-            // Fetch Staff for dropdown
-            const [staffList] = await pool.query(staffStatusService.getActiveStaffQuery());
+            const pageData = await loansMedicalPagesService.getWelfareMedicalPageData({
+                companyId: getCompanyId(req)
+            });
             
             res.render('data_entry/welfare/medical', {
                 title: 'Medical Management',
                 group: 'Welfare',
                 path: '/data-entry/welfare/medical',
-                user: { name: 'Data Entry Clerk' },
-                mCodes,
-                staffList
+                user: getViewUser(req),
+                mCodes: pageData.mCodes,
+                staffList: pageData.staffList
             });
         } catch (error) {
             console.error(error);
@@ -2796,50 +2985,17 @@ const dataEntryController = {
     getStaffMedicalHistory: async (req, res) => {
         try {
             const { pfno } = req.params;
-            
-            // Get Staff Details & Grade Limit
-            const [staffRows] = await pool.query(`
-                SELECT s.PFNo, s.SName, g.Medical as MedicalLimit 
-                FROM tblstaff s 
-                LEFT JOIN tblgrade g ON s.CGrade = g.GradeCode 
-                WHERE s.PFNo = ?
-            `, [pfno]);
 
-            if (staffRows.length === 0) {
+            const result = await loansMedicalPagesService.getStaffMedicalHistoryData({
+                companyId: getCompanyId(req),
+                pfNo: pfno
+            });
+
+            if (!result) {
                 return res.status(404).json({ error: 'Staff not found' });
             }
-            const staff = staffRows[0];
-            const limit = parseFloat(staff.MedicalLimit) || 0;
 
-            // Get Medical Records
-            const query = `
-                SELECT 
-                    m.TransNo,
-                    DATE_FORMAT(m.EntryDate, '%Y-%m-%d') as EntryDate,
-                    m.PFNo,
-                    m.Dependant,
-                    m.MCode,
-                    mc.TransName,
-                    m.Amount,
-                    m.PicturePath
-                FROM tblmedical m
-                LEFT JOIN tblMCode mc ON m.MCode = mc.TCode
-                WHERE m.PFNo = ?
-                ORDER BY m.EntryDate DESC
-            `;
-            const [records] = await pool.query(query, [pfno]);
-
-            // Calculate Usage and Balance
-            const used = records.reduce((sum, record) => sum + (parseFloat(record.Amount) || 0), 0);
-            const balance = limit - used;
-
-            res.json({
-                staff,
-                records,
-                balance,
-                limit,
-                used
-            });
+            res.json(result);
         } catch (error) {
             console.error(error);
             res.status(500).json({ error: 'Server Error' });
@@ -2960,83 +3116,40 @@ const dataEntryController = {
 
     addMedicalRecord: async (req, res) => {
         try {
-            const { entryDate, pfno, mCode, beneficiary, dependant, amount } = req.body;
-            const operator = (req.session && req.session.user && req.session.user.name) ? req.session.user.name : 'Data Entry Officer';
-            
-            // Get Picture Path
             const picturePath = req.file ? '/uploads/medical_receipts/' + req.file.filename : null;
-
-            // Generate TransNo
-            const [maxRows] = await pool.query('SELECT MAX(TransNo) as maxId FROM tblmedical');
-            const transNo = (maxRows[0].maxId || 0) + 1;
-
-            const depName = (beneficiary === 'Family') ? dependant : 'Self';
-            
-            await pool.query(
-                'INSERT INTO tblmedical (TransNo, EntryDate, PFNo, Dependant, MCode, Amount, PicturePath, TimeKeyed, CompanyID) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?)',
-                [transNo, entryDate, pfno, depName, mCode, parseFloat(amount) || 0, picturePath, 1] // Assuming CompanyID 1
-            );
+            await loansMedicalPagesService.saveMedicalDraft({
+                companyId: getCompanyId(req),
+                user: getViewUser(req),
+                payload: {
+                    ...req.body,
+                    dependant: req.body.beneficiary === 'Family' ? req.body.dependant : 'Self',
+                    picturePath
+                }
+            });
 
             res.json({ success: true, message: 'Medical record added successfully' });
         } catch (error) {
             console.error(error);
-            res.status(500).json({ error: 'Server Error' });
+            res.status(error.statusCode || 500).json({ error: error.message || 'Server Error' });
         }
     },
 
     getWelfareLoan: async (req, res) => {
         try {
-            // Fetch Staff for dropdown
-            const [staffList] = await pool.query(
-                staffStatusService.getActiveStaffQuery({ fields: 'PFNo, SName, AccountNo' })
-            );
-            
-            // Fetch Loan Transaction Types
-            const [loanCodes] = await pool.query('SELECT TCode, TransName FROM tblloancode ORDER BY TransName');
-
-            // Fetch Existing Loans for Application Table
-            const [applications] = await pool.query(`
-                SELECT 
-                    l.TransNo,
-                    l.EntryDate,
-                    l.PFNo,
-                    s.SName,
-                    l.Amount,
-                    l.Interest
-                FROM tblloan l
-                LEFT JOIN tblstaff s ON l.PFNo = s.PFNo
-                ORDER BY l.EntryDate DESC
-            `);
-
-            // Fetch Repayment Data (Loans with balance > 0 or recently active)
-            const [repayments] = await pool.query(`
-                SELECT 
-                    l.TransNo,
-                    l.PFNo,
-                    s.SName,
-                    l.Amount,
-                    l.EntryDate as LoanDate,
-                    l.Duration,
-                    l.RepaidAmount,
-                    l.LoanBal,
-                    l.StartDate,
-                    l.ExpDate,
-                    l.Repayment
-                FROM tblloan l
-                LEFT JOIN tblstaff s ON l.PFNo = s.PFNo
-                WHERE l.LoanBal > 0 OR l.RepaidAmount > 0
-                ORDER BY l.EntryDate DESC
-            `);
+            const pageData = await loansMedicalPagesService.getWelfareLoanPageData({
+                companyId: getCompanyId(req)
+            });
 
             res.render('data_entry/welfare/loan', {
                 title: 'Staff Loan',
                 group: 'Welfare',
                 path: '/data-entry/welfare/loan',
-                user: { name: 'Data Entry Clerk' },
-                staffList,
-                loanCodes,
-                applications,
-                repayments
+                user: getViewUser(req),
+                staffList: pageData.staffList,
+                loanCodes: pageData.loanCodes,
+                applications: pageData.applications,
+                repayments: pageData.repayments,
+                loanParams: pageData.loanParams
             });
         } catch (error) {
             console.error(error);
@@ -3047,34 +3160,15 @@ const dataEntryController = {
     getStaffLoanHistory: async (req, res) => {
         try {
             const { pfno } = req.params;
-
-            const [staffRows] = await pool.query(
-                `SELECT PFNo FROM tblstaff WHERE PFNo = ? AND ${staffStatusService.getActiveStaffFilter('')}`,
-                [pfno]
-            );
-            if (staffRows.length === 0) {
+            const result = await loansMedicalPagesService.getStaffLoanHistoryData({
+                companyId: getCompanyId(req),
+                pfNo: pfno
+            });
+            if (!result) {
                 return res.status(404).json({ error: 'Staff not found' });
             }
-            
-            // Get last loan details
-            const [loans] = await pool.query(`
-                SELECT * FROM tblloan 
-                WHERE PFNo = ? 
-                ORDER BY EntryDate DESC 
-                LIMIT 1
-            `, [pfno]);
 
-            let lastLoan = null;
-            if (loans.length > 0) {
-                const l = loans[0];
-                lastLoan = {
-                    EntryDate: l.EntryDate,
-                    Amount: l.Amount,
-                    Completed: (l.LoanBal <= 0) ? 'Yes' : 'No'
-                };
-            }
-
-            res.json({ lastLoan });
+            res.json(result);
         } catch (error) {
             console.error(error);
             res.status(500).json({ error: 'Server Error' });
@@ -3083,99 +3177,89 @@ const dataEntryController = {
 
     postWelfareLoanAdd: async (req, res) => {
         try {
-            const {
-                entryDate, pfno, lTrans, amount, duration,
-                monthlyRepayment, interest, monthlyInt, startDate, surcharge
-            } = req.body;
-
-            // Calculate Balance (Amount + Interest)
-            const loanBal = parseFloat(amount) + parseFloat(interest || 0);
-            
-            // Calculate Expiry Date based on StartDate + Duration (months)
-            const start = new Date(startDate);
-            const expDate = new Date(start.setMonth(start.getMonth() + parseInt(duration)));
-
-            // Get Max TransNo
-            const [maxRows] = await pool.query("SELECT MAX(TransNo) as maxNo FROM tblloan");
-            const nextTransNo = (maxRows[0].maxNo || 0) + 1;
-
-            const query = `
-                INSERT INTO tblloan (
-                    TransNo, EntryDate, PFNo, LTypeCode, LTrans, 
-                    Amount, Duration, DurationBal, Rate, 
-                    Repayment, Interest, MonthlyInt, MonthlyRepayment, 
-                    StartDate, ExpDate, LoanBal, RepaidAmount, 
-                    Approved, Expired, Reschedule, Repaid, CompanyID,
-                    Surcharge
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `;
-            
-            // Rate is 4% if duration > 5, else 0
-            const rate = parseInt(duration) > 5 ? 4 : 0;
-            const surchargeVal = surcharge === 'Yes' ? 'Yes' : 'No';
-
-            await pool.query(query, [
-                nextTransNo, entryDate, pfno, '01', lTrans,
-                amount, duration, duration, rate,
-                0, interest || 0, monthlyInt || 0, monthlyRepayment,
-                startDate, expDate, loanBal, 0,
-                0, 0, 0, 0, 1,
-                surchargeVal
-            ]);
+            await loansMedicalPagesService.saveLoanDraft({
+                companyId: getCompanyId(req),
+                user: getViewUser(req),
+                payload: req.body
+            });
 
             res.json({ success: true, message: 'Loan application added successfully' });
 
         } catch (error) {
             console.error(error);
-            res.status(500).json({ error: 'Server Error' });
+            res.status(error.statusCode || 500).json({ error: error.message || 'Server Error' });
         }
     },
 
     postWelfareLoanRepayment: async (req, res) => {
         try {
-            const {
-                transNo, repaymentDate, repaymentAmount, pfno
-            } = req.body;
-
-            // Insert into tblloanrepayment for Manager Approval
-            await pool.query(`
-                INSERT INTO tblloanrepayment (LoanTransNo, PFNo, Amount, DatePaid, Approved)
-                VALUES (?, ?, ?, ?, 0)
-            `, [transNo, pfno, parseFloat(repaymentAmount), repaymentDate]);
+            await loansMedicalPagesService.saveLoanRepaymentDraft({
+                companyId: getCompanyId(req),
+                user: getViewUser(req),
+                payload: req.body
+            });
 
             res.json({ success: true, message: 'Repayment submitted for approval' });
 
         } catch (error) {
             console.error(error);
-            res.status(500).json({ error: 'Server Error' });
+            res.status(error.statusCode || 500).json({ error: error.message || 'Server Error' });
         }
     },
 
     updateMedicalRecord: async (req, res) => {
         try {
-            const { transNo, entryDate, pfno, mCode, beneficiary, dependant, amount } = req.body;
-            
-            // Note: Removed Medical Limit Check as per request
-
-            const depName = (beneficiary === 'Family') ? dependant : 'Self';
-
-            let query = 'UPDATE tblmedical SET EntryDate = ?, PFNo = ?, Dependant = ?, MCode = ?, Amount = ?';
-            const params = [entryDate, pfno, depName, mCode, parseFloat(amount) || 0];
-
-            if (req.file) {
-                query += ', PicturePath = ?';
-                params.push('/uploads/medical_receipts/' + req.file.filename);
-            }
-
-            query += ' WHERE TransNo = ?';
-            params.push(transNo);
-
-            await pool.query(query, params);
+            const picturePath = req.file ? '/uploads/medical_receipts/' + req.file.filename : null;
+            await loansMedicalPagesService.saveMedicalDraft({
+                companyId: getCompanyId(req),
+                user: getViewUser(req),
+                payload: {
+                    ...req.body,
+                    dependant: req.body.beneficiary === 'Family' ? req.body.dependant : 'Self',
+                    picturePath
+                }
+            });
 
             res.json({ success: true, message: 'Medical record updated successfully' });
         } catch (error) {
             console.error(error);
-            res.status(500).json({ error: 'Server Error' });
+            res.status(error.statusCode || 500).json({ error: error.message || 'Server Error' });
+        }
+    },
+
+    getWelfareSurcharge: async (req, res) => {
+        try {
+            const pageData = await loansMedicalPagesService.getWelfareSurchargePageData({
+                companyId: getCompanyId(req)
+            });
+
+            res.render('data_entry/welfare/surcharge', {
+                title: 'Surcharge Management',
+                group: 'Welfare',
+                path: '/data-entry/welfare/surcharge',
+                user: getViewUser(req),
+                staffList: pageData.staffList,
+                surchargeTypes: pageData.surchargeTypes,
+                rows: pageData.rows
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send('Server Error');
+        }
+    },
+
+    postWelfareSurchargeSave: async (req, res) => {
+        try {
+            await loansMedicalPagesService.saveSurchargeDraft({
+                companyId: getCompanyId(req),
+                user: getViewUser(req),
+                payload: req.body
+            });
+
+            res.json({ success: true, message: 'Surcharge record saved successfully.' });
+        } catch (error) {
+            console.error(error);
+            res.status(error.statusCode || 500).json({ error: error.message || 'Server Error' });
         }
     },
 
@@ -3464,6 +3548,12 @@ const dataEntryController = {
                 }
             });
 
+            const recordReference = buildWorkflowReference('training', { pfno, course, startDate });
+            const record = await recordWorkflowService.fetchModuleRecord(getCompanyId(req), 'training', recordReference);
+            if (record) {
+                await syncDraftWorkflowRecord(req, 'training', recordReference, record);
+            }
+
             res.json({ success: true, message: 'Training added successfully.' });
         } catch (error) {
             console.error(error);
@@ -3480,7 +3570,13 @@ const dataEntryController = {
             
             const isCompleted = completed === 'on' || completed === true || completed === 1 ? 1 : 0;
             const safeYearCompleted = yearCompleted && yearCompleted !== '' ? yearCompleted : null;
-            
+            const previousReference = buildWorkflowReference('training', {
+                pfno,
+                course: originalCourse,
+                startDate: originalStartDate
+            });
+            await recordWorkflowService.assertRecordEditableByReference(getCompanyId(req), 'training', previousReference);
+             
             await controllerAuditHelper.auditUpdate({
                 table: 'tblcourse',
                 formName: 'data-entry/staff/training',
@@ -3501,11 +3597,17 @@ const dataEntryController = {
                 }
             });
 
+            const recordReference = buildWorkflowReference('training', { pfno, course, startDate });
+            const record = await recordWorkflowService.fetchModuleRecord(getCompanyId(req), 'training', recordReference);
+            if (record) {
+                await syncDraftWorkflowRecord(req, 'training', recordReference, record, previousReference);
+            }
+
             res.json({ success: true, message: 'Training updated successfully.' });
 
          } catch (error) {
              console.error(error);
-             res.status(500).json({ error: 'Server error' });
+             res.status(error.statusCode || 500).json({ error: error.message || 'Server error' });
          }
     },
 
@@ -3583,12 +3685,18 @@ const dataEntryController = {
     addQuery: async (req, res) => {
         try {
             const { pfno, qDate, qType, qDetails, mResponse, sDate, eDate, percent } = req.body;
+            const companyId = req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1;
+            const workflowUser = {
+                id: req.session?.user?.id || req.user?.id,
+                name: req.session?.user?.name || req.user?.name || 'Data Entry Clerk',
+                role: req.session?.user?.role || req.user?.role || 'data-entry'
+            };
 
             const query = `
                 INSERT INTO tblquery (
                     PFNO, QDate, QType, QDetails, Recorded, MResponse, SDate, EDate, Percent, 
                     Expired, Approved, CompanyID
-                ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, 0, 0, 1)
+                ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, 0, 0, ?)
             `;
             
             // Handle optional dates
@@ -3602,8 +3710,19 @@ const dataEntryController = {
                 fetchQuery: 'SELECT * FROM tblquery WHERE PFNO = ? AND QDate = ?',
                 fetchParams: [pfno, qDate],
                 applyChange: async () => {
-                    await pool.query(query, [pfno, qDate, qType, qDetails, mResponse, sDateVal, eDateVal, percent]);
+                    await pool.query(query, [pfno, qDate, qType, qDetails, mResponse, sDateVal, eDateVal, percent, companyId]);
                 }
+            });
+
+            await recordWorkflowService.ensureWorkflowTables();
+            const recordReference = recordWorkflowService.buildReference(pfno, qDate);
+            const sourceRecord = await recordWorkflowService.fetchModuleRecord(companyId, 'salary-query', recordReference);
+            await recordWorkflowService.ensureDraftItemForExistingRecord({
+                companyId,
+                module: 'salary-query',
+                recordReference,
+                record: sourceRecord,
+                user: workflowUser
             });
 
             res.json({ success: true });
@@ -3616,6 +3735,26 @@ const dataEntryController = {
     editQuery: async (req, res) => {
         try {
             const { pfno, originalQDate, qDate, qType, qDetails, mResponse, sDate, eDate, percent } = req.body;
+            const companyId = req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1;
+            const workflowUser = {
+                id: req.session?.user?.id || req.user?.id,
+                name: req.session?.user?.name || req.user?.name || 'Data Entry Clerk',
+                role: req.session?.user?.role || req.user?.role || 'data-entry'
+            };
+            const previousReference = recordWorkflowService.buildReference(pfno, originalQDate);
+
+            await recordWorkflowService.ensureWorkflowTables();
+            const currentRecord = await recordWorkflowService.fetchModuleRecord(companyId, 'salary-query', previousReference);
+            if (currentRecord) {
+                await recordWorkflowService.ensureDraftItemForExistingRecord({
+                    companyId,
+                    module: 'salary-query',
+                    recordReference: previousReference,
+                    previousReference,
+                    record: currentRecord,
+                    user: workflowUser
+                });
+            }
 
             const query = `
                 UPDATE tblquery 
@@ -3635,6 +3774,17 @@ const dataEntryController = {
                 applyChange: async () => {
                     await pool.query(query, [qDate, qType, qDetails, mResponse, sDateVal, eDateVal, percent, pfno, originalQDate]);
                 }
+            });
+
+            const recordReference = recordWorkflowService.buildReference(pfno, qDate);
+            const sourceRecord = await recordWorkflowService.fetchModuleRecord(companyId, 'salary-query', recordReference);
+            await recordWorkflowService.ensureDraftItemForExistingRecord({
+                companyId,
+                module: 'salary-query',
+                recordReference,
+                previousReference,
+                record: sourceRecord,
+                user: workflowUser
             });
 
             res.json({ success: true });
@@ -3701,39 +3851,89 @@ const dataEntryController = {
             }
             const staff = staffRows[0];
 
-            // Insert into tbltransfer
-            const query = `
-                INSERT INTO tbltransfer (
-                    PFNO, SName, TDate, PrevDept, Activity, TDept, 
-                    approved, approvedby, dateapproved, CompanyID
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `;
-            
-            // Defaulting dateapproved to NULL and approvedby to current user (or 'user')
-            // Using TDate from body or CURDATE()
             const tDate = transferDate || new Date();
-            
-            await controllerAuditHelper.auditCreate({
-                table: 'tbltransfer',
-                formName: 'data-entry/staff/transfer',
-                recordId: pfno,
-                fetchQuery: 'SELECT * FROM tbltransfer WHERE PFNO = ? AND TDate = ? ORDER BY TDate DESC LIMIT 1',
-                fetchParams: [pfno, tDate],
-                applyChange: async () => {
-                    await pool.query(query, [
-                        pfno, 
-                        staff.SName, 
-                        tDate, 
-                        staff.CDept, 
-                        0,
-                        newDeptCode, 
-                        0,
-                        req.user ? req.user.username : 'user', 
-                        null,
-                        1
-                    ]);
-                }
+            const companyId = getCompanyId(req);
+            const [existingRows] = await pool.query(
+                'SELECT * FROM tbltransfer WHERE PFNO = ? AND TDate = ? AND PrevDept = ? LIMIT 1',
+                [pfno, tDate, staff.CDept]
+            );
+            const existingRow = existingRows[0] || null;
+            const recordReference = buildWorkflowReference('transfer', {
+                pfno,
+                transferDate: tDate,
+                prevDept: staff.CDept
             });
+
+            if (existingRow) {
+                await recordWorkflowService.assertRecordEditableByReference(companyId, 'transfer', recordReference);
+                await controllerAuditHelper.auditUpdate({
+                    table: 'tbltransfer',
+                    formName: 'data-entry/staff/transfer',
+                    recordId: pfno,
+                    fetchQuery: 'SELECT * FROM tbltransfer WHERE PFNO = ? AND TDate = ? AND PrevDept = ? LIMIT 1',
+                    fetchParams: [pfno, tDate, staff.CDept],
+                    applyChange: async () => {
+                        await pool.query(
+                            `
+                                UPDATE tbltransfer
+                                SET SName = ?,
+                                    TDept = ?,
+                                    approved = 0,
+                                    approvedby = ?,
+                                    dateapproved = NULL,
+                                    CompanyID = ?
+                                WHERE PFNO = ?
+                                  AND TDate = ?
+                                  AND PrevDept = ?
+                            `,
+                            [
+                                staff.SName,
+                                newDeptCode,
+                                req.user ? req.user.username : 'user',
+                                1,
+                                pfno,
+                                tDate,
+                                staff.CDept
+                            ]
+                        );
+                    }
+                });
+            } else {
+                await controllerAuditHelper.auditCreate({
+                    table: 'tbltransfer',
+                    formName: 'data-entry/staff/transfer',
+                    recordId: pfno,
+                    fetchQuery: 'SELECT * FROM tbltransfer WHERE PFNO = ? AND TDate = ? AND PrevDept = ? ORDER BY TDate DESC LIMIT 1',
+                    fetchParams: [pfno, tDate, staff.CDept],
+                    applyChange: async () => {
+                        await pool.query(
+                            `
+                                INSERT INTO tbltransfer (
+                                    PFNO, SName, TDate, PrevDept, Activity, TDept, 
+                                    approved, approvedby, dateapproved, CompanyID
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            `,
+                            [
+                                pfno,
+                                staff.SName,
+                                tDate,
+                                staff.CDept,
+                                0,
+                                newDeptCode,
+                                0,
+                                req.user ? req.user.username : 'user',
+                                null,
+                                1
+                            ]
+                        );
+                    }
+                });
+            }
+
+            const record = await recordWorkflowService.fetchModuleRecord(getCompanyId(req), 'transfer', recordReference);
+            if (record) {
+                await syncDraftWorkflowRecord(req, 'transfer', recordReference, record);
+            }
 
             res.json({ success: true });
         } catch (error) {
@@ -4320,8 +4520,19 @@ const dataEntryController = {
     initiateRedundancy: async (req, res) => {
         try {
             const { pfno } = req.body;
+            const recordReference = recordWorkflowService.buildReference(pfno, 'REDUNDANCY');
+            await recordWorkflowService.assertRecordEditableByReference(getCompanyId(req), 'redundancy', recordReference);
+
             // Set Redundant to 2 (Pending)
-            await pool.query('UPDATE tblstaff SET Redundant = 2 WHERE PFNo = ?', [pfno]);
+            await pool.query(
+                'UPDATE tblstaff SET Redundant = 2, ReasonCode = COALESCE(ReasonCode, ?), Approved = 0 WHERE PFNo = ?',
+                ['12', pfno]
+            );
+
+            const record = await recordWorkflowService.fetchModuleRecord(getCompanyId(req), 'redundancy', recordReference);
+            if (record) {
+                await syncDraftWorkflowRecord(req, 'redundancy', recordReference, record);
+            }
             res.redirect('/data-entry/staff/redundancy');
         } catch (err) {
             console.error(err);
@@ -4432,26 +4643,101 @@ const dataEntryController = {
 
             const prevGradeSafe = currentGradeCode || '';
             const mode = type === 'demotion' ? 'D' : 'P';
+            const companyId = getCompanyId(req);
+            const [existingRows] = await pool.query(
+                'SELECT * FROM tblpromotions WHERE PFNO = ? AND Activity = 1 LIMIT 1',
+                [pfno]
+            );
+            const existingRow = existingRows[0] || null;
+            const previousReference = existingRow
+                ? buildWorkflowReference('promotion', {
+                    pfno: existingRow.PFNO,
+                    activity: existingRow.Activity,
+                    promotionDate: existingRow.PDate
+                })
+                : null;
+            const recordReference = buildWorkflowReference('promotion', {
+                pfno,
+                activity: 1,
+                promotionDate
+            });
 
-            // Activity = 0 (Pending/Promotion?) 
-            
-            const query = `
-                INSERT INTO tblpromotions (
-                    PFNO, PDate, PrevGrade, CGrade, JobTitle, 
-                    Activity, Mode, Approved, 
-                    Operator, dateKeyed, TimeKeyed, CompanyID
-                ) VALUES (
-                    ?, ?, ?, ?, ?, 
-                    1, ?, 0, 
-                    ?, NOW(), NOW(), 1
-                )
-            `;
-            
-            await pool.query(query, [
-                pfno, promotionDate, prevGradeSafe, newGrade, newJobTitle,
-                mode,
-                'DataEntry' // Operator
-            ]);
+            if (existingRow) {
+                await recordWorkflowService.assertRecordEditableByReference(companyId, 'promotion', previousReference);
+                await controllerAuditHelper.auditUpdate({
+                    table: 'tblpromotions',
+                    formName: 'data-entry/staff/promotion-demotion',
+                    recordId: pfno,
+                    fetchQuery: 'SELECT * FROM tblpromotions WHERE PFNO = ? AND Activity = 1 LIMIT 1',
+                    fetchParams: [pfno],
+                    applyChange: async () => {
+                        await pool.query(
+                            `
+                                UPDATE tblpromotions
+                                SET PDate = ?,
+                                    PrevGrade = ?,
+                                    CGrade = ?,
+                                    JobTitle = ?,
+                                    Mode = ?,
+                                    Approved = 0,
+                                    Operator = ?,
+                                    dateKeyed = NOW(),
+                                    TimeKeyed = NOW(),
+                                    CompanyID = ?
+                                WHERE PFNO = ?
+                                  AND Activity = 1
+                            `,
+                            [
+                                promotionDate,
+                                prevGradeSafe,
+                                newGrade,
+                                newJobTitle,
+                                mode,
+                                'DataEntry',
+                                1,
+                                pfno
+                            ]
+                        );
+                    }
+                });
+            } else {
+                await controllerAuditHelper.auditCreate({
+                    table: 'tblpromotions',
+                    formName: 'data-entry/staff/promotion-demotion',
+                    recordId: pfno,
+                    fetchQuery: 'SELECT * FROM tblpromotions WHERE PFNO = ? AND Activity = 1 LIMIT 1',
+                    fetchParams: [pfno],
+                    applyChange: async () => {
+                        await pool.query(
+                            `
+                                INSERT INTO tblpromotions (
+                                    PFNO, PDate, PrevGrade, CGrade, JobTitle,
+                                    Activity, Mode, Approved,
+                                    Operator, dateKeyed, TimeKeyed, CompanyID
+                                ) VALUES (
+                                    ?, ?, ?, ?, ?,
+                                    1, ?, 0,
+                                    ?, NOW(), NOW(), 1
+                                )
+                            `,
+                            [
+                                pfno,
+                                promotionDate,
+                                prevGradeSafe,
+                                newGrade,
+                                newJobTitle,
+                                mode,
+                                'DataEntry'
+                            ]
+                        );
+                    }
+                });
+            }
+
+            const record = await recordWorkflowService.fetchModuleRecord(getCompanyId(req), 'promotion', recordReference);
+            if (record) {
+                await syncDraftWorkflowRecord(req, 'promotion', recordReference, record, previousReference);
+            }
 
             res.redirect('/data-entry/staff/promotion-demotion');
         } catch (err) {
@@ -4530,9 +4816,13 @@ const dataEntryController = {
             const isInterviewed = interviewed === 'on' || interviewed === '1' ? 1 : 0;
             const operator = req.user ? req.user.username : 'Data Entry Clerk';
             const now = new Date();
+            const recordReference = recordWorkflowService.buildReference(pfno);
 
             // Check if record exists
             const [rows] = await pool.query('SELECT PFNo FROM tblformer WHERE PFNo = ?', [pfno]);
+            if (rows.length > 0) {
+                await recordWorkflowService.assertRecordEditableByReference(getCompanyId(req), 'staff-exit', recordReference);
+            }
 
             if (rows.length > 0) {
                 // Update
@@ -4567,6 +4857,11 @@ const dataEntryController = {
                     isInterviewed, dateInterviewed || null,
                     operator, now, now
                 ]);
+            }
+
+            const record = await recordWorkflowService.fetchModuleRecord(getCompanyId(req), 'staff-exit', recordReference);
+            if (record) {
+                await syncDraftWorkflowRecord(req, 'staff-exit', recordReference, record);
             }
 
             res.redirect('/data-entry/staff/exit?success=Record saved successfully');
@@ -5500,7 +5795,18 @@ const dataEntryController = {
                     await pool.query(query, params);
                 }
             });
-            
+
+            const [leaveRows] = await pool.query(
+                'SELECT ID FROM tblleave WHERE LCount = ? AND (CompanyID = ? OR CompanyID IS NULL) LIMIT 1',
+                [nextCount, getCompanyId(req)]
+            );
+            const leaveId = leaveRows[0]?.ID || nextCount;
+            const recordReference = recordWorkflowService.buildReference(leaveId);
+            const record = await recordWorkflowService.fetchModuleRecord(getCompanyId(req), 'leave', recordReference);
+            if (record) {
+                await syncDraftWorkflowRecord(req, 'leave', recordReference, record);
+            }
+             
             res.json({ success: true });
             
         } catch (error) {
@@ -6108,12 +6414,21 @@ const dataEntryController = {
                     IncDate, PFNo, Grade, Type, IncNo, Days, 
                     FPay, PPay, WPay, 
                     Approved, KeyedinBy, DateKeyed, TimeKeyed, CompanyID, EPassed, gRANTED
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, CURDATE(), CURTIME(), 1, 0, 0)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, CURDATE(), CURTIME(), ?, 0, 0)
             `;
 
+            const companyId = req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1;
+            const workflowUser = {
+                id: req.session?.user?.id || req.user?.id,
+                name: user,
+                role: req.session?.user?.role || req.user?.role || 'data-entry'
+            };
+            await recordWorkflowService.ensureWorkflowTables();
+
             for (const record of records) {
+                const incrementDateValue = incDate || now.toISOString().slice(0, 19).replace('T', ' ');
                 await pool.query(query, [
-                    incDate || now,
+                    incrementDateValue,
                     record.pfno,
                     record.grade,
                     type,
@@ -6122,8 +6437,27 @@ const dataEntryController = {
                     fPay,
                     pPay,
                     wPay,
-                    user
+                    user,
+                    companyId
                 ]);
+
+                const recordReference = recordWorkflowService.buildReference(
+                    record.pfno,
+                    incrementDateValue,
+                    type,
+                    record.grade,
+                    incNo || 0
+                );
+                const sourceRecord = await recordWorkflowService.fetchModuleRecord(companyId, 'increment', recordReference);
+                if (sourceRecord) {
+                    await recordWorkflowService.ensureDraftItemForExistingRecord({
+                        companyId,
+                        module: 'increment',
+                        recordReference,
+                        record: sourceRecord,
+                        user: workflowUser
+                    });
+                }
             }
 
             res.redirect('/data-entry/payroll/increments-pay-cut-backlog?success=Data saved successfully');
@@ -6260,62 +6594,60 @@ const dataEntryController = {
 
             // Check if there's an existing unapproved record
             const [existing] = await pool.query(`
-                SELECT RefNo FROM tblacting 
+                SELECT PFNo, SDate FROM tblacting 
                 WHERE PFNo = ? AND Approved = 0 
                 ORDER BY EntryDate DESC 
                 LIMIT 1
             `, [pfno]);
 
+            let previousReference = null;
             if (existing.length > 0) {
+                previousReference = buildWorkflowReference('acting', {
+                    pfno,
+                    sDate: existing[0].SDate
+                });
+                await recordWorkflowService.assertRecordEditableByReference(getCompanyId(req), 'acting', previousReference);
+
                 // Update existing record
                 await pool.query(`
                     UPDATE tblacting 
                     SET EntryDate = ?, C_Grade = ?, JobTitle = ?, CGrade_Salary = ?, 
                         A_dept = ?, A_Grade = ?, A_JobTitle = ?, GradeDifference = ?, 
                         A_Days = ?, SDate = ?, EDate = ?, A_Salary = ?, 
-                        Operator = ?, DateKeyed = ?, TimeKeyed = CURTIME()
-                    WHERE RefNo = ?
+                        Closed = 0, dATEcLOSED = NULL, Approved = 0, Dateapproved = NULL,
+                        Approvedby = NULL, Operator = ?, DateKeyed = ?, TimeKeyed = CURTIME()
+                    WHERE PFNo = ? AND SDate = ?
                 `, [
                     entryDate, c_grade, jobTitle, cGrade_salary,
                     a_dept, a_grade, a_jobTitle, gradeDifference,
                     a_days, sDate, eDate, a_salary,
-                    user, now, existing[0].RefNo
+                    user, now, pfno, existing[0].SDate
                 ]);
             } else {
-                // Insert new record
-                const refNo = `ACT-${Date.now()}`;
                 await pool.query(`
                     INSERT INTO tblacting (
-                        RefNo, PFNo, EntryDate, C_Grade, JobTitle, CGrade_Salary,
+                        PFNo, EntryDate, C_Grade, JobTitle, CGrade_Salary,
                         A_dept, A_Grade, A_JobTitle, GradeDifference, A_Days, SDate, EDate, A_Salary,
-                        Approved, Operator, DateKeyed, TimeKeyed
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, CURTIME())
+                        Closed, dATEcLOSED, Approved, Dateapproved, Approvedby,
+                        Operator, DateKeyed, TimeKeyed, CompanyID
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, 0, NULL, NULL, ?, ?, CURTIME(), ?)
                 `, [
-                    refNo, pfno, entryDate, c_grade, jobTitle, cGrade_salary,
+                    pfno, entryDate, c_grade, jobTitle, cGrade_salary,
                     a_dept, a_grade, a_jobTitle, gradeDifference, a_days, sDate, eDate, a_salary,
-                    user, now
+                    user, now, getCompanyId(req)
                 ]);
             }
 
-            // Update salary table as per requirements
-            // First: Set Approved = No for the staff
-            await pool.query(`
-                UPDATE tblSalary 
-                SET Approved = 0 
-                WHERE PFNo = ?
-            `, [pfno]);
-
-            // Second: Set Allw14 = A_Salary for unapproved records
-            await pool.query(`
-                UPDATE tblSalary 
-                SET Allw14 = ? 
-                WHERE Approved = 0 AND PFNo = ?
-            `, [a_salary, pfno]);
+            const recordReference = buildWorkflowReference('acting', { pfno, sDate });
+            const record = await recordWorkflowService.fetchModuleRecord(getCompanyId(req), 'acting', recordReference);
+            if (record) {
+                await syncDraftWorkflowRecord(req, 'acting', recordReference, record, previousReference);
+            }
 
             res.json({ success: true, message: 'Acting allowance saved successfully' });
         } catch (error) {
             console.error('Post Acting Allowance Error:', error);
-            res.status(500).json({ error: 'Server Error: ' + error.message });
+            res.status(error.statusCode || 500).json({ error: error.message || 'Server Error' });
         }
     },
 
@@ -6443,6 +6775,7 @@ const dataEntryController = {
 
     getYearlyPaymentsReport: async (req, res) => {
         try {
+            const workspace = getPayrollWorkspace(req);
             const pageData = await enquiryReportsService.getYearlyPaymentsReportData({
                 companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
                 filters: req.query
@@ -6451,8 +6784,12 @@ const dataEntryController = {
             res.render('data_entry/reports/yearly_payments', {
                 title: 'Yearly Payments Report',
                 group: 'Reports',
-                path: '/data-entry/reports/yearly-payments',
-                user: req.session.user || { name: 'Data Entry Clerk' },
+                path: workspace.yearlyPaymentsReportUrl,
+                user: getViewUser(req, workspace.isFinance ? 'Finance Officer' : 'Data Entry Clerk'),
+                partialsBase: workspace.partialsBase,
+                dashboardPath: workspace.dashboardPath,
+                workspaceLabel: workspace.workspaceLabel,
+                resetUrl: workspace.yearlyPaymentsReportUrl,
                 company: pageData.company,
                 payTypes: pageData.payTypes,
                 staffList: pageData.staffList,

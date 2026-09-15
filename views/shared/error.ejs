@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title || 'Request Error' %></title>
+  <link rel="stylesheet" href="/vendor/bootstrap.min.css">
+</head>
+<body class="bg-light">
+  <main class="container py-5">
+    <section class="card border-0 shadow-sm mx-auto" style="max-width: 680px;">
+      <div class="card-body p-4 p-md-5 text-center">
+        <p class="text-uppercase small fw-semibold text-secondary mb-2">HR &amp; Payroll</p>
+        <h1 class="h3 mb-3"><%= title || 'Unable to complete request' %></h1>
+        <p class="text-secondary mb-4"><%= message || 'The request could not be completed safely.' %></p>
+        <a href="<%= backUrl || '/' %>" class="btn btn-dark">Return safely</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

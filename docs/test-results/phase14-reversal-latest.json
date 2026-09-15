@@ -1,0 +1,68 @@
+{
+  "status": "PASS",
+  "completedAt": "2026-08-29T00:07:37.316Z",
+  "selfContained": true,
+  "safetyGuard": "ALLOW_DESTRUCTIVE_TESTS=true or NODE_ENV=test",
+  "testEnvironment": {
+    "companyId": 2,
+    "month": 11,
+    "year": 2098,
+    "activityCode": "01",
+    "users": [
+      {
+        "pfno": 99261,
+        "role": "finance-officer",
+        "username": "phase15a_finance"
+      },
+      {
+        "pfno": 99262,
+        "role": "manager",
+        "username": "phase15a_manager"
+      },
+      {
+        "pfno": 99263,
+        "role": "auditor",
+        "username": "phase15a_auditor"
+      },
+      {
+        "pfno": 99264,
+        "role": "entity-head",
+        "username": "phase15a_entity"
+      }
+    ],
+    "staffCount": 2,
+    "cleanupMarker": "phase15a_"
+  },
+  "payroll": {
+    "workflowBatchId": 156,
+    "generationNo": 1,
+    "rowCount": 2,
+    "checksum": "877b3b013f11bd4c10b6f4413114491e48bcad8acc53d4b29176609804ee4b49",
+    "postingBatchId": 52,
+    "finalStatus": "REVERSED"
+  },
+  "reversal": {
+    "requestId": 25,
+    "reversalBatchId": 31,
+    "finalStatus": "REVERSED",
+    "actionCount": 10,
+    "notificationCount": 13,
+    "auditCount": 10
+  },
+  "reconciliation": {
+    "originalDebitTotal": 12900,
+    "originalCreditTotal": 12900,
+    "reversalDebitTotal": 12900,
+    "reversalCreditTotal": 12900,
+    "netEffect": 0
+  },
+  "checks": {
+    "duplicateReversalBlocked": true,
+    "prematureExecutionBlocked": true,
+    "payrollMutationBlocked": true,
+    "glMutationBlocked": true,
+    "separationOfDutiesPassed": true,
+    "crossCompanyPassed": true,
+    "forcedRollbackPassed": true
+  }
+}

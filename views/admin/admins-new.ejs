@@ -19,6 +19,8 @@
         <a class="btn btn-outline-secondary" href="/admin/admins"><i class="bi bi-arrow-left me-2"></i>Back to Admins</a>
       </div>
 
+      <% if (error) { %><div class="alert alert-danger shadow-sm"><%= error %></div><% } %>
+
       <div class="card shadow-sm">
         <div class="card-body">
           <form action="/admin/admins" method="post">

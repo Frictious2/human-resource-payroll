@@ -205,16 +205,22 @@ async function getActiveMedicalDeductions(connection, { companyId, payrollDate, 
             FROM tblmedical m
             INNER JOIN tblstaff s
                 ON s.PFNo = m.PFNo
+            LEFT JOIN record_workflow_items rw
+                ON rw.CompanyID = COALESCE(m.CompanyID, ?)
+               AND rw.Module = 'medical'
+               AND rw.SourceTable = 'tblmedical'
+               AND rw.RecordReference = CAST(m.TransNo AS CHAR)
             ${staffStatusService.getPayrollStatusJoins({ staffAlias: 's' })}
             WHERE (m.CompanyID = ? OR m.CompanyID IS NULL)
               AND (s.CompanyID = ? OR s.CompanyID IS NULL)
               AND ${staffStatusService.getPayrollEligibilityClause({ staffAlias: 's', payrollDateExpression: "STR_TO_DATE(?, '%Y-%m-%d')" })}
+              AND (rw.id IS NULL OR rw.Status = 'FINAL_APPROVED')
               AND YEAR(m.EntryDate) = ?
               AND MONTH(m.EntryDate) = ?
               AND DATE(m.EntryDate) <= ?
             GROUP BY m.PFNo
         `,
-        [companyId, companyId, companyId, payrollDate, payrollDate, payrollDate, payrollYear, payrollMonth, payrollDate]
+        [companyId, companyId, companyId, companyId, payrollDate, payrollDate, payrollDate, payrollYear, payrollMonth, payrollDate]
     );
 
     return rows;
@@ -381,7 +387,7 @@ async function checkPayrollAlreadyPosted(connection, { companyId, activityCode, 
     if (Number(currentSnapshot.posted_rows || 0) > 0 ||
         Number(batchRows[0] && batchRows[0].count || 0) > 0 ||
         Number(exportRows[0] && exportRows[0].count || 0) > 0) {
-        throw createError('This payroll activity has already been posted to accounts for the selected month and year.', 409);
+        throw createError('Payroll has already been posted to accounts.', 409);
     }
 
     return currentSnapshot;

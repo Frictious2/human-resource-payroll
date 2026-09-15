@@ -3,12 +3,15 @@ const STAFF_STATUS_MODES = Object.freeze({
     FORMER: 'former',
     RETIRED: 'retired',
     REDUNDANT: 'redundant',
+    OTHER_NON_ACTIVE: 'other_non_active',
     ALL: 'all'
 });
 
 const ACTIVE_EMP_STATUS_CODES = ['01', '1', '03', '3', '04', '4'];
 const FORMER_EMP_STATUS_CODES = ['02', '2'];
-const RETIRED_EMP_STATUS_CODES = ['05', '5'];
+const RETIRED_EMP_STATUS_CODES = [];
+const RETIREMENT_REASON_CODES = ['04', '05', '09'];
+const REDUNDANCY_REASON_CODES = ['12'];
 
 function getColumnRef(alias, columnName) {
     return alias ? `${alias}.${columnName}` : columnName;
@@ -27,28 +30,44 @@ function getActiveStaffFilter(alias = '') {
     const redundant = getColumnRef(alias, 'Redundant');
 
     // Live personnel_master status codes currently map 01=CURRENT, 03=PROBATION, 04=PART-TIME.
-    // Former staff are stored as 02 and redundant staff are separately marked in Redundant.
-    return `COALESCE(${redundant}, 0) = 0 AND (${empStatus} IS NULL OR CAST(${empStatus} AS CHAR) IN (${ACTIVE_EMP_STATUS_CODES.map((code) => `'${code}'`).join(', ')}))`;
+    // Former staff are stored as 02 and final redundant staff are marked with Redundant = 1.
+    // Pending redundancy proposals use Redundant = 2 and must remain visible until final approval.
+    return `COALESCE(${redundant}, 0) IN (0, 2) AND (${empStatus} IS NULL OR CAST(${empStatus} AS CHAR) IN (${ACTIVE_EMP_STATUS_CODES.map((code) => `'${code}'`).join(', ')}))`;
 }
 
 function getFormerStaffFilter(alias = '') {
     const empStatus = getColumnRef(alias, 'EmpStatus');
     const redundant = getColumnRef(alias, 'Redundant');
-    return `COALESCE(${redundant}, 0) = 0 AND CAST(COALESCE(${empStatus}, '') AS CHAR) IN (${FORMER_EMP_STATUS_CODES.map((code) => `'${code}'`).join(', ')})`;
+    const reasonCode = getColumnRef(alias, 'ReasonCode');
+    return `COALESCE(${redundant}, 0) = 0
+        AND CAST(COALESCE(${empStatus}, '') AS CHAR) IN (${FORMER_EMP_STATUS_CODES.map((code) => `'${code}'`).join(', ')})
+        AND (
+            ${reasonCode} IS NULL
+            OR CAST(${reasonCode} AS CHAR) NOT IN (${RETIREMENT_REASON_CODES.map((code) => `'${code}'`).join(', ')})
+        )`;
 }
 
 function getRetiredStaffFilter(alias = '') {
     const empStatus = getColumnRef(alias, 'EmpStatus');
     const redundant = getColumnRef(alias, 'Redundant');
-
-    // No RETIRED code exists in the current live tblstatus rows, but we keep a dedicated
-    // mode so explicitly retired pages can adopt the same helper if that code is introduced.
-    return `COALESCE(${redundant}, 0) = 0 AND CAST(COALESCE(${empStatus}, '') AS CHAR) IN (${RETIRED_EMP_STATUS_CODES.map((code) => `'${code}'`).join(', ')})`;
+    const reasonCode = getColumnRef(alias, 'ReasonCode');
+    return `COALESCE(${redundant}, 0) = 0
+        AND CAST(COALESCE(${empStatus}, '') AS CHAR) IN (${FORMER_EMP_STATUS_CODES.map((code) => `'${code}'`).join(', ')})
+        AND CAST(COALESCE(${reasonCode}, '') AS CHAR) IN (${RETIREMENT_REASON_CODES.map((code) => `'${code}'`).join(', ')})`;
 }
 
 function getRedundantStaffFilter(alias = '') {
     const redundant = getColumnRef(alias, 'Redundant');
-    return `COALESCE(${redundant}, 0) <> 0`;
+    return `COALESCE(${redundant}, 0) = 1`;
+}
+
+function getOtherNonActiveStaffFilter(alias = '') {
+    const empStatus = getColumnRef(alias, 'EmpStatus');
+    const redundant = getColumnRef(alias, 'Redundant');
+    const reasonCode = getColumnRef(alias, 'ReasonCode');
+    return `COALESCE(${redundant}, 0) = 0
+        AND CAST(COALESCE(${empStatus}, '') AS CHAR) IN (${FORMER_EMP_STATUS_CODES.map((code) => `'${code}'`).join(', ')})
+        AND CAST(COALESCE(${reasonCode}, '') AS CHAR) NOT IN (${RETIREMENT_REASON_CODES.concat(REDUNDANCY_REASON_CODES).map((code) => `'${code}'`).join(', ')})`;
 }
 
 function getStaffStatusFilter(alias = '', mode = STAFF_STATUS_MODES.ACTIVE) {
@@ -59,6 +78,8 @@ function getStaffStatusFilter(alias = '', mode = STAFF_STATUS_MODES.ACTIVE) {
             return getRetiredStaffFilter(alias);
         case STAFF_STATUS_MODES.REDUNDANT:
             return getRedundantStaffFilter(alias);
+        case STAFF_STATUS_MODES.OTHER_NON_ACTIVE:
+            return getOtherNonActiveStaffFilter(alias);
         case STAFF_STATUS_MODES.ALL:
             return '';
         case STAFF_STATUS_MODES.ACTIVE:
@@ -137,18 +158,21 @@ function getPayrollEligibilityClause({
     const redundant = getColumnRef(staffAlias, 'Redundant');
     const dateRedundant = getColumnRef(staffAlias, 'DateRedundant');
     const reasonDate = getColumnRef(staffAlias, 'ReasonDate');
+    const reasonCode = getColumnRef(staffAlias, 'ReasonCode');
     const statusName = getColumnRef(statusAlias, 'Status');
     const formerDate = getColumnRef(formerAlias, 'effective_former_date');
     const formerCodes = FORMER_EMP_STATUS_CODES.map((code) => `'${code}'`).join(', ');
-    const retiredCodes = RETIRED_EMP_STATUS_CODES.map((code) => `'${code}'`).join(', ');
+    const retirementReasons = RETIREMENT_REASON_CODES.map((code) => `'${code}'`).join(', ');
 
     // For payroll eligibility we use the payroll date against the effective exit dates already
     // present in the legacy schema. If a staff member is non-active but no effective date exists,
     // we treat them as ineligible rather than guessing that the payroll period is historical.
     return `
         (
-            COALESCE(${redundant}, 0) = 0
+            COALESCE(${redundant}, 0) IN (0, 2)
             OR (
+                COALESCE(${redundant}, 0) = 1
+                AND
                 ${dateRedundant} IS NOT NULL
                 AND ${payrollDateExpression} <= DATE(${dateRedundant})
             )
@@ -159,7 +183,8 @@ function getPayrollEligibilityClause({
         )
         AND (
             NOT (
-                CAST(COALESCE(${empStatus}, '') AS CHAR) IN (${formerCodes}, ${retiredCodes})
+                CAST(COALESCE(${empStatus}, '') AS CHAR) IN (${formerCodes})
+                OR CAST(COALESCE(${reasonCode}, '') AS CHAR) IN (${retirementReasons}, '12')
                 OR UPPER(COALESCE(${statusName}, '')) LIKE '%FORMER%'
                 OR UPPER(COALESCE(${statusName}, '')) LIKE '%RETIR%'
             )
@@ -185,11 +210,14 @@ module.exports = {
     ACTIVE_EMP_STATUS_CODES,
     FORMER_EMP_STATUS_CODES,
     RETIRED_EMP_STATUS_CODES,
+    RETIREMENT_REASON_CODES,
+    REDUNDANCY_REASON_CODES,
     normalizeMode,
     getActiveStaffFilter,
     getFormerStaffFilter,
     getRetiredStaffFilter,
     getRedundantStaffFilter,
+    getOtherNonActiveStaffFilter,
     getStaffStatusFilter,
     applyStaffStatusFilter,
     buildStaffQuery,

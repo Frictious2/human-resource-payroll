@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> · HR & Payroll</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+                <div>
+                    <h2 class="mb-1">Payroll Reversal Detail</h2>
+                    <div class="text-muted">Track approvals, review the original payroll posting, and execute only after final approval.</div>
+                </div>
+                <a href="/finance/payroll/reversals" class="btn btn-outline-secondary">Back to Reversals</a>
+            </div>
+
+            <% if (successMessage) { %><div class="alert alert-success"><%= successMessage %></div><% } %>
+            <% if (errorMessage) { %><div class="alert alert-danger"><%= errorMessage %></div><% } %>
+
+            <div class="row g-4 mb-4">
+                <div class="col-xl-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header"><span class="fw-semibold">Request Summary</span></div>
+                        <div class="card-body">
+                            <dl class="row mb-0">
+                                <dt class="col-sm-5">Status</dt><dd class="col-sm-7"><span class="badge <%= detail.request.badgeClass %>"><%= detail.request.Status %></span></dd>
+                                <dt class="col-sm-5">Period</dt><dd class="col-sm-7"><%= String(detail.request.PMonth).padStart(2, '0') %>/<%= detail.request.PYear %></dd>
+                                <dt class="col-sm-5">Activity</dt><dd class="col-sm-7"><%= detail.request.PType %></dd>
+                                <dt class="col-sm-5">Workflow Batch</dt><dd class="col-sm-7">#<%= detail.request.WorkflowBatchID %></dd>
+                                <dt class="col-sm-5">GL Batch</dt><dd class="col-sm-7">#<%= detail.request.GLPostingBatchID || '—' %></dd>
+                                <dt class="col-sm-5">Reason</dt><dd class="col-sm-7"><%= detail.request.Reason %></dd>
+                                <dt class="col-sm-5">Requested At</dt><dd class="col-sm-7"><%= detail.request.RequestedAt ? new Date(detail.request.RequestedAt).toLocaleString('en-GB') : 'N/A' %></dd>
+                                <dt class="col-sm-5">Executed At</dt><dd class="col-sm-7"><%= detail.request.ExecutedAt ? new Date(detail.request.ExecutedAt).toLocaleString('en-GB') : 'Not yet executed' %></dd>
+                                <dt class="col-sm-5">Reversal Ref</dt><dd class="col-sm-7"><%= detail.request.ReversalBatchReference || 'Pending' %></dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-8">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header"><span class="fw-semibold">Finance Actions</span></div>
+                        <div class="card-body">
+                            <% if (detail.canSubmit) { %>
+                                <form method="post" action="/finance/payroll/reversals/<%= detail.request.id %>/submit" class="mb-3">
+                                    <div class="mb-3">
+                                        <label class="form-label">Submission Note</label>
+                                        <textarea class="form-control" name="comments" rows="3"><%= detail.request.Reason %></textarea>
+                                    </div>
+                                    <button class="btn btn-primary" type="submit">Submit to Manager</button>
+                                </form>
+                                <form method="post" action="/finance/payroll/reversals/<%= detail.request.id %>/cancel" class="mb-3">
+                                    <div class="mb-3">
+                                        <label class="form-label">Cancellation Comment (optional)</label>
+                                        <textarea class="form-control" name="comments" rows="2"></textarea>
+                                    </div>
+                                    <button class="btn btn-outline-danger" type="submit">Cancel Request</button>
+                                </form>
+                            <% } %>
+                            <% if (detail.canExecute) { %>
+                                <form method="post" action="/finance/payroll/reversals/<%= detail.request.id %>/execute">
+                                    <div class="alert alert-warning">Execution creates equal and opposite reversal GL entries, preserves the original posting history, and marks the payroll workflow as reversed.</div>
+                                    <button class="btn btn-danger" type="submit"><i class="bi bi-lightning-charge me-2"></i>Execute Approved Reversal</button>
+                                </form>
+                            <% } %>
+                            <% if (!detail.canSubmit && !detail.canExecute) { %>
+                                <div class="text-muted">No Finance action is available in the current reversal status.</div>
+                            <% } %>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-xl-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header"><span class="fw-semibold">Payroll Snapshot</span></div>
+                        <div class="card-body">
+                            <dl class="row mb-0">
+                                <dt class="col-sm-6">Total Staff</dt><dd class="col-sm-6"><%= Number(detail.workflowDetail.batch.TotalStaff || 0).toLocaleString('en-US') %></dd>
+                                <dt class="col-sm-6">Total Gross</dt><dd class="col-sm-6"><%= Number(detail.workflowDetail.batch.TotalGross || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></dd>
+                                <dt class="col-sm-6">Total Deductions</dt><dd class="col-sm-6"><%= Number(detail.workflowDetail.batch.TotalDeductions || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></dd>
+                                <dt class="col-sm-6">Total Net</dt><dd class="col-sm-6"><%= Number(detail.workflowDetail.batch.TotalNet || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></dd>
+                                <dt class="col-sm-6">Checksum</dt><dd class="col-sm-6"><code><%= detail.request.OriginalPayrollChecksum %></code></dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-6">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-header"><span class="fw-semibold">GL Posting Summary</span></div>
+                        <div class="card-body">
+                            <dl class="row mb-0">
+                                <dt class="col-sm-6">Original GL Batch</dt><dd class="col-sm-6">#<%= detail.request.GLPostingBatchID %></dd>
+                                <dt class="col-sm-6">Posting Status</dt><dd class="col-sm-6"><%= detail.postingDetail?.batch?.status || 'N/A' %></dd>
+                                <dt class="col-sm-6">Total Lines</dt><dd class="col-sm-6"><%= Number(detail.postingDetail?.lines?.length || 0).toLocaleString('en-US') %></dd>
+                                <dt class="col-sm-6">Total Amount</dt><dd class="col-sm-6"><%= Number(detail.postingDetail?.batch?.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></dd>
+                                <dt class="col-sm-6">Reversal Batch</dt><dd class="col-sm-6"><%= detail.reversalBatch ? `#${detail.reversalBatch.id}` : 'Pending' %></dd>
+                                <dt class="col-sm-6">Reversal Totals</dt><dd class="col-sm-6"><%= detail.reversalBatch ? `${Number(detail.reversalBatch.TotalDebit || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ${Number(detail.reversalBatch.TotalCredit || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Pending' %></dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header"><span class="fw-semibold">Reversal Workflow History</span></div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr><th>Action</th><th>From</th><th>To</th><th>Comments</th><th>When</th></tr>
+                            </thead>
+                            <tbody>
+                                <% if (!detail.actions.length) { %>
+                                    <tr><td colspan="5" class="text-center text-muted py-4">No reversal workflow actions recorded yet.</td></tr>
+                                <% } %>
+                                <% detail.actions.forEach((action) => { %>
+                                    <tr>
+                                        <td><%= action.Action %></td>
+                                        <td><%= action.FromStatus || 'N/A' %></td>
+                                        <td><%= action.ToStatus %></td>
+                                        <td><%= action.Comments || '—' %></td>
+                                        <td><%= action.ActionAt ? new Date(action.ActionAt).toLocaleString('en-GB') : 'N/A' %></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header"><span class="fw-semibold">Original GL Posting Lines</span></div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>GL Account</th>
+                                    <th>Account Name</th>
+                                    <th>Entry Type</th>
+                                    <th>Amount</th>
+                                    <th>Narration</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% if (!detail.postingDetail?.lines?.length) { %>
+                                    <tr><td colspan="5" class="text-center text-muted py-4">No GL posting lines were found for this reversal request.</td></tr>
+                                <% } %>
+                                <% (detail.postingDetail?.lines || []).forEach((line) => { %>
+                                    <tr>
+                                        <td><%= line.gl_account_code %></td>
+                                        <td><%= line.gl_account_name %></td>
+                                        <td><%= line.entry_type %></td>
+                                        <td><%= Number(line.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td><%= line.narration || '—' %></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

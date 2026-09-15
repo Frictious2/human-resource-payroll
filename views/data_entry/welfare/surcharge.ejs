@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-1"><%= title %></h2>
+                    <div class="text-muted">Only final-approved surcharges become payroll-active deductions.</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/data-entry/workflow/records?module=surcharge" class="btn btn-outline-secondary">Open Workflow Queue</a>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#surchargeModal">
+                        <i class="bi bi-plus-lg me-1"></i> Add Surcharge
+                    </button>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>PFNo</th>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Amount</th>
+                                    <th>Start Date</th>
+                                    <th>End Date</th>
+                                    <th>Status</th>
+                                    <th>Comments</th>
+                                    <th class="text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% if (!rows.length) { %>
+                                    <tr><td colspan="9" class="text-center text-muted py-4">No surcharge records found.</td></tr>
+                                <% } %>
+                                <% rows.forEach((row) => { const editable = ['DRAFT', 'RETURNED_BY_MANAGER', 'RETURNED_BY_ENTITY_HEAD', 'FINAL_REJECTED'].includes(row.WorkflowStatus || 'DRAFT'); %>
+                                    <tr>
+                                        <td><%= row.PFNo %></td>
+                                        <td><%= row.SName || '-' %></td>
+                                        <td><%= row.SurchargeTypeName || row.SType %></td>
+                                        <td><%= Number(row.SAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td><%= row.StarDate ? new Date(row.StarDate).toLocaleDateString('en-GB') : '-' %></td>
+                                        <td><%= row.ExpDate ? new Date(row.ExpDate).toLocaleDateString('en-GB') : '-' %></td>
+                                        <td>
+                                            <span class="badge <%= row.WorkflowStatus === 'FINAL_APPROVED' ? 'bg-success' : row.WorkflowStatus?.includes('RETURNED') ? 'bg-warning text-dark' : row.WorkflowStatus === 'SUBMITTED_TO_MANAGER' || row.WorkflowStatus === 'SUBMITTED_TO_ENTITY_HEAD' ? 'bg-info text-dark' : row.WorkflowStatus === 'FINAL_REJECTED' ? 'bg-danger' : 'bg-secondary' %>">
+                                                <%= row.WorkflowStatus || 'DRAFT' %>
+                                            </span>
+                                        </td>
+                                        <td><%= row.WorkflowComments || '-' %></td>
+                                        <td class="text-end">
+                                            <% if (editable) { %>
+                                                <button class="btn btn-sm btn-outline-primary" onclick='openSurchargeModal(<%- JSON.stringify(row) %>)'>Edit</button>
+                                            <% } else { %>
+                                                <span class="text-muted small">Read only</span>
+                                            <% } %>
+                                        </td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="modal fade" id="surchargeModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Surcharge Record</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="surchargeForm" class="row g-3">
+                        <input type="hidden" name="previousReference" id="previousReference" />
+                        <div class="col-md-6">
+                            <label class="form-label">Entry Date</label>
+                            <input type="datetime-local" class="form-control" name="entryDate" id="entryDate" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Staff</label>
+                            <select class="form-select" name="pfNo" id="pfNo" required>
+                                <option value="">Select Staff...</option>
+                                <% staffList.forEach((staff) => { %>
+                                    <option value="<%= staff.PFNo %>"><%= staff.PFNo %> - <%= staff.SName %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Surcharge Type</label>
+                            <select class="form-select" name="sType" id="sType" required>
+                                <option value="">Select Type...</option>
+                                <% surchargeTypes.forEach((type) => { %>
+                                    <option value="<%= type.Code %>"><%= type.Code %> - <%= type.Surcharge %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Recurring Code</label>
+                            <input type="text" class="form-control" name="amountCode" id="amountCode" maxlength="2" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Surcharge Amount</label>
+                            <input type="number" step="0.01" class="form-control" name="sAmount" id="sAmount" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Duration</label>
+                            <input type="number" class="form-control" name="duration" id="duration" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Bank / Reference</label>
+                            <input type="text" class="form-control" name="bank" id="bank" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Start Date</label>
+                            <input type="date" class="form-control" name="startDate" id="startDate" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">End Date</label>
+                            <input type="date" class="form-control" name="expDate" id="expDate" />
+                        </div>
+                        <div class="col-12 text-end">
+                            <button type="submit" class="btn btn-primary">Save Draft</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/vendor/bootstrap.bundle.min.js"></script>
+    <script>
+        const surchargeModal = new bootstrap.Modal(document.getElementById('surchargeModal'));
+        document.getElementById('entryDate').value = new Date().toISOString().slice(0, 16);
+
+        function openSurchargeModal(row = null) {
+            document.getElementById('surchargeForm').reset();
+            document.getElementById('entryDate').value = new Date().toISOString().slice(0, 16);
+            document.getElementById('previousReference').value = '';
+            if (row) {
+                document.getElementById('previousReference').value = row.WorkflowRecordReference || '';
+                document.getElementById('entryDate').value = row.EntryDate ? new Date(row.EntryDate).toISOString().slice(0, 16) : '';
+                document.getElementById('pfNo').value = row.PFNo || '';
+                document.getElementById('sType').value = row.SType || '';
+                document.getElementById('amountCode').value = row.Amount || '';
+                document.getElementById('sAmount').value = row.SAmount || '';
+                document.getElementById('duration').value = row.Duration || '';
+                document.getElementById('bank').value = row.Bank || '';
+                document.getElementById('startDate').value = row.StarDate ? new Date(row.StarDate).toISOString().slice(0, 10) : '';
+                document.getElementById('expDate').value = row.ExpDate ? new Date(row.ExpDate).toISOString().slice(0, 10) : '';
+            }
+            surchargeModal.show();
+        }
+
+        document.getElementById('surchargeForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const data = Object.fromEntries(new FormData(event.target).entries());
+
+            try {
+                const response = await fetch('/data-entry/api/welfare/surcharge/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || 'Failed to save surcharge record.');
+                }
+                alert('Surcharge draft saved successfully. Submit it from the workflow queue when ready.');
+                location.reload();
+            } catch (error) {
+                alert(error.message || 'Server Error');
+            }
+        });
+    </script>
+</body>
+</html>

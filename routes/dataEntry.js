@@ -2,46 +2,83 @@ const express = require('express');
 const router = express.Router();
 const dataEntryController = require('../controllers/dataEntryController');
 const benefitController = require('../controllers/benefitController');
-const payrollGlPostingRoutes = require('./payrollGlPostingRoutes');
-const processEmolumentsRoutes = require('./processEmolumentsRoutes');
+const recordWorkflowController = require('../controllers/recordWorkflowController');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+const statementReportController = require('../controllers/statementReportController');
+
+const staffPhotoDirectory = path.join(process.cwd(), 'public', 'uploads', 'staff_photos');
+const medicalReceiptDirectory = path.join(process.cwd(), 'public', 'uploads', 'medical_receipts');
+fs.mkdirSync(staffPhotoDirectory, { recursive: true });
+fs.mkdirSync(medicalReceiptDirectory, { recursive: true });
+
+function denyFinanceOnlyAccess(req, res) {
+    const message = 'Payroll processing and GL posting are now restricted to Finance Officer accounts. Please use the Finance workspace for these actions.';
+    const acceptHeader = req.get('accept') || '';
+
+    if (req.xhr || req.path.startsWith('/api/') || acceptHeader.includes('application/json')) {
+        return res.status(403).json({
+            success: false,
+            message
+        });
+    }
+
+    return res.status(403).render('shared/coming-soon', {
+        role: req.user ? req.user.role : 'data-entry',
+        title: 'Access Denied',
+        group: 'Security',
+        user: req.user || { name: 'User' },
+        message
+    });
+}
+
+function imageFileFilter(req, file, cb) {
+    const filetypes = /jpeg|jpg|png|gif|webp/;
+    const mimetype = filetypes.test(String(file.mimetype || '').toLowerCase());
+    const extname = filetypes.test(path.extname(file.originalname || '').toLowerCase());
+    if (mimetype && extname) {
+        return cb(null, true);
+    }
+    return cb(new Error('Only image uploads are allowed.'));
+}
 
 // Multer Setup for Staff Photos
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, 'public/uploads/staff_photos/');
+        cb(null, staffPhotoDirectory);
     },
     filename: function (req, file, cb) {
         cb(null, req.body.pfno + '_' + Date.now() + path.extname(file.originalname));
     }
 });
-const upload = multer({ storage: storage });
+const upload = multer({
+    storage,
+    fileFilter: imageFileFilter,
+    limits: { fileSize: 3 * 1024 * 1024 }
+});
 
 // Multer Setup for Medical Receipts
 const medicalStorage = multer.diskStorage({
     destination: function (req, file, cb) {
-        // Ensure directory exists or use a standard one. 
-        // Ideally we should check/create, but for now assuming public/uploads exists.
-        // I will stick to a new folder 'medical_receipts' inside uploads.
-        // Note: The user might need to create this folder manually or I should ensure it exists.
-        // Since I can't easily run 'mkdir', I'll assume 'public/uploads' exists and maybe just put it there 
-        // or rely on node to not fail if I point to it. 
-        // Actually, multer throws if dir doesn't exist. 
-        // I'll check if I can use 'fs' to ensure dir exists in the controller or just use 'public/uploads' root?
-        // No, let's try to be organized. 'public/uploads/medical_receipts/'
-        cb(null, 'public/uploads/medical_receipts/');
+        cb(null, medicalReceiptDirectory);
     },
     filename: function (req, file, cb) {
         cb(null, 'MED_' + req.body.pfno + '_' + Date.now() + path.extname(file.originalname));
     }
 });
-const uploadMedical = multer({ storage: medicalStorage });
+const uploadMedical = multer({
+    storage: medicalStorage,
+    fileFilter: imageFileFilter,
+    limits: { fileSize: 3 * 1024 * 1024 }
+});
 
 // Dashboard
 router.get('/', (req, res) => res.redirect('/data-entry/dashboard'));
 router.get('/dashboard', dataEntryController.getDashboard);
 router.get('/pending-approvals', dataEntryController.getPendingApprovals);
+router.get('/workflow/records', recordWorkflowController.getDataEntryQueue);
+router.post('/workflow/items/:workflowItemId/submit', recordWorkflowController.postDataEntrySubmit);
 
 // 1. Enquiry
 router.get('/enquiry/staff', dataEntryController.getStaffEnquiry);
@@ -97,8 +134,6 @@ router.post('/staff/redundancy', dataEntryController.initiateRedundancy);
 router.get('/staff/exit', dataEntryController.getStaffExit);
 router.get('/staff/exit/search', dataEntryController.searchStaffExit);
 router.post('/staff/exit', dataEntryController.postStaffExit);
-router.get('/staff/import', dataEntryController.getComingSoon);
-router.get('/staff/travel', dataEntryController.getComingSoon);
 
 // Leave
 router.get('/leave/application', dataEntryController.getLeaveApplication);
@@ -127,9 +162,9 @@ router.get('/payroll/edit-payroll', dataEntryController.getPayrollEdit);
 router.post('/payroll/edit-payroll', dataEntryController.postPayrollEdit);
 router.get('/payroll/view-payroll', dataEntryController.getPayrollView);
 router.post('/payroll/view-payroll/preview', dataEntryController.postPayrollViewPreview);
-router.use('/payroll/process-emoluments', processEmolumentsRoutes);
-router.use('/payroll/post-to-accounts', payrollGlPostingRoutes);
-router.use('/payroll/gl-posting', payrollGlPostingRoutes);
+router.use('/payroll/process-emoluments', denyFinanceOnlyAccess);
+router.use('/payroll/post-to-accounts', denyFinanceOnlyAccess);
+router.use('/payroll/gl-posting', denyFinanceOnlyAccess);
 router.get('/payroll/yearly-payments', dataEntryController.getPayrollYearlyPayments);
 router.post('/payroll/yearly-payments', dataEntryController.postPayrollYearlyPayments);
 router.get('/payroll/increments-pay-cut-backlog', dataEntryController.getIncrementsPayCutBacklog);
@@ -141,7 +176,6 @@ router.get('/payroll/bonus', dataEntryController.getPayrollBonus);
 router.get('/api/payroll/bonus-awards/pending', dataEntryController.getBonusAwardsPending);
 router.get('/api/payroll/bonus-awards/:id', dataEntryController.getBonusAwardById);
 router.post('/api/payroll/bonus-awards', dataEntryController.postBonusAward);
-router.get('/payroll/liabilities', dataEntryController.getComingSoon);
 router.get('/payroll/salary-reviews', dataEntryController.getPayrollSalaryReviews);
 router.post('/payroll/salary-reviews', dataEntryController.postPayrollSalaryReviews);
 router.get('/payroll/vehicle-insurance', dataEntryController.getPayrollVehicleInsurance);
@@ -157,11 +191,12 @@ router.get('/welfare/loan', dataEntryController.getWelfareLoan);
 router.post('/api/welfare/loan/add', dataEntryController.postWelfareLoanAdd);
 router.post('/api/welfare/loan/repayment', dataEntryController.postWelfareLoanRepayment);
 router.get('/api/staff/:pfno/loan-history', dataEntryController.getStaffLoanHistory);
+router.get('/welfare/surcharge', dataEntryController.getWelfareSurcharge);
+router.post('/api/welfare/surcharge/save', dataEntryController.postWelfareSurchargeSave);
 router.get('/welfare/guarantee', dataEntryController.getWelfareGuarantee);
 router.post('/api/welfare/guarantee', dataEntryController.postWelfareGuarantee);
 router.get('/welfare/benefits', benefitController.getWelfareBenefits);
 router.post('/api/welfare/benefits/calculate', benefitController.calculateBenefits);
-router.get('/welfare/corporate-benefit', dataEntryController.getComingSoon);
 router.get('/welfare/redundancy', dataEntryController.getWelfareRedundancy);
 
 // 5. Reports
@@ -177,20 +212,16 @@ router.get('/reports/journal', dataEntryController.getJournalReport);
 router.get('/reports/journal/preview', dataEntryController.getJournalReportPreview);
 router.get('/reports/vehicle-insurance-status', dataEntryController.getVehicleInsuranceStatusReport);
 router.get('/reports/medical', dataEntryController.getMedicalReports);
-router.get('/reports/bio-data', dataEntryController.getBioDataReport);
+router.get('/reports/bio-data', statementReportController.getDataEntryBioDataReport);
 router.get('/reports/loan', dataEntryController.getLoanReport);
-router.get('/reports/long-service', dataEntryController.getComingSoon);
 router.get('/reports/leave', dataEntryController.getLeaveReport);
 router.get('/reports/guarantees', dataEntryController.getGuaranteesReport);
 router.get('/reports/acting-allowance', dataEntryController.getActingAllowanceReport);
 router.get('/reports/attendance', dataEntryController.getAttendanceReport);
-router.get('/reports/nassit-grats-statement', dataEntryController.getComingSoon);
-router.get('/reports/payroll-liabilities', dataEntryController.getComingSoon);
-router.get('/reports/com-org-liabilities', dataEntryController.getComingSoon);
+router.get('/reports/nassit-grats-statement', statementReportController.getDataEntryNassitGratuityReport);
 router.get('/reports/yearly-payments', dataEntryController.getYearlyPaymentsReport);
 router.get('/reports/benefit-status', benefitController.getBenefitStatusReport);
 router.post('/api/reports/benefit-status/calculate', benefitController.calculateBenefits);
-router.get('/reports/travel', dataEntryController.getComingSoon);
 router.get('/reports/redundancy', dataEntryController.getReportsRedundancy);
 router.get('/reports/master-pay-sheet', dataEntryController.getReportsMasterPaySheet);
 

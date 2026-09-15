@@ -7,8 +7,10 @@ const {
 const payrollValidationService = require('./payrollValidationService');
 const staffStatusService = require('./staffStatusService');
 const incrementPayrollService = require('./incrementPayrollService');
+const payrollWorkflowService = require('./payrollWorkflowService');
+const auditTrailService = require('./auditTrailService');
 
-const ALLOWED_ROLES = new Set(['data-entry', 'admin', 'manager', 'developer']);
+const ALLOWED_ROLES = new Set(['finance-officer', 'admin', 'developer']);
 
 function roundAmount(value) {
     return Math.round((Number(value) || 0) * 100) / 100;
@@ -50,12 +52,182 @@ function parseHistoryKey(batchId) {
     };
 }
 
-async function getNextAuditTrailId(connection) {
-    const [rows] = await connection.query(
-        'SELECT COALESCE(MAX(AuditTrailID), 0) + 1 AS nextId FROM tblaudittrail'
+function buildWorkflowActor(processedByUser, userRole, fallbackName) {
+    return {
+        id: Number(processedByUser?.id ?? processedByUser?.pfno ?? 0) || 0,
+        role: String(processedByUser?.role || userRole || '').trim(),
+        name: processedByUser?.name || processedByUser?.fullName || processedByUser?.username || fallbackName || 'System',
+        source: processedByUser?.source || 'tblpassword'
+    };
+}
+
+function assertWorkflowAllowsProcessing(existingBatch) {
+    if (!existingBatch) {
+        return {
+            isCorrectionRun: false,
+            previousStatus: null
+        };
+    }
+
+    const blockedStatuses = new Set([
+        payrollWorkflowService.WORKFLOW_STATUSES.SUBMITTED_TO_MANAGER,
+        payrollWorkflowService.WORKFLOW_STATUSES.MANAGER_ENDORSED,
+        payrollWorkflowService.WORKFLOW_STATUSES.SUBMITTED_TO_AUDITOR,
+        payrollWorkflowService.WORKFLOW_STATUSES.AUDITOR_ENDORSED,
+        payrollWorkflowService.WORKFLOW_STATUSES.SUBMITTED_TO_ENTITY_HEAD,
+        payrollWorkflowService.WORKFLOW_STATUSES.FINAL_APPROVED,
+        payrollWorkflowService.WORKFLOW_STATUSES.POSTED_TO_ACCOUNTS
+    ]);
+
+    if (blockedStatuses.has(existingBatch.Status)) {
+        const error = new Error('This payroll batch is currently under review or has already been approved and cannot be reprocessed.');
+        error.statusCode = 409;
+        throw error;
+    }
+
+    if (existingBatch.Status === payrollWorkflowService.WORKFLOW_STATUSES.CORRECTION_IN_PROGRESS) {
+        return {
+            isCorrectionRun: true,
+            previousStatus: existingBatch.Status
+        };
+    }
+
+    const restrictedStatuses = new Set([
+        payrollWorkflowService.WORKFLOW_STATUSES.PROCESSED,
+        payrollWorkflowService.WORKFLOW_STATUSES.RETURNED_BY_MANAGER,
+        payrollWorkflowService.WORKFLOW_STATUSES.RETURNED_BY_AUDITOR,
+        payrollWorkflowService.WORKFLOW_STATUSES.FINAL_REJECTED
+    ]);
+
+    if (restrictedStatuses.has(existingBatch.Status)) {
+        const error = new Error('This payroll batch already exists. Use the controlled correction or restart workflow before processing it again.');
+        error.statusCode = 409;
+        throw error;
+    }
+
+    return {
+        isCorrectionRun: false,
+        previousStatus: existingBatch.Status
+    };
+}
+
+async function removeExistingPayrollRowsForCorrection(connection, {
+    companyId,
+    payrollMonth,
+    payrollYear,
+    activityCode,
+    workflowBatch = null
+}) {
+    let allowReopenReplacement = false;
+    if (
+        workflowBatch &&
+        workflowBatch.Status === payrollWorkflowService.WORKFLOW_STATUSES.CORRECTION_IN_PROGRESS &&
+        Number(workflowBatch.OriginalWorkflowBatchID || 0) > 0 &&
+        Number(workflowBatch.ReopenRequestID || 0) > 0
+    ) {
+        const [[originalBatch]] = await connection.query(
+            `
+                SELECT id, Status
+                FROM payroll_workflow_batches
+                WHERE id = ?
+                LIMIT 1
+            `,
+            [workflowBatch.OriginalWorkflowBatchID]
+        );
+
+        const [[archiveStats]] = await connection.query(
+            `
+                SELECT COUNT(*) AS archivedRows
+                FROM payroll_reversed_row_archive
+                WHERE OriginalWorkflowBatchID = ?
+            `,
+            [workflowBatch.OriginalWorkflowBatchID]
+        ).catch((error) => {
+            if (error?.code === 'ER_NO_SUCH_TABLE' || error?.sqlState === '42S02') {
+                return [[{ archivedRows: 0 }]];
+            }
+            throw error;
+        });
+
+        allowReopenReplacement = Boolean(
+            originalBatch &&
+            originalBatch.Status === payrollWorkflowService.WORKFLOW_STATUSES.REVERSED &&
+            Number(archiveStats?.archivedRows || 0) > 0
+        );
+    }
+
+    const [[rowStats]] = await connection.query(
+        `
+            SELECT
+                COUNT(*) AS totalRows,
+                SUM(CASE WHEN COALESCE(posted_to_gl, 0) <> 0 THEN 1 ELSE 0 END) AS postedRows
+            FROM tblpayroll
+            WHERE CompanyID = ?
+              AND PMonth = ?
+              AND PYear = ?
+              AND PType = ?
+        `,
+        [companyId, payrollMonth, payrollYear, activityCode]
     );
 
-    return rows[0] && rows[0].nextId ? rows[0].nextId : 1;
+    const totalRows = Number(rowStats?.totalRows || 0);
+    const postedRows = Number(rowStats?.postedRows || 0);
+    if (postedRows > 0 && !allowReopenReplacement) {
+        const error = new Error('This payroll has already been posted to accounts and requires a formal reversal.');
+        error.statusCode = 409;
+        throw error;
+    }
+
+    try {
+        const [[glBatchStats]] = await connection.query(
+            `
+                SELECT COUNT(*) AS count
+                FROM payroll_gl_posting_batches
+                WHERE company_id = ?
+                  AND posting_month = ?
+                  AND posting_year = ?
+                  AND activity_code = ?
+            `,
+            [companyId, payrollMonth, payrollYear, activityCode]
+        );
+
+        if (Number(glBatchStats?.count || 0) > 0 && !allowReopenReplacement) {
+            const error = new Error('This payroll has already been posted to accounts and requires a formal reversal.');
+            error.statusCode = 409;
+            throw error;
+        }
+    } catch (error) {
+        if (error?.code !== 'ER_NO_SUCH_TABLE' && error?.sqlState !== '42S02') {
+            throw error;
+        }
+    }
+
+    if (totalRows === 0) {
+        return {
+            totalRows: 0,
+            deletedRows: 0
+        };
+    }
+
+    const [deleteResult] = await connection.query(
+        `
+            DELETE FROM tblpayroll
+            WHERE CompanyID = ?
+              AND PMonth = ?
+              AND PYear = ?
+              AND PType = ?
+              AND (
+                    COALESCE(posted_to_gl, 0) = 0
+                    OR ?
+              )
+        `,
+        [companyId, payrollMonth, payrollYear, activityCode, allowReopenReplacement ? 1 : 0]
+    );
+
+    return {
+        totalRows,
+        deletedRows: Number(deleteResult?.affectedRows || 0)
+    };
 }
 
 async function logProcessAudit(connection, {
@@ -65,24 +237,17 @@ async function logProcessAudit(connection, {
     recordId,
     message
 }) {
-    const nextId = await getNextAuditTrailId(connection);
-    await connection.query(
-        `INSERT INTO tblaudittrail
-        (AuditTrailID, ChangeDate, UserName, FormName, Action, RecordID, FieldName, OldValue, NewValue, Loggedout, CompanyID)
-        VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-            nextId,
-            userName || 'System',
-            'payroll/process-emoluments',
-            action,
-            String(recordId || '').slice(0, 6) || null,
-            null,
-            null,
-            message || null,
-            0,
-            companyId
-        ]
-    );
+    await auditTrailService.writeAuditEntryWithExecutor(connection, {
+        action,
+        userName: userName || 'System',
+        formName: 'payroll/process-emoluments',
+        recordId: String(recordId || '').slice(0, 6) || null,
+        fieldName: null,
+        oldValue: null,
+        newValue: message || null,
+        loggedout: 0,
+        companyId
+    });
 }
 
 async function getCompanyPaymentSetup(connection, companyId) {
@@ -697,8 +862,14 @@ async function applyMedicalDeductions(connection, { companyId, payrollMonth, pay
                 FROM tblmedical m
                 INNER JOIN tblstaff s
                     ON s.PFNo = m.PFNo
+                LEFT JOIN record_workflow_items rw
+                    ON rw.CompanyID = COALESCE(m.CompanyID, ?)
+                   AND rw.Module = 'medical'
+                   AND rw.SourceTable = 'tblmedical'
+                   AND rw.RecordReference = CAST(m.TransNo AS CHAR)
                 WHERE (m.CompanyID = ? OR m.CompanyID IS NULL)
                   AND (s.CompanyID = ? OR s.CompanyID IS NULL)
+                  AND (rw.id IS NULL OR rw.Status = 'FINAL_APPROVED')
                   AND YEAR(m.EntryDate) = ?
                   AND MONTH(m.EntryDate) = ?
                   AND DATE(m.EntryDate) <= ?
@@ -712,7 +883,7 @@ async function applyMedicalDeductions(connection, { companyId, payrollMonth, pay
               AND p.PType = '01'
               AND COALESCE(p.WithoutPay, 0) = 0
         `,
-        [companyId, companyId, payrollYear, payrollMonth, payrollDate, companyId, payrollMonth, payrollYear]
+        [companyId, companyId, companyId, payrollYear, payrollMonth, payrollDate, companyId, payrollMonth, payrollYear]
     );
 
     return result.affectedRows || 0;
@@ -797,6 +968,7 @@ async function refreshPayrollNetIncome(connection, { companyId, payrollMonth, pa
 }
 
 async function runSalarySideEffects(connection, {
+    companyId,
     payrollDate,
     payrollMonth,
     payrollYear
@@ -890,12 +1062,12 @@ async function runSalarySideEffects(connection, {
 
     await connection.query(
         `
-            INSERT INTO tblpayday (PayDate)
-            SELECT DISTINCT SalDate
+            INSERT IGNORE INTO tblpayday (PayDate, CompanyID)
+            SELECT DISTINCT SalDate, ?
             FROM tblpayroll
             WHERE DATE(SalDate) = ?
         `,
-        [payrollDate]
+        [companyId, payrollDate]
     );
 
     await connection.query(
@@ -933,7 +1105,7 @@ async function runSalarySideEffects(connection, {
             INSERT INTO tblgltrans (
                 GLDate, BasicSalary, Headquarters, Transport, COLA, Responsibility, MaidAllowance, Acting, Risk, Professional,
                 StaffWelfare, Academic, IncomeTax, NassitEmp, ProvidentEmp, SSA, JSA, GLMonth, GLYear, SalAdvance, IntOnAdv,
-                SalaryWages, Rent, Approved
+                SalaryWages, Rent, Approved, CompanyID
             )
             SELECT
                 MAX(p.PDate),
@@ -959,15 +1131,40 @@ async function runSalarySideEffects(connection, {
                 SUM(p.Ded3),
                 SUM(p.NetIncome),
                 SUM(p.Ded4),
-                0
+                0,
+                ?
             FROM tblpayroll p
             WHERE DATE(p.PDate) = ?
               AND p.PType = '01'
               AND p.PMonth = ?
               AND p.PYear = ?
             GROUP BY p.PMonth
+            ON DUPLICATE KEY UPDATE
+                GLDate = VALUES(GLDate),
+                BasicSalary = VALUES(BasicSalary),
+                Headquarters = VALUES(Headquarters),
+                Transport = VALUES(Transport),
+                COLA = VALUES(COLA),
+                Responsibility = VALUES(Responsibility),
+                MaidAllowance = VALUES(MaidAllowance),
+                Acting = VALUES(Acting),
+                Risk = VALUES(Risk),
+                Professional = VALUES(Professional),
+                StaffWelfare = VALUES(StaffWelfare),
+                Academic = VALUES(Academic),
+                IncomeTax = VALUES(IncomeTax),
+                NassitEmp = VALUES(NassitEmp),
+                ProvidentEmp = VALUES(ProvidentEmp),
+                SSA = VALUES(SSA),
+                JSA = VALUES(JSA),
+                SalAdvance = VALUES(SalAdvance),
+                IntOnAdv = VALUES(IntOnAdv),
+                SalaryWages = VALUES(SalaryWages),
+                Rent = VALUES(Rent),
+                Approved = VALUES(Approved),
+                CompanyID = VALUES(CompanyID)
         `,
-        [payrollDate, payrollMonth, payrollYear]
+        [companyId, payrollDate, payrollMonth, payrollYear]
     );
 }
 
@@ -1007,7 +1204,7 @@ class ProcessEmolumentsService {
         }
     }
 
-    static async processEmoluments({ companyId, activityCode, payrollDate, processedByName, userRole }) {
+    static async processEmoluments({ companyId, activityCode, payrollDate, processedByName, processedByUser = null, userRole }) {
         const validatedPayload = validateProcessEmolumentsInput({ companyId, activityCode, payrollDate });
 
         this.ensureAuthorized(userRole);
@@ -1022,6 +1219,8 @@ class ProcessEmolumentsService {
         } = validatedPayload;
         const { parsedDate } = derivePayrollPeriod(validatedPayrollDate);
         const sqlDate = formatSqlDate(parsedDate);
+        const workflowActor = buildWorkflowActor(processedByUser, userRole, processedByName);
+        const actorName = workflowActor.name || processedByName || 'System';
 
         if (validatedActivityCode !== '01') {
             const error = new Error(`${activityName} processing is not fully implemented yet.`);
@@ -1032,6 +1231,34 @@ class ProcessEmolumentsService {
         const connection = await pool.getConnection();
         try {
             await connection.beginTransaction();
+
+            const existingWorkflowBatch = await payrollWorkflowService.getWorkflowBatch(
+                validatedCompanyId,
+                payrollMonth,
+                payrollYear,
+                validatedActivityCode,
+                connection
+            );
+            const workflowProcessingState = assertWorkflowAllowsProcessing(existingWorkflowBatch);
+
+            let correctionRemovalSummary = null;
+            if (workflowProcessingState.isCorrectionRun) {
+                correctionRemovalSummary = await removeExistingPayrollRowsForCorrection(connection, {
+                    companyId: validatedCompanyId,
+                    payrollMonth,
+                    payrollYear,
+                    activityCode: validatedActivityCode,
+                    workflowBatch: existingWorkflowBatch
+                });
+
+                await logProcessAudit(connection, {
+                    companyId: validatedCompanyId,
+                    userName: actorName,
+                    action: 'REMOVE_OLD_UNPOSTED_PAYROLL_ROWS',
+                    recordId: makeHistoryKey({ activityCode: validatedActivityCode, payrollMonth, payrollYear }),
+                    message: `Removed ${correctionRemovalSummary.deletedRows} unposted payroll row(s) for controlled correction.`
+                });
+            }
 
             await payrollValidationService.validateProcessEmoluments(connection, {
                 companyId: validatedCompanyId,
@@ -1058,7 +1285,7 @@ class ProcessEmolumentsService {
                 companyId: validatedCompanyId,
                 payingBBAN: companySetup.AccNo || '',
                 payingBank: companySetup.PayingBank || '',
-                operatorName: processedByName || 'System',
+                operatorName: actorName,
                 incrementContext,
                 appliedIncrementRows
             });
@@ -1069,7 +1296,7 @@ class ProcessEmolumentsService {
                 companyId: validatedCompanyId,
                 payingBBAN: companySetup.AccNo || '',
                 payingBank: companySetup.PayingBank || '',
-                operatorName: processedByName || 'System',
+                operatorName: actorName,
                 incrementContext,
                 appliedIncrementRows
             });
@@ -1078,7 +1305,7 @@ class ProcessEmolumentsService {
                 payrollMonth,
                 payrollYear,
                 companyId: validatedCompanyId,
-                operatorName: processedByName || 'System',
+                operatorName: actorName,
                 incrementContext,
                 appliedIncrementRows
             });
@@ -1131,41 +1358,61 @@ class ProcessEmolumentsService {
             await incrementPayrollService.markAppliedIncrements(connection, incrementRowsToMark);
 
             await runSalarySideEffects(connection, {
+                companyId,
                 payrollDate: sqlDate,
                 payrollMonth,
                 payrollYear
             });
 
-            const [[summary]] = await connection.query(
-                `
-                    SELECT
-                        COUNT(*) AS totalStaff,
-                        COALESCE(SUM(TotalIncome), 0) AS totalGross,
-                        COALESCE(SUM(Tax), 0) AS totalTax,
-                        COALESCE(SUM(COALESCE(NassitEmp, 0) + COALESCE(UnionDues, 0) + COALESCE(GratEmp, 0) + COALESCE(Ded1, 0) + COALESCE(Ded2, 0) + COALESCE(Ded3, 0) + COALESCE(Ded4, 0) + COALESCE(Ded5, 0) + COALESCE(Ded6, 0) + COALESCE(Ded7, 0)), 0) AS totalDeductions,
-                        COALESCE(SUM(NetIncome), 0) AS totalNet
-                    FROM tblpayroll
-                    WHERE CompanyID = ?
-                      AND PType = '01'
-                      AND PMonth = ?
-                      AND PYear = ?
-                `,
-                [validatedCompanyId, payrollMonth, payrollYear]
-            );
+            const workflowTransition = await payrollWorkflowService.transitionWorkflow({
+                companyId: validatedCompanyId,
+                pMonth: payrollMonth,
+                pYear: payrollYear,
+                pType: validatedActivityCode,
+                action: payrollWorkflowService.WORKFLOW_ACTIONS.PROCESS_PAYROLL,
+                user: workflowActor,
+                comments: workflowProcessingState.isCorrectionRun
+                    ? `Reprocessed ${activityName} payroll for ${String(payrollMonth).padStart(2, '0')}/${payrollYear} after correction.`
+                    : `Processed ${activityName} payroll for ${String(payrollMonth).padStart(2, '0')}/${payrollYear}.`,
+                metadata: {
+                    activityName,
+                    payrollDate: sqlDate,
+                    source: 'process-emoluments',
+                    correctionRun: workflowProcessingState.isCorrectionRun,
+                    correctionRemovalSummary
+                },
+                connection
+            });
+
+            const summary = workflowTransition.snapshot;
 
             const recordId = makeHistoryKey({ activityCode: validatedActivityCode, payrollMonth, payrollYear });
             await logProcessAudit(connection, {
                 companyId: validatedCompanyId,
-                userName: processedByName || 'System',
-                action: 'New',
+                userName: actorName,
+                action: workflowProcessingState.isCorrectionRun ? 'COMPLETE_PAYROLL_CORRECTION' : 'New',
                 recordId,
-                message: `Processed ${summary.totalStaff} salary payroll record(s) for ${String(payrollMonth).padStart(2, '0')}/${payrollYear}.`
+                message: workflowProcessingState.isCorrectionRun
+                    ? `Corrected payroll processed successfully for ${String(payrollMonth).padStart(2, '0')}/${payrollYear} with ${summary.totalStaff} payroll row(s).`
+                    : `Processed ${summary.totalStaff} salary payroll record(s) for ${String(payrollMonth).padStart(2, '0')}/${payrollYear}.`
             });
+
+            if (workflowProcessingState.isCorrectionRun) {
+                await logProcessAudit(connection, {
+                    companyId: validatedCompanyId,
+                    userName: actorName,
+                    action: 'RESET_WORKFLOW_APPROVAL_STATE',
+                    recordId,
+                    message: 'Previous Manager, Auditor, and Entity Head approval fields were reset after payroll correction.'
+                });
+            }
 
             await connection.commit();
 
             return {
                 batchId: recordId,
+                workflowBatchId: workflowTransition.batch.id,
+                workflowStatus: workflowTransition.batch.Status,
                 activityCode: validatedActivityCode,
                 activityName,
                 payrollMonth,
@@ -1174,7 +1421,8 @@ class ProcessEmolumentsService {
                 totalGross: roundAmount(summary.totalGross),
                 totalTax: roundAmount(summary.totalTax),
                 totalDeductions: roundAmount(summary.totalDeductions),
-                totalNet: roundAmount(summary.totalNet)
+                totalNet: roundAmount(summary.totalNet),
+                isCorrectionRun: workflowProcessingState.isCorrectionRun
             };
         } catch (error) {
             await connection.rollback();
@@ -1182,7 +1430,7 @@ class ProcessEmolumentsService {
             try {
                 await logProcessAudit(connection, {
                     companyId: validatedCompanyId,
-                    userName: processedByName || 'System',
+                    userName: actorName,
                     action: 'Edit',
                     recordId: makeHistoryKey({ activityCode: validatedActivityCode, payrollMonth, payrollYear }),
                     message: error.message

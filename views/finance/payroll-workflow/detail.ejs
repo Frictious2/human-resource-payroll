@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= title %> - Finance</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="/css/styles.css" rel="stylesheet" />
+</head>
+<body>
+    <%- include('../partials/topbar', { user }) %>
+    <%- include('../partials/sidebar') %>
+
+    <main class="main">
+        <div class="container-fluid py-3">
+            <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
+                <div>
+                    <h2 class="mb-1">Payroll Workflow Detail</h2>
+                    <p class="text-muted mb-0">Review the payroll snapshot, employee rows, and workflow history before submission.</p>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="/finance/payroll/workflow" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-2"></i>Back to Workflow</a>
+                    <% if (canSubmitToManager) { %>
+                        <form method="POST" action="/finance/payroll/workflow/<%= batch.id %>/submit-to-manager">
+                            <button type="submit" class="btn btn-success"><i class="bi bi-send-check me-2"></i>Submit to Manager</button>
+                        </form>
+                    <% } %>
+                    <% if (batch.Status === 'CORRECTION_IN_PROGRESS') { %>
+                        <a href="<%= correctionProcessUrl %>" class="btn btn-warning"><i class="bi bi-arrow-repeat me-2"></i>Run Corrected Process Emoluments</a>
+                    <% } %>
+                </div>
+            </div>
+
+            <% if (successMessage) { %>
+                <div class="alert alert-success shadow-sm"><%= successMessage %></div>
+            <% } %>
+            <% if (errorMessage) { %>
+                <div class="alert alert-danger shadow-sm"><%= errorMessage %></div>
+            <% } %>
+
+            <% if (canStartCorrection) { %>
+                <div class="card shadow-sm border-warning mb-4">
+                    <div class="card-body">
+                        <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+                            <div>
+                                <h5 class="card-title mb-1">Controlled Payroll Correction</h5>
+                                <p class="text-muted mb-0">
+                                    This batch was returned or rejected. Start a controlled correction to preserve the existing workflow history,
+                                    keep the current snapshot for audit, and rerun Process Emoluments for this exact payroll period.
+                                </p>
+                            </div>
+                            <div class="small text-muted">
+                                Once correction starts, the batch moves to <code>CORRECTION_IN_PROGRESS</code> until Finance reruns payroll.
+                            </div>
+                        </div>
+                        <form method="POST" action="/finance/payroll/workflow/<%= batch.id %>/start-correction" class="row g-3 mt-1">
+                            <div class="col-12">
+                                <label for="comments" class="form-label">Correction Reason / Acknowledgement</label>
+                                <textarea class="form-control" id="comments" name="comments" rows="3" required placeholder="State the return or rejection reason being addressed before rerunning payroll."></textarea>
+                            </div>
+                            <div class="col-12 d-flex justify-content-end">
+                                <button type="submit" class="btn btn-warning"><i class="bi bi-arrow-repeat me-2"></i>Start Correction</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            <% } %>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <div class="text-muted small">Payroll Period</div>
+                            <div class="fw-semibold"><%= String(batch.PMonth).padStart(2, '0') %>/<%= batch.PYear %></div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-muted small">Company</div>
+                            <div class="fw-semibold"><%= batch.companyName || batch.CompanyID %></div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-muted small">Activity</div>
+                            <div class="fw-semibold"><%= batch.PType %></div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-muted small">Workflow Status</div>
+                            <div><span class="badge <%= getStatusBadgeClass(batch.Status) %>"><%= batch.Status %></span></div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-muted small">Processed By</div>
+                            <div class="fw-semibold"><%= batch.processedByName || batch.ProcessedBy || 'N/A' %></div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-muted small">Processed At</div>
+                            <div class="fw-semibold"><%= batch.ProcessedAt ? new Date(batch.ProcessedAt).toLocaleString('en-GB') : 'N/A' %></div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-muted small">Manager Comments</div>
+                            <div class="fw-semibold"><%= batch.ManagerComments || 'N/A' %></div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-muted small">Auditor Comments</div>
+                            <div class="fw-semibold"><%= batch.AuditorComments || 'N/A' %></div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-muted small">Final Decision By</div>
+                            <div class="fw-semibold"><%= batch.finalDecisionByName || 'N/A' %></div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-muted small">Final Decision At</div>
+                            <div class="fw-semibold"><%= batch.finalDecisionAt ? new Date(batch.finalDecisionAt).toLocaleString('en-GB') : 'N/A' %></div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-muted small">Entity Head / HNO Comments</div>
+                            <div class="fw-semibold"><%= batch.EntityHeadComments || 'N/A' %></div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-muted small">Posted By</div>
+                            <div class="fw-semibold"><%= batch.postedToAccountsByName || 'N/A' %></div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-muted small">Posted At</div>
+                            <div class="fw-semibold"><%= batch.postedToAccountsAt ? new Date(batch.postedToAccountsAt).toLocaleString('en-GB') : 'N/A' %></div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-muted small">GL Batch</div>
+                            <div class="fw-semibold"><%= batch.glPostingBatchId ? `#${batch.glPostingBatchId}` : 'N/A' %></div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="text-muted small">GL Posting Date</div>
+                            <div class="fw-semibold"><%= batch.glPostingDate ? new Date(batch.glPostingDate).toLocaleDateString('en-GB') : 'N/A' %></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">Total Staff</div><div class="fs-4 fw-semibold"><%= Number(batch.TotalStaff || 0).toLocaleString() %></div></div></div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">Payroll Rows</div><div class="fs-4 fw-semibold"><%= Number(batch.PayrollRowCount || 0).toLocaleString() %></div></div></div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">Total Basic</div><div class="fs-4 fw-semibold"><%= Number(batch.TotalBasic || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div></div></div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">Total Allowances</div><div class="fs-4 fw-semibold"><%= Number(batch.TotalAllowances || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div></div></div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">Total Gross</div><div class="fs-4 fw-semibold"><%= Number(batch.TotalGross || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div></div></div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">Total Taxable</div><div class="fs-4 fw-semibold"><%= Number(batch.TotalTaxable || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div></div></div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">Total Tax</div><div class="fs-4 fw-semibold"><%= Number(batch.TotalTax || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div></div></div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">Total Net</div><div class="fs-4 fw-semibold"><%= Number(batch.TotalNet || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div></div></div>
+                </div>
+            </div>
+
+            <div class="row g-4 mb-4">
+                <div class="col-md-6">
+                    <div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">NASSIT Employee</div><div class="fs-4 fw-semibold"><%= Number(batch.TotalNassitEmployee || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div></div></div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card shadow-sm h-100"><div class="card-body"><div class="text-muted small">NASSIT Employer</div><div class="fs-4 fw-semibold"><%= Number(batch.TotalNassitEmployer || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div></div></div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <span class="fw-semibold">Workflow History</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Action</th>
+                                    <th>From</th>
+                                    <th>To</th>
+                                    <th>By</th>
+                                    <th>Role</th>
+                                    <th>At</th>
+                                    <th>Comments</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% if (!history.length) { %>
+                                    <tr><td colspan="7" class="text-center py-4 text-muted">No workflow actions have been recorded yet.</td></tr>
+                                <% } %>
+                                <% history.forEach((entry) => { %>
+                                    <tr>
+                                        <td><%= entry.Action %></td>
+                                        <td><%= entry.FromStatus || 'DRAFT' %></td>
+                                        <td><%= entry.ToStatus %></td>
+                                        <td><%= entry.actorName || entry.ActionBy || 'N/A' %></td>
+                                        <td><%= entry.actorRole || 'N/A' %></td>
+                                        <td><%= entry.ActionAt ? new Date(entry.ActionAt).toLocaleString('en-GB') : 'N/A' %></td>
+                                        <td><%= entry.Comments || '' %></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">Employee Payroll Rows</span>
+                    <span class="small text-muted">Checksum: <%= batch.PayrollChecksum || 'N/A' %></span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>PF No</th>
+                                    <th>Staff Name</th>
+                                    <th>Department</th>
+                                    <th>Grade</th>
+                                    <th>Job Title</th>
+                                    <th>Pay Status</th>
+                                    <th class="text-end">Basic</th>
+                                    <th class="text-end">Allowances</th>
+                                    <th class="text-end">Gross</th>
+                                    <th class="text-end">Taxable</th>
+                                    <th class="text-end">Tax</th>
+                                    <th class="text-end">NASSIT</th>
+                                    <th class="text-end">Deductions</th>
+                                    <th class="text-end">Net</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% if (!payrollRows.length) { %>
+                                    <tr><td colspan="14" class="text-center py-4 text-muted">No payroll rows were found for this workflow batch.</td></tr>
+                                <% } %>
+                                <% payrollRows.forEach((row) => { %>
+                                    <tr>
+                                        <td><%= row.PFNo %></td>
+                                        <td><%= row.StaffName || '' %></td>
+                                        <td><%= row.DeptName || row.DeptCode || '' %></td>
+                                        <td><%= row.GradeName || row.GradeCode || '' %></td>
+                                        <td><%= row.JobTitle || '' %></td>
+                                        <td>
+                                            <% if (Number(row.FullPay || 0) !== 0) { %>
+                                                <span class="badge text-bg-success">Full Pay</span>
+                                            <% } else if (Number(row.HalfPay || 0) !== 0) { %>
+                                                <span class="badge text-bg-warning">Half Pay</span>
+                                            <% } else if (Number(row.WithoutPay || 0) !== 0) { %>
+                                                <span class="badge text-bg-secondary">Without Pay</span>
+                                            <% } else { %>
+                                                <span class="badge bg-light text-dark border">N/A</span>
+                                            <% } %>
+                                        </td>
+                                        <td class="text-end"><%= Number(row.Salary || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td class="text-end"><%= Number(row.AllowanceTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td class="text-end"><%= Number(row.TotalIncome || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td class="text-end"><%= Number(row.Taxable || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td class="text-end"><%= Number(row.Tax || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td class="text-end"><%= Number(row.NassitEmployee || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td class="text-end"><%= Number(row.DeductionTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                        <td class="text-end"><%= Number(row.NetIncome || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="mt-4 py-3 text-center text-muted border-top">
+                <%- include('../partials/footer') %>
+            </footer>
+        </div>
+    </main>
+
+    <script src="/vendor/bootstrap.bundle.min.js"></script>
+</body>
+</html>

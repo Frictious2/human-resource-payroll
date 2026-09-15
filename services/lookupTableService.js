@@ -8,14 +8,18 @@ async function listRows(table, { orderBy = 'Code ASC' } = {}) {
 
 async function getNextCode(table, { codeColumn = 'Code', startCode, padLength } = {}) {
     const [rows] = await pool.query(
-        `SELECT ${codeColumn} FROM ${table} ORDER BY ${codeColumn} DESC LIMIT 1`
+        `SELECT ${codeColumn} FROM ${table}`
     );
 
     let nextCode = startCode;
 
     if (rows.length > 0) {
-        const lastCodeInt = parseInt(rows[0][codeColumn], 10);
-        if (!Number.isNaN(lastCodeInt)) {
+        const numericCodes = rows
+            .map((row) => parseInt(row[codeColumn], 10))
+            .filter((value) => !Number.isNaN(value));
+
+        if (numericCodes.length > 0) {
+            const lastCodeInt = Math.max(...numericCodes);
             nextCode = String(lastCodeInt + 1).padStart(padLength, '0');
         }
     }

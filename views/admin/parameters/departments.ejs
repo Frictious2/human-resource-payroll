@@ -7,48 +7,6 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
     <link href="/css/styles.css" rel="stylesheet" />
-    <!-- html2pdf.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <!-- SheetJS for Excel export -->
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
-    <style>
-        @media print {
-            tr { page-break-inside: avoid; }
-            .d-print-none { display: none !important; }
-        }
-        tr { page-break-inside: avoid; }
-    </style>
-    <style>
-        .editable-cell {
-            padding: 0.25rem;
-        }
-        .editable-cell input {
-            width: 100%;
-            border: 1px solid transparent;
-            background: transparent;
-            padding: 2px 4px;
-        }
-        .editable-cell input:focus {
-            border: 1px solid #0d6efd;
-            background: #fff;
-            outline: none;
-        }
-        .cell-updated {
-            animation: highlight 1s ease-out;
-        }
-        @keyframes highlight {
-            0% { background-color: #d1e7dd; }
-            100% { background-color: transparent; }
-        }
-        .cell-error {
-            animation: highlight-error 1s ease-out;
-            border: 1px solid red !important;
-        }
-        @keyframes highlight-error {
-            0% { background-color: #f8d7da; }
-            100% { background-color: transparent; }
-        }
-    </style>
 </head>
 <body>
     <%- include('../partials/topbar', { user }) %>
@@ -56,103 +14,137 @@
 
     <main class="main">
         <div class="container-fluid">
-            <div class="d-flex align-items-center justify-content-between mb-4">
-                <h2 class="mb-0">Departments</h2>
-                <div class="d-flex gap-2 d-print-none">
-                    <button type="button" class="btn btn-success" onclick="exportExcel()">
-                        <i class="bi bi-file-earmark-excel"></i> Export to Excel
-                    </button>
-                    <button type="button" class="btn btn-danger" onclick="exportPDF()">
-                        <i class="bi bi-file-earmark-pdf"></i> Export to PDF
-                    </button>
-                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addDeptModal">
-                        <i class="bi bi-plus-circle me-2"></i>Add Department
+            <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
+                <div>
+                    <h2 class="mb-1">Departments</h2>
+                    <div class="text-muted">Department maintenance now uses the approval workflow. Live `tbldept` rows stay unchanged until the Entity Head/HNO approves a proposal.</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/admin/parameter-changes?module=departments" class="btn btn-outline-secondary">Open Proposals</a>
+                    <button class="btn btn-primary" type="button" id="createDepartmentBtn">
+                        <i class="bi bi-plus-circle me-2"></i>Create Department Proposal
                     </button>
                 </div>
             </div>
 
-            <div class="card shadow-sm" id="printableArea">
-                <div class="card-body p-3 border-bottom d-print-none">
-                    <div class="row">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-5">
+                            <label class="form-label">Search</label>
+                            <input id="searchInput" class="form-control" placeholder="Search code or department name">
+                        </div>
                         <div class="col-md-4">
-                            <input type="text" id="searchInput" class="form-control" placeholder="Search departments...">
+                            <label class="form-label">Workflow Status</label>
+                            <select id="statusFilter" class="form-select">
+                                <option value="">All</option>
+                                <option value="DRAFT">Draft</option>
+                                <option value="RETURNED_BY_ENTITY_HEAD">Returned</option>
+                                <option value="SUBMITTED_TO_ENTITY_HEAD">Awaiting Approval</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button id="resetFiltersBtn" class="btn btn-outline-secondary w-100" type="button">Reset Filters</button>
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">Live Departments</span>
+                    <span class="text-muted small" id="liveSummary">0 live rows</span>
+                </div>
                 <div class="card-body p-0">
-                    <!-- Print Header -->
-                    <div class="d-none d-print-block text-center py-4">
-                        <h2 class="fw-bold mt-0">HR Payroll</h2>
-                        <h4 class="text-decoration-underline mt-0">Departments</h4>
-                    </div>
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0" id="departmentsTable">
                             <thead class="table-light">
                                 <tr>
-                                    <th style="width: 15%">No.</th>
-                                    <th style="width: 75%">Department Name</th>
-                                    <th class="text-end" style="width: 10%">Actions</th>
+                                    <th>Code</th>
+                                    <th>Department Name</th>
+                                    <th>Historical Usage</th>
+                                    <th>Latest Pending Proposal</th>
+                                    <th>Workflow Status</th>
+                                    <th class="text-end">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <!-- Rows will be populated by JS -->
-                            </tbody>
+                            <tbody></tbody>
                         </table>
                     </div>
                 </div>
-                <div class="card-footer bg-white border-top-0 py-3">
-                    <nav aria-label="Page navigation">
-                        <ul class="pagination justify-content-end mb-0" id="pagination">
-                            <!-- Pagination will be populated by JS -->
-                        </ul>
-                    </nav>
-                </div>
             </div>
 
-            <footer class="mt-4 py-3 text-center text-muted border-top">
-                <%- include('../partials/footer') %>
-            </footer>
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">Pending Create Proposals Not Yet In Live `tbldept`</span>
+                    <span class="text-muted small" id="pendingSummary">0 pending create proposals</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" id="pendingCreateTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Proposed Code</th>
+                                    <th>Proposed Department</th>
+                                    <th>Status</th>
+                                    <th>Reason</th>
+                                    <th class="text-end">Open</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 
-    <!-- Add Department Modal -->
-    <div class="modal fade" id="addDeptModal" tabindex="-1">
+    <div class="modal fade" id="departmentModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Add Department</h5>
+                    <h5 class="modal-title" id="departmentModalTitle">Create Department Proposal</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="addDeptForm">
+                    <form id="departmentForm">
+                        <input type="hidden" id="formMode" value="create">
+                        <input type="hidden" id="originalCode" value="">
                         <div class="mb-3">
-                            <label class="form-label">Department Name *</label>
-                            <input type="text" class="form-control" name="Dept" required>
+                            <label class="form-label">Department Name</label>
+                            <input type="text" class="form-control" id="departmentName" maxlength="100" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Reason for Change</label>
+                            <textarea class="form-control" id="departmentReason" rows="3" required></textarea>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary" id="saveNewDeptBtn">Save Department</button>
+                    <button type="button" class="btn btn-primary" id="saveDepartmentBtn">Save Proposal</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Delete Modal -->
-    <div class="modal fade" id="delete_item" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
+    <div class="modal fade" id="deleteProposalModal" tabindex="-1">
+        <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Delete Department</h5>
+                    <h5 class="modal-title">Propose Department Deletion</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Are you sure want to delete this department?</p>
+                    <p class="mb-3">This only creates a deletion proposal. The live department remains unchanged unless the Entity Head/HNO approves it.</p>
+                    <div class="mb-3">
+                        <label class="form-label">Reason</label>
+                        <textarea class="form-control" id="deleteReason" rows="3" required></textarea>
+                    </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteProposalBtn">Save Deletion Proposal</button>
                 </div>
             </div>
         </div>
@@ -160,293 +152,238 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // State for pagination and search
-        let allData = [];
+        let liveRows = [];
+        let pendingCreates = [];
+        let selectedDeleteCode = '';
 
-        async function exportExcel() {
-            if (!allData || allData.length === 0) {
-                alert("No data to export");
-                return;
-            }
-            
-            const ws = XLSX.utils.json_to_sheet(allData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Departments");
-            XLSX.writeFile(wb, "Departments.xlsx");
-        }
+        const departmentModal = new bootstrap.Modal(document.getElementById('departmentModal'));
+        const deleteProposalModal = new bootstrap.Modal(document.getElementById('deleteProposalModal'));
 
-        async function exportPDF() {
-            const element = document.getElementById('printableArea');
-            const header = element.querySelector('.d-print-block');
-            const originalPage = currentPage;
-            
-            // Show header
-            if (header) header.classList.remove('d-none');
-            
-            // Render ALL data for PDF
-            // We use the current filteredData but show ALL of it
-            renderTable(filteredData, 0); 
-            
-            const opt = {
-                margin: 10,
-                filename: 'Departments.pdf',
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2 },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
-            
-            try {
-                await html2pdf().set(opt).from(element).save();
-            } finally {
-                // Restore state
-                if (header) header.classList.add('d-none');
-                currentPage = originalPage;
-                renderPage(); // Restore pagination
+        function badgeClass(status) {
+            switch (status) {
+                case 'DRAFT': return 'bg-secondary-subtle text-secondary-emphasis';
+                case 'RETURNED_BY_ENTITY_HEAD': return 'bg-info-subtle text-info-emphasis';
+                case 'SUBMITTED_TO_ENTITY_HEAD': return 'bg-warning-subtle text-warning-emphasis';
+                case 'APPLIED': return 'bg-success-subtle text-success-emphasis';
+                default: return 'bg-light text-dark';
             }
         }
-        let filteredData = [];
-        let currentPage = 1;
-        const rowsPerPage = 10;
-        let deleteId = null;
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const tableBody = document.querySelector('#departmentsTable tbody');
-            const addDeptModal = new bootstrap.Modal(document.getElementById('addDeptModal'));
-            const addDeptForm = document.getElementById('addDeptForm');
-            const searchInput = document.getElementById('searchInput');
-            const paginationContainer = document.getElementById('pagination');
-
-            // Load Data
-            loadDepartments();
-
-            async function loadDepartments() {
-                try {
-                    const res = await fetch('/admin/api/parameters/departments');
-                    const json = await res.json();
-                    allData = json.data;
-                    filterData();
-                } catch (err) {
-                    console.error('Failed to load departments', err);
-                    alert('Error loading departments');
-                }
+        async function loadDepartments() {
+            const response = await fetch('/admin/api/parameters/departments');
+            const json = await response.json();
+            if (!response.ok) {
+                throw new Error(json.error || 'Failed to load departments');
             }
 
-            // Search Logic
-            searchInput.addEventListener('input', () => {
-                filterData();
+            liveRows = json.data.liveRows || [];
+            pendingCreates = json.data.pendingCreates || [];
+            renderTables();
+        }
+
+        function renderTables() {
+            const term = String(document.getElementById('searchInput').value || '').toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+
+            const filteredLive = liveRows.filter((row) => {
+                const matchesText = [row.Code, row.Dept, row.latestPendingStatus || ''].some((value) => String(value || '').toLowerCase().includes(term));
+                const matchesStatus = !statusFilter || row.latestPendingStatus === statusFilter;
+                return matchesText && matchesStatus;
             });
 
-            function filterData() {
-                const term = searchInput.value.toLowerCase();
-                filteredData = allData.filter(item => 
-                    Object.values(item).some(val => 
-                        String(val).toLowerCase().includes(term)
-                    )
-                );
-                currentPage = 1;
-                renderPage();
-            }
-
-            function renderPage() {
-                const start = (currentPage - 1) * rowsPerPage;
-                const end = start + rowsPerPage;
-                const pageData = filteredData.slice(start, end);
-                renderTable(pageData, start);
-                renderPagination();
-            }
-
-            function renderPagination() {
-                const totalPages = Math.ceil(filteredData.length / rowsPerPage);
-                paginationContainer.innerHTML = '';
-
-                if (totalPages <= 1) return;
-
-                // Previous
-                const prevLi = document.createElement('li');
-                prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
-                prevLi.innerHTML = `<a class="page-link" href="#">Previous</a>`;
-                prevLi.onclick = (e) => { e.preventDefault(); if (currentPage > 1) { currentPage--; renderPage(); } };
-                paginationContainer.appendChild(prevLi);
-
-                // Page Numbers
-                let startPage = Math.max(1, currentPage - 2);
-                let endPage = Math.min(totalPages, startPage + 4);
-                
-                if (endPage - startPage < 4) {
-                    startPage = Math.max(1, endPage - 4);
-                }
-
-                for (let i = startPage; i <= endPage; i++) {
-                    const li = document.createElement('li');
-                    li.className = `page-item ${i === currentPage ? 'active' : ''}`;
-                    li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
-                    li.onclick = (e) => { e.preventDefault(); currentPage = i; renderPage(); };
-                    paginationContainer.appendChild(li);
-                }
-
-                // Next
-                const nextLi = document.createElement('li');
-                nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
-                nextLi.innerHTML = `<a class="page-link" href="#">Next</a>`;
-                nextLi.onclick = (e) => { e.preventDefault(); if (currentPage < totalPages) { currentPage++; renderPage(); } };
-                paginationContainer.appendChild(nextLi);
-            }
-
-            function renderTable(items, startIndex) {
-                tableBody.innerHTML = '';
-                if (items.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="3" class="text-center py-3">No departments found</td></tr>';
-                    return;
-                }
-                items.forEach((item, index) => {
+            const tbody = document.querySelector('#departmentsTable tbody');
+            tbody.innerHTML = '';
+            if (!filteredLive.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No departments found.</td></tr>';
+            } else {
+                filteredLive.forEach((row) => {
+                    const requestUrl = row.latestPendingRequest ? `/admin/parameter-changes/${row.latestPendingRequest.id}` : '';
+                    const usageCount = Number(row.usage?.total || 0);
+                    const editableLiveProposal = row.latestPendingStatus === 'DRAFT' || row.latestPendingStatus === 'RETURNED_BY_ENTITY_HEAD';
+                    const lockedLiveProposal = row.latestPendingStatus === 'SUBMITTED_TO_ENTITY_HEAD';
                     const tr = document.createElement('tr');
-                    tr.dataset.code = item.Code;
                     tr.innerHTML = `
-                        <td>${startIndex + index + 1}</td>
-                        <td class="editable-cell"><input type="text" name="Dept" value="${item.Dept || ''}" required></td>
+                        <td class="fw-semibold">${row.Code || ''}</td>
+                        <td>${row.Dept || ''}</td>
+                        <td>${usageCount} staff assignment(s)</td>
+                        <td>${row.latestPendingRequest ? `${row.latestPendingRequest.ChangeType} proposal` : '<span class="text-muted">None</span>'}</td>
+                        <td>${row.latestPendingStatus ? `<span class="badge ${badgeClass(row.latestPendingStatus)}">${row.latestPendingStatus}</span>` : '<span class="text-muted">—</span>'}</td>
                         <td class="text-end">
-                            <button class="btn btn-sm btn-outline-danger delete-btn"><i class="bi bi-trash"></i></button>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-primary" ${lockedLiveProposal ? 'disabled' : ''} onclick="openEditModal('${row.Code}', ${JSON.stringify(String(row.Dept || '')).replace(/"/g, '&quot;')})">${editableLiveProposal ? 'Edit Draft' : 'Edit'}</button>
+                                ${requestUrl ? `<a class="btn btn-outline-secondary" href="${requestUrl}">Proposal</a>` : ''}
+                                <button type="button" class="btn btn-outline-danger" ${lockedLiveProposal ? 'disabled' : ''} onclick="openDeleteModal('${row.Code}', ${row.canDelete ? 'true' : 'false'})">Delete</button>
+                            </div>
                         </td>
                     `;
-                    tableBody.appendChild(tr);
+                    tbody.appendChild(tr);
                 });
             }
 
-            // Inline Editing
-            tableBody.addEventListener('change', async (e) => {
-                const target = e.target;
-                if (target.tagName === 'INPUT') {
-                    handleUpdate(target);
-                }
-            });
-
-            tableBody.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    e.target.blur(); 
-                }
-            });
-
-            // Delete Button
-            tableBody.addEventListener('click', async (e) => {
-                const btn = e.target.closest('.delete-btn');
-                if (btn) {
-                    const row = btn.closest('tr');
-                    const code = row.dataset.code;
-                    openDeleteModal(code);
-                }
-            });
-
-            function openDeleteModal(code) {
-                deleteId = code;
-                const modal = new bootstrap.Modal(document.getElementById('delete_item'));
-                modal.show();
+            const pendingBody = document.querySelector('#pendingCreateTable tbody');
+            pendingBody.innerHTML = '';
+            if (!pendingCreates.length) {
+                pendingBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No pending create proposals are waiting outside the live table.</td></tr>';
+            } else {
+                pendingCreates.forEach((row) => {
+                    const editablePendingCreate = row.Status === 'DRAFT' || row.Status === 'RETURNED_BY_ENTITY_HEAD';
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="fw-semibold">${row.proposedCode}</td>
+                        <td>${row.proposedLabel || ''}</td>
+                        <td><span class="badge ${badgeClass(row.Status)}">${row.Status}</span></td>
+                        <td>${row.Reason || ''}</td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                ${editablePendingCreate ? `<button type="button" class="btn btn-outline-primary" onclick="openPendingCreateModal('${row.proposedCode}', ${JSON.stringify(String(row.proposedLabel || '')).replace(/"/g, '&quot;')})">Edit Draft</button>` : ''}
+                                <a href="/admin/parameter-changes/${row.id}" class="btn btn-outline-secondary">Open Proposal</a>
+                            </div>
+                        </td>
+                    `;
+                    pendingBody.appendChild(tr);
+                });
             }
 
-            document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
-                if (!deleteId) return;
-                
-                try {
-                    const res = await fetch(`/admin/api/parameters/departments/${deleteId}`, { method: 'DELETE' });
-                    const json = await res.json();
-                    if (json.success) {
-                        // Remove from allData and re-render
-                        allData = allData.filter(i => i.Code != deleteId);
-                        filterData();
-                        
-                        // Close modal
-                        const modalEl = document.getElementById('delete_item');
-                        const modal = bootstrap.Modal.getInstance(modalEl);
-                        if (modal) modal.hide();
-                    } else {
-                        alert('Failed to delete');
-                    }
-                } catch (err) {
-                    console.error(err);
-                    alert('Error deleting department');
-                }
-            });
+            document.getElementById('liveSummary').textContent = `${filteredLive.length} live row(s)`;
+            document.getElementById('pendingSummary').textContent = `${pendingCreates.length} pending create proposal(s)`;
+        }
 
-            async function handleUpdate(input) {
-                const row = input.closest('tr');
-                const code = row.dataset.code;
-                const value = input.value;
+        function openCreateModal() {
+            document.getElementById('formMode').value = 'create';
+            document.getElementById('originalCode').value = '';
+            document.getElementById('departmentModalTitle').textContent = 'Create Department Proposal';
+            document.getElementById('departmentName').value = '';
+            document.getElementById('departmentReason').value = '';
+            departmentModal.show();
+        }
 
-                if (!value) {
-                    showError(input);
-                    alert('Department Name is required');
-                    return; 
-                }
+        function openPendingCreateModal(code, name) {
+            document.getElementById('formMode').value = 'create';
+            document.getElementById('originalCode').value = code;
+            document.getElementById('departmentModalTitle').textContent = `Edit Department Draft ${code}`;
+            document.getElementById('departmentName').value = name || '';
+            document.getElementById('departmentReason').value = '';
+            departmentModal.show();
+        }
 
-                input.disabled = true;
+        function openEditModal(code, name) {
+            document.getElementById('formMode').value = 'edit';
+            document.getElementById('originalCode').value = code;
+            document.getElementById('departmentModalTitle').textContent = `Edit Department ${code}`;
+            document.getElementById('departmentName').value = name || '';
+            document.getElementById('departmentReason').value = '';
+            departmentModal.show();
+        }
 
-                try {
-                    const res = await fetch(`/admin/api/parameters/departments/${code}`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ Dept: value })
-                    });
-                    const json = await res.json();
-                    
-                    input.disabled = false;
-                    input.focus(); 
-                    
-                    if (json.success) {
-                        input.parentElement.classList.add('cell-updated');
-                        setTimeout(() => input.parentElement.classList.remove('cell-updated'), 1000);
-                        
-                        // Update local data
-                        const itemIndex = allData.findIndex(i => i.Code == code);
-                        if (itemIndex > -1) {
-                            allData[itemIndex].Dept = value;
-                        }
-                    } else {
-                        showError(input);
-                    }
-                } catch (err) {
-                    console.error(err);
-                    input.disabled = false;
-                    showError(input);
-                }
+        function openDeleteModal(code, canDelete) {
+            if (!canDelete) {
+                alert('This department is assigned to staff records and cannot be deleted.');
+                return;
             }
 
-            function showError(input) {
-                input.parentElement.classList.add('cell-error');
-                setTimeout(() => input.parentElement.classList.remove('cell-error'), 1000);
+            selectedDeleteCode = code;
+            document.getElementById('deleteReason').value = '';
+            deleteProposalModal.show();
+        }
+
+        async function saveDepartmentProposal() {
+            const mode = document.getElementById('formMode').value;
+            const code = document.getElementById('originalCode').value;
+            const Dept = String(document.getElementById('departmentName').value || '').trim();
+            const reason = String(document.getElementById('departmentReason').value || '').trim();
+
+            if (!Dept) {
+                alert('Department name is required.');
+                return;
             }
 
-            // Add New Department
-            document.getElementById('saveNewDeptBtn').addEventListener('click', async () => {
-                const formData = new FormData(addDeptForm);
-                const data = Object.fromEntries(formData.entries());
+            if (!reason) {
+                alert('Please provide a reason for this change.');
+                return;
+            }
 
-                if (!data.Dept) {
-                    alert('Department Name is required');
-                    return;
-                }
+            const url = mode === 'create'
+                ? '/admin/api/parameters/departments'
+                : `/admin/api/parameters/departments/${encodeURIComponent(code)}`;
+            const method = mode === 'create' ? 'POST' : 'PATCH';
+            const payload = mode === 'create'
+                ? { Code: code || undefined, Dept, reason }
+                : { Dept, reason };
 
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const json = await response.json();
+            if (!response.ok) {
+                throw new Error(json.error || 'Failed to save department proposal.');
+            }
+
+            departmentModal.hide();
+            await loadDepartments();
+            alert(json.message || 'Department proposal saved.');
+        }
+
+        async function saveDeleteProposal() {
+            if (!selectedDeleteCode) {
+                return;
+            }
+
+            const reason = String(document.getElementById('deleteReason').value || '').trim();
+            if (!reason) {
+                alert('Please provide a reason for this deletion proposal.');
+                return;
+            }
+
+            const response = await fetch(`/admin/api/parameters/departments/${encodeURIComponent(selectedDeleteCode)}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason })
+            });
+            const json = await response.json();
+            if (!response.ok) {
+                throw new Error(json.error || 'Failed to save deletion proposal.');
+            }
+
+            deleteProposalModal.hide();
+            selectedDeleteCode = '';
+            await loadDepartments();
+            alert(json.message || 'Deletion proposal saved.');
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            document.getElementById('createDepartmentBtn').addEventListener('click', openCreateModal);
+            document.getElementById('saveDepartmentBtn').addEventListener('click', async () => {
                 try {
-                    const res = await fetch('/admin/api/parameters/departments', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(data)
-                    });
-                    const json = await res.json();
-
-                    if (json.success) {
-                        addDeptModal.hide();
-                        addDeptForm.reset();
-                        
-                        // Add to allData and re-render
-                        allData.push(json.item);
-                        filterData();
-                    } else {
-                        alert(json.error || 'Failed to add department');
-                    }
-                } catch (err) {
-                    console.error(err);
-                    alert('Error adding department');
+                    await saveDepartmentProposal();
+                } catch (error) {
+                    console.error(error);
+                    alert(error.message || 'Failed to save department proposal.');
                 }
             });
+            document.getElementById('confirmDeleteProposalBtn').addEventListener('click', async () => {
+                try {
+                    await saveDeleteProposal();
+                } catch (error) {
+                    console.error(error);
+                    alert(error.message || 'Failed to save deletion proposal.');
+                }
+            });
+            document.getElementById('searchInput').addEventListener('input', renderTables);
+            document.getElementById('statusFilter').addEventListener('change', renderTables);
+            document.getElementById('resetFiltersBtn').addEventListener('click', () => {
+                document.getElementById('searchInput').value = '';
+                document.getElementById('statusFilter').value = '';
+                renderTables();
+            });
+
+            try {
+                await loadDepartments();
+            } catch (error) {
+                console.error(error);
+                alert(error.message || 'Failed to load departments.');
+            }
         });
     </script>
 </body>

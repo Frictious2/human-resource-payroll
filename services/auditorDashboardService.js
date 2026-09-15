@@ -1,15 +1,24 @@
 const pool = require('../config/db');
 const payrollAuditService = require('./payrollAuditService');
+const auditorPayrollWorkflowService = require('./auditorPayrollWorkflowService');
 
 const AUDITOR_SCOPE_CLAUSE = `
     (
-        UserName IS NULL OR UserName NOT IN (SELECT username FROM developer)
+        UserName IS NULL OR UserName NOT IN (
+            SELECT username FROM developer
+            UNION
+            SELECT email FROM developer
+            UNION
+            SELECT FullName FROM developer
+        )
     )
     AND (
         FormName IS NULL
         OR (
             FormName NOT LIKE 'developer/%'
             AND FormName NOT LIKE '/developer/%'
+            AND FormName <> 'developer'
+            AND FormName <> '/developer'
         )
     )
 `;
@@ -43,7 +52,8 @@ async function getMetrics(companyId) {
         pendingFinancialApprovals,
         unpostedPayrollPeriods,
         pendingPostingBatches,
-        payrollAudit
+        payrollAudit,
+        workflowWidgets
     ] = await Promise.all([
         getSingleValue(`SELECT COUNT(*) AS totalCount FROM tblaudittrail WHERE ${AUDITOR_SCOPE_CLAUSE}`, [], 'totalCount'),
         getSingleValue(`SELECT COUNT(*) AS todayCount FROM tblaudittrail WHERE ${AUDITOR_SCOPE_CLAUSE} AND DATE(ChangeDate) = CURDATE()`, [], 'todayCount'),
@@ -111,7 +121,8 @@ async function getMetrics(companyId) {
             `,
             [companyId]
         ),
-        payrollAuditService.getPayrollRowsForNonActiveStaffAfterStatusChange({ companyId })
+        payrollAuditService.getPayrollRowsForNonActiveStaffAfterStatusChange({ companyId }),
+        auditorPayrollWorkflowService.getAuditorDashboardWidgets(companyId)
     ]);
 
     return {
@@ -122,7 +133,12 @@ async function getMetrics(companyId) {
         pendingFinancialApprovals,
         unpostedPayrollPeriods,
         pendingPostingBatches,
-        payrollExceptions: payrollAudit.totals.suspiciousGroups
+        payrollExceptions: payrollAudit.totals.suspiciousGroups,
+        awaitingAuditReview: workflowWidgets.cards.awaitingAuditReview,
+        endorsedToEntityHead: workflowWidgets.cards.endorsedToEntityHead,
+        returnedForCorrection: workflowWidgets.cards.returnedForCorrection,
+        finalApproved: workflowWidgets.cards.finalApproved,
+        finalRejected: workflowWidgets.cards.finalRejected
     };
 }
 
@@ -211,7 +227,7 @@ async function getTopUsersToday() {
 }
 
 async function getControlChecks(companyId) {
-    const [financialApprovals, unpostedPeriods, pendingBatches] = await Promise.all([
+    const [financialApprovals, unpostedPeriods, pendingBatches, workflowWidgets] = await Promise.all([
         pool.query(`
             SELECT 'Loans' AS label, '/manager/approve/loan' AS route, COUNT(*) AS total
             FROM tblloan
@@ -259,13 +275,16 @@ async function getControlChecks(companyId) {
               AND UPPER(COALESCE(status, '')) <> 'POSTED'
             ORDER BY created_at DESC
             LIMIT 8
-        `, [companyId])
+        `, [companyId]),
+        auditorPayrollWorkflowService.getAuditorDashboardWidgets(companyId)
     ]);
 
     return {
         financialApprovals: financialApprovals[0].filter((row) => Number(row.total || 0) > 0),
         unpostedPeriods: unpostedPeriods[0],
-        pendingBatches: pendingBatches[0]
+        pendingBatches: pendingBatches[0],
+        recentWorkflowActions: workflowWidgets.recentActions,
+        latestAwaitingTotals: workflowWidgets.latestAwaitingTotals
     };
 }
 

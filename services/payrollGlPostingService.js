@@ -1,20 +1,368 @@
 const payrollGlQueryService = require('./payrollGlQueryService');
 const payrollValidationService = require('./payrollValidationService');
+const payrollWorkflowService = require('./payrollWorkflowService');
 const pool = require('../config/db');
 
-const SUPPORTED_ACTIVITIES = {
+const ACTIVITY_NAMES = {
+    '00': 'Allowances',
     '01': 'Salary',
     '02': 'Rent Allowance',
+    '04': 'Welfare',
     '05': 'Inducement',
+    '06': 'Gratuity',
+    '07': 'Backlog / Arrears',
     '08': 'EOS Benefits',
     '09': 'Bonus',
     '13': 'Leave Allowance',
-    '15': 'Long Service'
+    '14': 'Acting',
+    '15': 'Long Service',
+    '33': 'Provident',
+    '40': 'Guarantee',
+    '41': 'Ex-Gratia',
+    '42': 'Death Benefit',
+    '99': 'All'
 };
+
+const GL_POSTING_POLICY = {
+    '01': {
+        state: 'SUPPORTED',
+        implementationType: 'salary-monthly-payroll',
+        processEmolumentsSupport: 'Implemented',
+        legacyGlEvidence: 'Verified current tblgltrans salary-style columns, active GL mappings, and posting batches.',
+        reason: 'Salary posting is fully implemented, mapped, generation-aware, and regression-tested.'
+    },
+    '02': {
+        state: 'BLOCKED_PENDING_MAPPING',
+        implementationType: 'yearly-payment-rent',
+        processEmolumentsSupport: 'Not implemented as standalone payroll activity',
+        legacyGlEvidence: 'Yearly payment rows exist, but no verified GL mapping rows or posting batches were found.',
+        reason: 'Rent Allowance appears in yearly payments, but its dedicated Post to Accounts rule is not verified.'
+    },
+    '04': {
+        state: 'NOT_APPLICABLE',
+        implementationType: 'non-payroll-lookup',
+        processEmolumentsSupport: 'No standalone payroll processing path found',
+        legacyGlEvidence: 'No current GL posting evidence was found.',
+        reason: 'Welfare is present as a pay type label, but no monthly payroll or GL posting path was verified.'
+    },
+    '05': {
+        state: 'BLOCKED_PENDING_MAPPING',
+        implementationType: 'yearly-payment-inducement',
+        processEmolumentsSupport: 'Not implemented as standalone payroll activity',
+        legacyGlEvidence: 'Yearly payment rows exist, but no verified GL mapping rows or posting batches were found.',
+        reason: 'Inducement has yearly-payment usage but no approved GL posting configuration.'
+    },
+    '06': {
+        state: 'LEGACY_ONLY',
+        implementationType: 'legacy-benefit',
+        processEmolumentsSupport: 'No standalone payroll processing path found',
+        legacyGlEvidence: 'No current GL posting evidence was found.',
+        reason: 'Gratuity exists in legacy pay types, but no current payroll posting implementation was verified.'
+    },
+    '07': {
+        state: 'NEEDS_CONFIRMATION',
+        implementationType: 'backlog-arrears',
+        processEmolumentsSupport: 'Declared in activity definitions only',
+        legacyGlEvidence: 'No verified GL query, mapping rows, or posting batches were found.',
+        reason: 'Backlog / Arrears requires client or legacy-query confirmation before any GL posting can be enabled.'
+    },
+    '08': {
+        state: 'NEEDS_CONFIRMATION',
+        implementationType: 'end-of-service-benefit',
+        processEmolumentsSupport: 'Not implemented as standalone payroll activity',
+        legacyGlEvidence: 'EOS records exist, but no verified GL mapping rows or posting batches were found.',
+        reason: 'EOS Benefits need confirmed debit/credit treatment and posting structure before enabling GL posting.'
+    },
+    '09': {
+        state: 'NEEDS_CONFIRMATION',
+        implementationType: 'bonus-award',
+        processEmolumentsSupport: 'Not implemented as standalone payroll activity',
+        legacyGlEvidence: 'Bonus workflow/pages exist, but no verified GL mapping rows or posting batches were found.',
+        reason: 'Bonus posting rules are not yet verified, so Post to Accounts must remain blocked.'
+    },
+    '13': {
+        state: 'NOT_APPLICABLE',
+        implementationType: 'leave-allowance-via-salary-supporting-table',
+        processEmolumentsSupport: 'Handled through tblleaveallowance using TCode 01',
+        legacyGlEvidence: 'Current Process Emoluments feeds leave allowance into salary-side support tables, not a standalone GL posting batch.',
+        reason: 'Leave Allowance is currently handled through salary-side processing rather than a separate Post to Accounts activity.'
+    },
+    '14': {
+        state: 'NOT_APPLICABLE',
+        implementationType: 'acting-allowance-component',
+        processEmolumentsSupport: 'Handled as Salary component Allw14',
+        legacyGlEvidence: 'Acting allowance flows into salary payroll components, not a separate GL activity.',
+        reason: 'Acting is represented inside salary posting components, not as its own Post to Accounts batch.'
+    },
+    '15': {
+        state: 'NEEDS_CONFIRMATION',
+        implementationType: 'long-service-award',
+        processEmolumentsSupport: 'Declared in activity definitions only',
+        legacyGlEvidence: 'No verified GL mapping rows or posting batches were found.',
+        reason: 'Long Service requires confirmed accounting treatment before GL posting can be enabled.'
+    },
+    '33': {
+        state: 'LEGACY_ONLY',
+        implementationType: 'legacy-benefit',
+        processEmolumentsSupport: 'No standalone payroll processing path found',
+        legacyGlEvidence: 'No current GL posting evidence was found.',
+        reason: 'Provident is not verified as a separate Post to Accounts activity in the current system.'
+    },
+    '40': {
+        state: 'LEGACY_ONLY',
+        implementationType: 'legacy-guarantee',
+        processEmolumentsSupport: 'No standalone payroll processing path found',
+        legacyGlEvidence: 'No current GL posting evidence was found.',
+        reason: 'Guarantee exists in legacy pay types, but no current payroll GL rule was verified.'
+    },
+    '41': {
+        state: 'NEEDS_CONFIRMATION',
+        implementationType: 'ex-gratia',
+        processEmolumentsSupport: 'No standalone payroll processing path found',
+        legacyGlEvidence: 'No current GL posting evidence was found.',
+        reason: 'Ex-Gratia needs client or accounting confirmation before any GL posting logic can be enabled.'
+    },
+    '42': {
+        state: 'NEEDS_CONFIRMATION',
+        implementationType: 'death-benefit',
+        processEmolumentsSupport: 'No standalone payroll processing path found',
+        legacyGlEvidence: 'No current GL posting evidence was found.',
+        reason: 'Death Benefit needs client or accounting confirmation before any GL posting logic can be enabled.'
+    },
+    '99': {
+        state: 'NOT_APPLICABLE',
+        implementationType: 'selector-only',
+        processEmolumentsSupport: 'Not a real payroll activity',
+        legacyGlEvidence: 'No current GL posting evidence was found.',
+        reason: 'Code 99 is an aggregate selector and must never be posted to accounts.'
+    }
+};
+
+const ACTIVITY_DISPLAY_ORDER = ['01', '02', '04', '05', '06', '07', '08', '09', '13', '14', '15', '33', '40', '41', '42', '00', '99'];
 
 function roundMoney(value) {
     const amount = Number(value || 0);
     return Math.round((amount + Number.EPSILON) * 100) / 100;
+}
+
+function normalizeActivityCode(activityCode) {
+    const rawValue = String(activityCode || '').trim();
+    if (!rawValue) {
+        return '';
+    }
+
+    if (/^\d+$/.test(rawValue)) {
+        return rawValue.padStart(2, '0');
+    }
+
+    return rawValue.toUpperCase();
+}
+
+function getActivityName(activityCode, fallbackName = '') {
+    const normalizedCode = normalizeActivityCode(activityCode);
+    return fallbackName || ACTIVITY_NAMES[normalizedCode] || normalizedCode;
+}
+
+function getActivityPolicy(activityCode) {
+    const normalizedCode = normalizeActivityCode(activityCode);
+    return GL_POSTING_POLICY[normalizedCode] || {
+        state: 'NEEDS_CONFIRMATION',
+        implementationType: 'unclassified-legacy-activity',
+        processEmolumentsSupport: 'Unknown',
+        legacyGlEvidence: 'No verified GL posting evidence was found.',
+        reason: 'This payroll activity is not yet configured for Post to Accounts.'
+    };
+}
+
+async function getActivityUsageMaps(companyId) {
+    const queries = {
+        payrollUsage: `
+            SELECT LPAD(TRIM(PType), 2, '0') AS code, COUNT(*) AS usageCount
+            FROM tblpayroll
+            WHERE CompanyID = ?
+            GROUP BY LPAD(TRIM(PType), 2, '0')
+        `,
+        yearlyUsage: `
+            SELECT LPAD(TRIM(PType), 2, '0') AS code, COUNT(*) AS usageCount
+            FROM tblyearlypayments
+            WHERE CompanyID = ?
+            GROUP BY LPAD(TRIM(PType), 2, '0')
+        `,
+        incrementUsage: `
+            SELECT LPAD(TRIM(Type), 2, '0') AS code, COUNT(*) AS usageCount
+            FROM tblincrement
+            WHERE CompanyID = ?
+            GROUP BY LPAD(TRIM(Type), 2, '0')
+        `,
+        postingUsage: `
+            SELECT LPAD(TRIM(activity_code), 2, '0') AS code, COUNT(*) AS usageCount
+            FROM payroll_gl_posting_batches
+            WHERE company_id = ?
+            GROUP BY LPAD(TRIM(activity_code), 2, '0')
+        `,
+        mappingUsage: `
+            SELECT LPAD(TRIM(activity_code), 2, '0') AS code, COUNT(*) AS usageCount
+            FROM gl_account_mappings
+            WHERE company_id = ?
+              AND is_active = 1
+            GROUP BY LPAD(TRIM(activity_code), 2, '0')
+        `
+    };
+
+    const usageMaps = {};
+    for (const [key, sql] of Object.entries(queries)) {
+        const [rows] = await pool.query(sql, [companyId]);
+        usageMaps[key] = new Map(rows.map((row) => [normalizeActivityCode(row.code), Number(row.usageCount || 0)]));
+    }
+
+    return usageMaps;
+}
+
+async function getPayTypeRows(companyId) {
+    const [rows] = await pool.query(
+        `
+            SELECT CompanyID, TRIM(Code) AS Code, TRIM(PayType) AS PayType
+            FROM tblpaytype
+            WHERE CompanyID = ? OR CompanyID IS NULL
+            ORDER BY COALESCE(CompanyID, ?), Code
+        `,
+        [companyId, companyId]
+    );
+
+    return rows;
+}
+
+async function getActivityGlPostingCatalog(companyId) {
+    const normalizedCompanyId = Number(companyId) || 1;
+    const [payTypes, usageMaps] = await Promise.all([
+        getPayTypeRows(normalizedCompanyId),
+        getActivityUsageMaps(normalizedCompanyId)
+    ]);
+
+    const discoveredCodes = new Set([
+        ...ACTIVITY_DISPLAY_ORDER,
+        ...payTypes.map((row) => normalizeActivityCode(row.Code)),
+        ...usageMaps.payrollUsage.keys(),
+        ...usageMaps.yearlyUsage.keys(),
+        ...usageMaps.incrementUsage.keys(),
+        ...usageMaps.postingUsage.keys(),
+        ...usageMaps.mappingUsage.keys()
+    ]);
+
+    const orderedCodes = Array.from(discoveredCodes).sort((left, right) => {
+        const leftIndex = ACTIVITY_DISPLAY_ORDER.indexOf(left);
+        const rightIndex = ACTIVITY_DISPLAY_ORDER.indexOf(right);
+        if (leftIndex !== -1 || rightIndex !== -1) {
+            return (leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex) - (rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex);
+        }
+
+        return left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
+    });
+
+    return orderedCodes.map((code) => {
+        const payTypeRow = payTypes.find((row) => normalizeActivityCode(row.Code) === code) || null;
+        const policy = getActivityPolicy(code);
+        const mappingCount = usageMaps.mappingUsage.get(code) || 0;
+        const postingBatchCount = usageMaps.postingUsage.get(code) || 0;
+        const supported = policy.state === 'SUPPORTED';
+
+        return {
+            code,
+            companyId: payTypeRow?.CompanyID || normalizedCompanyId,
+            name: getActivityName(code, payTypeRow?.PayType || ''),
+            payType: payTypeRow?.PayType || getActivityName(code),
+            supported,
+            state: policy.state,
+            reason: supported
+                ? 'Approved General Ledger posting configuration is available for this payroll activity.'
+                : 'This activity can be processed in payroll but does not yet have an approved General Ledger posting configuration.',
+            detailedReason: policy.reason,
+            implementationType: policy.implementationType,
+            processEmolumentsSupport: policy.processEmolumentsSupport,
+            legacyGlEvidence: policy.legacyGlEvidence,
+            usage: {
+                tblPayroll: usageMaps.payrollUsage.get(code) || 0,
+                tblyearlypayments: usageMaps.yearlyUsage.get(code) || 0,
+                tblincrement: usageMaps.incrementUsage.get(code) || 0,
+                postingBatches: postingBatchCount,
+                activeMappings: mappingCount
+            },
+            currentPostToAccountsSupport: supported,
+            currentProcessEmolumentsSupport: policy.processEmolumentsSupport,
+            missingMappings: supported
+                ? []
+                : [
+                    policy.state === 'NOT_APPLICABLE'
+                        ? 'Separate Post to Accounts handling is not applicable in the current design.'
+                        : 'Verified debit/credit mapping and posting strategy are still required.'
+                ]
+        };
+    });
+}
+
+async function getActivityGlPostingReadiness(activityCode, companyId) {
+    const normalizedCode = normalizeActivityCode(activityCode);
+    const catalog = await getActivityGlPostingCatalog(companyId);
+    const entry = catalog.find((row) => row.code === normalizedCode);
+    if (entry) {
+        return entry;
+    }
+
+    const policy = getActivityPolicy(normalizedCode);
+    return {
+        code: normalizedCode,
+        companyId: Number(companyId) || 1,
+        name: getActivityName(normalizedCode),
+        supported: false,
+        state: policy.state,
+        reason: 'This activity can be processed in payroll but does not yet have an approved General Ledger posting configuration.',
+        detailedReason: policy.reason,
+        implementationType: policy.implementationType,
+        processEmolumentsSupport: policy.processEmolumentsSupport,
+        legacyGlEvidence: policy.legacyGlEvidence,
+        usage: {
+            tblPayroll: 0,
+            tblyearlypayments: 0,
+            tblincrement: 0,
+            postingBatches: 0,
+            activeMappings: 0
+        },
+        currentPostToAccountsSupport: false,
+        currentProcessEmolumentsSupport: policy.processEmolumentsSupport,
+        missingMappings: ['Verified debit/credit mapping and posting strategy are still required.']
+    };
+}
+
+async function getSupportedGlPostingActivities(companyId) {
+    const catalog = await getActivityGlPostingCatalog(companyId);
+    return catalog.filter((row) => row.supported);
+}
+
+async function assertActivityGlPostingSupported(companyId, activityCode) {
+    const readiness = await getActivityGlPostingReadiness(activityCode, companyId);
+    if (!readiness.supported) {
+        const error = new Error('Post to Accounts is not yet configured for this payroll activity.');
+        error.statusCode = 409;
+        error.activityReadiness = readiness;
+        throw error;
+    }
+
+    return readiness;
+}
+
+function normalizeWorkflowActor(postedByUser = {}) {
+    return {
+        id: Number(postedByUser.id ?? postedByUser.user_id ?? postedByUser.UserID ?? postedByUser.PFNo ?? 0) || 0,
+        role: String(postedByUser.role || postedByUser.level || '').trim() || 'finance-officer',
+        name: postedByUser.name || postedByUser.fullName || postedByUser.username || postedByUser.email || 'Finance Officer',
+        source: postedByUser.source || 'tblpassword'
+    };
+}
+
+function createWorkflowApprovalError(message, statusCode = 409) {
+    const error = new Error(message);
+    error.statusCode = statusCode;
+    return error;
 }
 
 function isHeadquartersDepartment(deptCode) {
@@ -270,6 +618,57 @@ function buildPostingComponents(record) {
     return components.filter((component) => component.amount > 0);
 }
 
+async function validateWorkflowReadyForPosting(connection, {
+    companyId,
+    activityCode,
+    postingMonth,
+    postingYear
+}) {
+    const workflowBatch = await payrollWorkflowService.getWorkflowBatch(
+        companyId,
+        postingMonth,
+        postingYear,
+        activityCode,
+        connection
+    );
+
+    if (!workflowBatch) {
+        throw createWorkflowApprovalError('No workflow batch was found for the selected payroll period.', 404);
+    }
+
+    if (workflowBatch.Status !== payrollWorkflowService.WORKFLOW_STATUSES.FINAL_APPROVED) {
+        throw createWorkflowApprovalError('Monthly payroll has not received final approval from the Entity Head/HNO.', 409);
+    }
+
+    const currentSnapshot = await payrollWorkflowService.calculatePayrollSnapshot(
+        companyId,
+        postingMonth,
+        postingYear,
+        activityCode,
+        connection
+    );
+    const integrity = payrollWorkflowService.verifyPayrollSnapshotUnchanged(workflowBatch, currentSnapshot);
+    if (!integrity.matches) {
+        throw createWorkflowApprovalError('Payroll figures have changed after final approval. The payroll must be returned for correction and approved again before posting.', 409);
+    }
+
+    const postingStatus = await payrollGlQueryService.getPayrollPostingStatus(connection, {
+        companyId,
+        activityCode,
+        postingMonth,
+        postingYear
+    });
+    if (Number(postingStatus.posted_rows || 0) > 0) {
+        throw createWorkflowApprovalError('Payroll has already been posted to accounts.', 409);
+    }
+
+    return {
+        workflowBatch,
+        currentSnapshot,
+        postingStatus
+    };
+}
+
 function getDefaultSalaryMappings() {
     return [
         { pay_component_code: 'SALARY', gl_account_code: '90102', gl_account_name: 'BASIC SALARY', entry_type: 'debit' },
@@ -337,7 +736,7 @@ function groupPostingComponentsByGlAccount({ companyId, activityCode, postingDat
             glAccountName: mapping.glAccountName,
             entryType: mapping.entryType,
             amount: 0,
-            narration: `${monthLabel} ${SUPPORTED_ACTIVITIES[activityCode]} posting`,
+            narration: `${monthLabel} ${getActivityName(activityCode)} posting`,
             sourceTable: component.sourceTable || 'tblpayroll',
             sourceRecordId: component.sourceRecordId || null
         };
@@ -386,7 +785,7 @@ function validateRequiredGlMappings(components, mappingRows) {
 
     const missingMappings = Array.from(requiredMappings).filter((mappingKey) => !mappingMap.has(mappingKey));
     if (missingMappings.length > 0) {
-        const error = new Error(`Required GL accounts are missing for: ${missingMappings.join(', ')}.`);
+        const error = new Error(`Required GL mappings are incomplete. Missing: ${missingMappings.join(', ')}.`);
         error.statusCode = 409;
         throw error;
     }
@@ -444,23 +843,135 @@ async function buildSalaryPostingPayload({ connection, companyId, activityCode, 
     };
 }
 
-async function postMonthlyPayrollToGL({ companyId, activityCode, postingDate, postedBy }) {
+function mapWorkflowStatusToPostingBadge(status, isPosted, checksumValid = true, isSupported = true) {
+    if (!isSupported) {
+        return { label: 'GL Not Configured', tone: 'warning', canPost: false };
+    }
+
+    if (isPosted || status === payrollWorkflowService.WORKFLOW_STATUSES.POSTED_TO_ACCOUNTS) {
+        return { label: 'Already Posted', tone: 'success', canPost: false };
+    }
+
+    if (!checksumValid && status === payrollWorkflowService.WORKFLOW_STATUSES.FINAL_APPROVED) {
+        return { label: 'Approval Invalidated', tone: 'danger', canPost: false };
+    }
+
+    switch (status) {
+        case payrollWorkflowService.WORKFLOW_STATUSES.FINAL_APPROVED:
+            return { label: 'Ready to Post', tone: 'success', canPost: true };
+        case payrollWorkflowService.WORKFLOW_STATUSES.SUBMITTED_TO_MANAGER:
+        case payrollWorkflowService.WORKFLOW_STATUSES.MANAGER_ENDORSED:
+            return { label: 'Awaiting Manager Endorsement', tone: 'info', canPost: false };
+        case payrollWorkflowService.WORKFLOW_STATUSES.SUBMITTED_TO_AUDITOR:
+        case payrollWorkflowService.WORKFLOW_STATUSES.AUDITOR_ENDORSED:
+            return { label: 'Awaiting Auditor Review', tone: 'secondary', canPost: false };
+        case payrollWorkflowService.WORKFLOW_STATUSES.SUBMITTED_TO_ENTITY_HEAD:
+            return { label: 'Awaiting Final Approval', tone: 'dark', canPost: false };
+        case payrollWorkflowService.WORKFLOW_STATUSES.RETURNED_BY_MANAGER:
+        case payrollWorkflowService.WORKFLOW_STATUSES.RETURNED_BY_AUDITOR:
+        case payrollWorkflowService.WORKFLOW_STATUSES.FINAL_REJECTED:
+            return { label: 'Returned / Rejected', tone: 'warning', canPost: false };
+        case payrollWorkflowService.WORKFLOW_STATUSES.CORRECTION_IN_PROGRESS:
+            return { label: 'Correction In Progress', tone: 'warning', canPost: false };
+        case payrollWorkflowService.WORKFLOW_STATUSES.PROCESSED:
+            return { label: 'Awaiting Submission', tone: 'primary', canPost: false };
+        default:
+            return { label: status || 'No Workflow', tone: 'light', canPost: false };
+    }
+}
+
+async function getPostingReadinessRows(companyId) {
+    return payrollGlQueryService.withTransaction(async (connection) => {
+        await payrollGlQueryService.ensureInfrastructure(connection);
+
+        const activityCatalog = await getActivityGlPostingCatalog(companyId);
+        const workflowBatches = await payrollWorkflowService.listWorkflowBatches(companyId, {}, connection);
+        const rows = [];
+
+        for (const batch of workflowBatches.slice(0, 60)) {
+            const activityReadiness = activityCatalog.find((row) => row.code === normalizeActivityCode(batch.PType))
+                || await getActivityGlPostingReadiness(batch.PType, companyId);
+            const currentSnapshot = await payrollWorkflowService.calculatePayrollSnapshot(
+                companyId,
+                batch.PMonth,
+                batch.PYear,
+                batch.PType,
+                connection
+            );
+            const integrity = payrollWorkflowService.verifyPayrollSnapshotUnchanged(batch, currentSnapshot);
+            const postingStatus = await payrollGlQueryService.getPayrollPostingStatus(connection, {
+                companyId,
+                activityCode: batch.PType,
+                postingMonth: Number(batch.PMonth),
+                postingYear: Number(batch.PYear)
+            });
+            const postingBatch = await payrollGlQueryService.findExistingBatch(connection, {
+                companyId,
+                activityCode: batch.PType,
+                postingMonth: Number(batch.PMonth),
+                postingYear: Number(batch.PYear)
+            });
+            const readiness = mapWorkflowStatusToPostingBadge(
+                batch.Status,
+                Number(postingStatus.posted_rows || 0) > 0 || (postingBatch && postingBatch.status !== 'reversed'),
+                integrity.matches,
+                activityReadiness.supported
+            );
+
+            rows.push({
+                ...batch,
+                activityName: activityReadiness.name || getActivityName(batch.PType),
+                finalApprovedByName: batch.finalApprovedByName || batch.FinalApprovedBy || '',
+                checksumValid: integrity.matches,
+                currentChecksum: currentSnapshot.payrollChecksum,
+                postedRows: Number(postingStatus.posted_rows || 0),
+                glPostingBatchId: postingStatus.gl_posted_batch_id || postingBatch?.id || null,
+                glPostedAt: postingStatus.gl_posted_at || null,
+                readinessLabel: readiness.label,
+                readinessTone: readiness.tone,
+                canPost: readiness.canPost,
+                activitySupported: activityReadiness.supported,
+                activitySupportState: activityReadiness.state,
+                activitySupportReason: activityReadiness.reason,
+                activitySupportDetail: activityReadiness.detailedReason,
+                activityImplementationType: activityReadiness.implementationType
+            });
+        }
+
+        return rows;
+    });
+}
+
+async function postMonthlyPayrollToGL({ companyId, activityCode, postingDate, postedBy, postedByUser, connection = null }) {
     const postingMonth = postingDate.getMonth() + 1;
     const postingYear = postingDate.getFullYear();
+    const workflowActor = normalizeWorkflowActor(postedByUser || { id: postedBy });
+    const managedTransaction = !connection;
 
     try {
-        return await payrollGlQueryService.withTransaction(async (connection) => {
-            await payrollGlQueryService.ensureInfrastructure(connection);
+        const work = async (executor) => {
+            await payrollGlQueryService.ensureInfrastructure(executor);
+            const activityReadiness = await assertActivityGlPostingSupported(companyId, activityCode);
 
-            const duplicateBatch = await payrollGlQueryService.findExistingBatch(connection, {
+            const workflowReadiness = await validateWorkflowReadyForPosting(executor, {
                 companyId,
                 activityCode,
                 postingMonth,
                 postingYear
             });
+            const workflowBatch = workflowReadiness.workflowBatch;
+            const generationNo = Number(workflowBatch?.GenerationNo || 1);
+
+            const duplicateBatch = await payrollGlQueryService.findExistingBatch(executor, {
+                companyId,
+                activityCode,
+                postingMonth,
+                postingYear,
+                generationNo
+            });
 
             if (duplicateBatch && duplicateBatch.status !== 'reversed') {
-                const error = new Error('This payroll activity has already been posted for the selected month and year.');
+                const error = new Error('A GL posting batch already exists for this payroll period.');
                 error.statusCode = 409;
                 throw error;
             }
@@ -468,7 +979,7 @@ async function postMonthlyPayrollToGL({ companyId, activityCode, postingDate, po
             let postingPayload;
             if (activityCode === '01') {
                 postingPayload = await buildSalaryPostingPayload({
-                    connection,
+                    connection: executor,
                     companyId,
                     activityCode,
                     postingDate,
@@ -481,21 +992,23 @@ async function postMonthlyPayrollToGL({ companyId, activityCode, postingDate, po
                 throw error;
             }
 
-            const batchId = await payrollGlQueryService.insertPostingBatch(connection, {
+            const batchId = await payrollGlQueryService.insertPostingBatch(executor, {
                 companyId,
                 activityCode,
                 postingDate,
                 postingMonth,
                 postingYear,
+                generationNo,
+                workflowBatchId: workflowBatch.id,
                 status: 'posted',
                 totalLines: postingPayload.postingLines.length,
                 totalAmount: postingPayload.totalAmount,
                 sourceRecordCount: postingPayload.sourceRows.length,
                 postedBy,
-                remarks: `${SUPPORTED_ACTIVITIES[activityCode]} posting for ${postingMonth}/${postingYear}`
+                remarks: `${activityReadiness.name} posting for ${postingMonth}/${postingYear}`
             });
 
-            await payrollGlQueryService.insertPostingLines(connection, postingPayload.postingLines.map((line) => ({
+            await payrollGlQueryService.insertPostingLines(executor, postingPayload.postingLines.map((line) => ({
                 batchId,
                 companyId,
                 activityCode,
@@ -509,7 +1022,7 @@ async function postMonthlyPayrollToGL({ companyId, activityCode, postingDate, po
                 sourceRecordId: line.sourceRecordId
             })));
 
-            const markedRows = await payrollGlQueryService.markPayrollRowsPosted(connection, {
+            const markedRows = await payrollGlQueryService.markPayrollRowsPosted(executor, {
                 batchId,
                 companyId,
                 activityCode,
@@ -518,12 +1031,29 @@ async function postMonthlyPayrollToGL({ companyId, activityCode, postingDate, po
             });
 
             if (markedRows !== postingPayload.sourceRows.length) {
-                const error = new Error('Payroll posting state changed during processing. Please try again.');
+                const error = new Error('Payroll row count changed during posting. No changes were committed.');
                 error.statusCode = 409;
                 throw error;
             }
 
-            await payrollGlQueryService.insertAuditLog(connection, {
+            const workflowTransition = await payrollWorkflowService.transitionWorkflow({
+                companyId,
+                pMonth: postingMonth,
+                pYear: postingYear,
+                pType: activityCode,
+                action: payrollWorkflowService.WORKFLOW_ACTIONS.POST_TO_ACCOUNTS,
+                user: workflowActor,
+                comments: `GL posting batch #${batchId} completed successfully.`,
+                metadata: {
+                    stage: 'gl-posting',
+                    glPostingBatchId: batchId,
+                    totalPostedLines: postingPayload.postingLines.length,
+                    totalPostedAmount: postingPayload.totalAmount
+                },
+                connection: executor
+            });
+
+            await payrollGlQueryService.insertAuditLog(executor, {
                 companyId,
                 userId: postedBy,
                 action: 'GL_POST',
@@ -538,17 +1068,29 @@ async function postMonthlyPayrollToGL({ companyId, activityCode, postingDate, po
             return {
                 success: true,
                 batchId,
+                workflowBatchId: workflowTransition.batch.id,
+                workflowStatus: workflowTransition.batch.Status,
                 postingMonth,
                 postingYear,
                 activityCode,
                 totalLines: postingPayload.postingLines.length,
                 totalAmount: postingPayload.totalAmount
             };
-        });
+        };
+
+        if (managedTransaction) {
+            return await payrollGlQueryService.withTransaction(work);
+        }
+
+        return await work(connection);
     } catch (error) {
-        await payrollGlQueryService.withTransaction(async (connection) => {
-            await payrollGlQueryService.ensureInfrastructure(connection);
-            await payrollGlQueryService.insertAuditLog(connection, {
+        if (!managedTransaction) {
+            throw error;
+        }
+
+        await payrollGlQueryService.withTransaction(async (auditConnection) => {
+            await payrollGlQueryService.ensureInfrastructure(auditConnection);
+            await payrollGlQueryService.insertAuditLog(auditConnection, {
                 companyId,
                 userId: postedBy,
                 action: 'GL_POST',
@@ -610,10 +1152,16 @@ module.exports = {
     buildPostingComponents,
     getPostingBatchDetail,
     getPostingHistory,
+    getPostingReadinessRows,
+    getActivityGlPostingCatalog,
+    getActivityGlPostingReadiness,
+    getSupportedGlPostingActivities,
+    assertActivityGlPostingSupported,
     groupPostingComponentsByGlAccount,
-    getSupportedActivities: payrollGlQueryService.getSupportedActivities,
+    getSupportedActivities: getSupportedGlPostingActivities,
     postMonthlyPayrollToGL,
     reversePostingBatch,
+    validateRequiredGlMappings,
     getCompanySummary: async (companyId) => {
         const [rows] = await pool.query(
             `SELECT CompanyID, Com_Name, Address
@@ -626,3 +1174,52 @@ module.exports = {
         return rows[0] || { CompanyID: companyId, Com_Name: 'Human Resource Payroll', Address: '' };
     }
 };
+
+async function resolveLatestApprovedWorkflowGeneration(companyId, pMonth, pYear, pType, connection = null) {
+    const executor = connection || pool;
+    const [rows] = await executor.query(
+        `
+            SELECT *
+            FROM payroll_workflow_batches
+            WHERE CompanyID = ?
+              AND PMonth = ?
+              AND PYear = ?
+              AND PType = ?
+              AND Status = 'FINAL_APPROVED'
+            ORDER BY COALESCE(GenerationNo, 1) DESC, id DESC
+            LIMIT 1
+        `,
+        [Number(companyId) || 1, Number(pMonth), Number(pYear), String(pType || '').trim()]
+    );
+    return rows[0] || null;
+}
+
+function patchPostingExport(exportName) {
+    const original = module.exports[exportName];
+    if (typeof original !== 'function') {
+        return;
+    }
+
+    module.exports[exportName] = async function phase15GenerationAwarePosting(payload = {}) {
+        const companyId = Number(payload.companyId || payload.CompanyID) || 1;
+        const pMonth = Number(payload.pMonth || payload.PMonth || payload.postingMonth) || 0;
+        const pYear = Number(payload.pYear || payload.PYear || payload.postingYear) || 0;
+        const pType = String(payload.pType || payload.PType || payload.activityCode || payload.activity_code || '').trim();
+        const connection = payload.connection || null;
+
+        if (companyId && pMonth && pYear && pType) {
+            const latestApproved = await resolveLatestApprovedWorkflowGeneration(companyId, pMonth, pYear, pType, connection);
+            if (latestApproved) {
+                payload.workflowBatchId = payload.workflowBatchId || latestApproved.id;
+                payload.generationNo = payload.generationNo || latestApproved.GenerationNo || 1;
+            }
+        }
+
+        return original.call(this, payload);
+    };
+}
+
+patchPostingExport('postPayrollToGl');
+patchPostingExport('postPayrollBatchToGl');
+patchPostingExport('postToAccounts');
+module.exports.resolveLatestApprovedWorkflowGeneration = resolveLatestApprovedWorkflowGeneration;

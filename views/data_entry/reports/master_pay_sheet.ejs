@@ -10,8 +10,8 @@
     <style>@media print { @page { size: A4 landscape; margin: 10mm; } .no-print { display:none !important; } .main{margin-left:0 !important;} }</style>
 </head>
 <body>
-    <%- include('../partials/topbar', { user }) %>
-    <%- include('../partials/sidebar') %>
+    <%- include('../../' + partialsBase + '/topbar', { user }) %>
+    <%- include('../../' + partialsBase + '/sidebar') %>
     <main class="main">
         <div class="container-fluid py-3">
             <div class="d-flex align-items-center justify-content-between mb-4">
@@ -20,7 +20,7 @@
             </div>
             <div class="card shadow-sm mb-4 no-print">
                 <div class="card-body">
-                    <form method="GET" action="/data-entry/reports/master-pay-sheet" class="row g-3">
+                    <form method="GET" action="<%= formAction %>" class="row g-3">
                         <div class="col-md-2"><label class="form-label">Month</label><input type="number" class="form-control" name="month" min="1" max="12" value="<%= filters.month %>"></div>
                         <div class="col-md-2"><label class="form-label">Year</label><input type="number" class="form-control" name="year" min="2000" max="2100" value="<%= filters.year %>"></div>
                         <div class="col-md-3"><label class="form-label">Activity</label><select class="form-select" name="payType"><option value="">All Activities</option><% payTypes.forEach((type) => { %><option value="<%= type.Code %>" <%= filters.payType === type.Code ? 'selected' : '' %>><%= type.Code %> - <%= type.PayType %></option><% }) %></select></div>
@@ -54,7 +54,7 @@
                     </div>
                 </div>
             </div>
-            <footer class="mt-4 py-3 text-center text-muted border-top no-print"><%- include('../partials/footer') %></footer>
+            <footer class="mt-4 py-3 text-center text-muted border-top no-print"><%- include('../../' + partialsBase + '/footer') %></footer>
         </div>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

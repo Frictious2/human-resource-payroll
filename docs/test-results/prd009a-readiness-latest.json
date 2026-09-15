@@ -1,0 +1,1102 @@
+[dotenv@17.2.3] injecting env (10) from .env -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
+{
+  "auditDate": "2026-08-27",
+  "environment": {
+    "nodeEnv": "undefined",
+    "dbName": "personnel_master",
+    "sessionSecret": "missing",
+    "sessionStore": "MySQL",
+    "sessionTableExists": true,
+    "smtpHost": "hrpayroll.davisasmedia.com",
+    "emailNotificationsEnabled": false,
+    "appBaseUrl": null
+  },
+  "securityReadiness": {
+    "csrfProtection": true,
+    "securityHeaders": true,
+    "loginRateLimiting": true,
+    "productionSessionSecretValidation": true,
+    "productionCookieConfiguration": {
+      "httpOnly": true,
+      "secureInProduction": true,
+      "sameSite": "lax",
+      "trustProxyHops": 1
+    },
+    "incompleteProductionRoutes": {
+      "comingSoonRouteCount": 0,
+      "activeNavigationPlaceholderCount": 0,
+      "managerComingSoonRoutes": 0,
+      "managerComingSoonNavigation": false,
+      "status": "PASS"
+    },
+    "staffSelfService": "NOT_IMPLEMENTED_DEFERRED",
+    "activeProductionRoles": [
+      "admin",
+      "data-entry",
+      "finance-officer",
+      "finance-manager",
+      "manager",
+      "auditor",
+      "entity-head"
+    ]
+  },
+  "glPostingActivityScope": {
+    "discoveredCodes": [
+      "01",
+      "02",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "13",
+      "14",
+      "15",
+      "33",
+      "40",
+      "41",
+      "42",
+      "00",
+      "99"
+    ],
+    "supportedCodes": [
+      "01"
+    ],
+    "blockedCodes": [
+      "02",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "13",
+      "14",
+      "15",
+      "33",
+      "40",
+      "41",
+      "42",
+      "00",
+      "99"
+    ],
+    "unsupportedCodeCount": 16,
+    "enforcementConfigured": true,
+    "activities": [
+      {
+        "code": "01",
+        "name": "SALARY",
+        "supported": true,
+        "state": "SUPPORTED",
+        "implementationType": "salary-monthly-payroll",
+        "reason": "Salary posting is fully implemented, mapped, generation-aware, and regression-tested.",
+        "usage": {
+          "tblPayroll": 261,
+          "tblyearlypayments": 0,
+          "tblincrement": 0,
+          "postingBatches": 2,
+          "activeMappings": 24
+        }
+      },
+      {
+        "code": "02",
+        "name": "RENT",
+        "supported": false,
+        "state": "BLOCKED_PENDING_MAPPING",
+        "implementationType": "yearly-payment-rent",
+        "reason": "Rent Allowance appears in yearly payments, but its dedicated Post to Accounts rule is not verified.",
+        "usage": {
+          "tblPayroll": 0,
+          "tblyearlypayments": 194,
+          "tblincrement": 0,
+          "postingBatches": 0,
+          "activeMappings": 0
+        }
+      },
+      {
+        "code": "04",
+        "name": "WELFARE",
+        "supported": false,
+        "state": "NOT_APPLICABLE",
+        "implementationType": "non-payroll-lookup",
+        "reason": "Welfare is present as a pay type label, but no monthly payroll or GL posting path was verified.",
+        "usage": {
+          "tblPayroll": 0,
+          "tblyearlypayments": 0,
+          "tblincrement": 1,
+          "postingBatches": 0,
+          "activeMappings": 0
+        }
+      },
+      {
+        "code": "05",
+        "name": "INDUCEMENT",
+        "supported": false,
+        "state": "BLOCKED_PENDING_MAPPING",
+        "implementationType": "yearly-payment-inducement",
+        "reason": "Inducement has yearly-payment usage but no approved GL posting configuration.",
+        "usage": {
+          "tblPayroll": 0,
+          "tblyearlypayments": 194,
+          "tblincrement": 1,
+          "postingBatches": 0,
+          "activeMappings": 0
+        }
+      },
+      {
+        "code": "06",
+        "name": "GRATUITY",
+        "supported": false,
+        "state": "LEGACY_ONLY",
+        "implementationType": "legacy-benefit",
+        "reason": "Gratuity exists in legacy pay types, but no current payroll posting implementation was verified.",
+        "usage": {
+          "tblPayroll": 0,
+          "tblyearlypayments": 0,
+          "tblincrement": 0,
+          "postingBatches": 0,
+          "activeMappings": 0
+        }
+      },
+      {
+        "code": "07",
+        "name": "BACKLOG",
+        "supported": false,
+        "state": "NEEDS_CONFIRMATION",
+        "implementationType": "backlog-arrears",
+        "reason": "Backlog / Arrears requires client or legacy-query confirmation before any GL posting can be enabled.",
+        "usage": {
+          "tblPayroll": 0,
+          "tblyearlypayments": 0,
+          "tblincrement": 0,
+          "postingBatches": 0,
+          "activeMappings": 0
+        }
+      },
+      {
+        "code": "08",
+        "name": "EOS BENEFIT",
+        "supported": false,
+        "state": "NEEDS_CONFIRMATION",
+        "implementationType": "end-of-service-benefit",
+        "reason": "EOS Benefits need confirmed debit/credit treatment and posting structure before enabling GL posting.",
+        "usage": {
+          "tblPayroll": 0,
+          "tblyearlypayments": 0,
+          "tblincrement": 0,
+          "postingBatches": 0,
+          "activeMappings": 0
+        }
+      },
+      {
+        "code": "09",
+        "name": "BONUS",
+        "supported": false,
+        "state": "NEEDS_CONFIRMATION",
+        "implementationType": "bonus-award",
+        "reason": "Bonus posting rules are not yet verified, so Post to Accounts must remain blocked.",
+        "usage": {
+          "tblPayroll": 0,
+          "tblyearlypayments": 0,
+          "tblincrement": 0,
+          "postingBatches": 0,
+          "activeMappings": 0
+        }
+      },
+      {
+        "code": "13",
+        "name": "LEAVE",
+        "supported": false,
+        "state": "NOT_APPLICABLE",
+        "implementationType": "leave-allowance-via-salary-supporting-table",
+        "reason": "Leave Allowance is currently handled through salary-side processing rather than a separate Post to Accounts activity.",
+        "usage": {
+          "tblPayroll": 0,
+          "tblyearlypayments": 194,
+          "tblincrement": 0,
+          "postingBatches": 0,
+          "activeMappings": 0
+        }
+      },
+      {
+        "code": "14",
+        "name": "ACTING",
+        "supported": false,
+        "state": "NOT_APPLICABLE",
+        "implementationType": "acting-allowance-component",
+        "reason": "Acting is represented inside salary posting components, not as its own Post to Accounts batch.",
+        "usage": {
+          "tblPayroll": 0,
+          "tblyearlypayments": 0,
+          "tblincrement": 0,
+          "postingBatches": 0,
+          "activeMappings": 0
+        }
+      },
+      {
+        "code": "15",
+        "name": "LONG SERVICE",
+        "supported": false,
+        "state": "NEEDS_CONFIRMATION",
+        "implementationType": "long-service-award",
+        "reason": "Long Service requires confirmed accounting treatment before GL posting can be enabled.",
+        "usage": {
+          "tblPayroll": 0,
+          "tblyearlypayments": 0,
+          "tblincrement": 0,
+          "postingBatches": 0,
+          "activeMappings": 0
+        }
+      },
+      {
+        "code": "33",
+        "name": "PROVIDENT",
+        "supported": false,
+        "state": "LEGACY_ONLY",
+        "implementationType": "legacy-benefit",
+        "reason": "Provident is not verified as a separate Post to Accounts activity in the current system.",
+        "usage": {
+          "tblPayroll": 0,
+          "tblyearlypayments": 0,
+          "tblincrement": 0,
+          "postingBatches": 0,
+          "activeMappings": 0
+        }
+      },
+      {
+        "code": "40",
+        "name": "GUARANTEE",
+        "supported": false,
+        "state": "LEGACY_ONLY",
+        "implementationType": "legacy-guarantee",
+        "reason": "Guarantee exists in legacy pay types, but no current payroll GL rule was verified.",
+        "usage": {
+          "tblPayroll": 0,
+          "tblyearlypayments": 0,
+          "tblincrement": 0,
+          "postingBatches": 0,
+          "activeMappings": 0
+        }
+      },
+      {
+        "code": "41",
+        "name": "EX-GRACIA",
+        "supported": false,
+        "state": "NEEDS_CONFIRMATION",
+        "implementationType": "ex-gratia",
+        "reason": "Ex-Gratia needs client or accounting confirmation before any GL posting logic can be enabled.",
+        "usage": {
+          "tblPayroll": 0,
+          "tblyearlypayments": 0,
+          "tblincrement": 0,
+          "postingBatches": 0,
+          "activeMappings": 0
+        }
+      },
+      {
+        "code": "42",
+        "name": "DEATH BENEFIT",
+        "supported": false,
+        "state": "NEEDS_CONFIRMATION",
+        "implementationType": "death-benefit",
+        "reason": "Death Benefit needs client or accounting confirmation before any GL posting logic can be enabled.",
+        "usage": {
+          "tblPayroll": 0,
+          "tblyearlypayments": 0,
+          "tblincrement": 0,
+          "postingBatches": 0,
+          "activeMappings": 0
+        }
+      },
+      {
+        "code": "00",
+        "name": "ALLOWANCES",
+        "supported": false,
+        "state": "NEEDS_CONFIRMATION",
+        "implementationType": "unclassified-legacy-activity",
+        "reason": "This payroll activity is not yet configured for Post to Accounts.",
+        "usage": {
+          "tblPayroll": 0,
+          "tblyearlypayments": 0,
+          "tblincrement": 0,
+          "postingBatches": 0,
+          "activeMappings": 0
+        }
+      },
+      {
+        "code": "99",
+        "name": "ALL",
+        "supported": false,
+        "state": "NOT_APPLICABLE",
+        "implementationType": "selector-only",
+        "reason": "Code 99 is an aggregate selector and must never be posted to accounts.",
+        "usage": {
+          "tblPayroll": 0,
+          "tblyearlypayments": 0,
+          "tblincrement": 0,
+          "postingBatches": 0,
+          "activeMappings": 0
+        }
+      }
+    ]
+  },
+  "schema": [
+    {
+      "table": "sessions",
+      "exists": true,
+      "engine": "InnoDB",
+      "indexes": [
+        {
+          "key": "PRIMARY",
+          "column": "session_id",
+          "nonUnique": 0,
+          "seq": 1
+        },
+        {
+          "key": "idx_sessions_expires",
+          "column": "expires",
+          "nonUnique": 1,
+          "seq": 1
+        }
+      ]
+    },
+    {
+      "table": "payroll_workflow_batches",
+      "exists": true,
+      "engine": "InnoDB",
+      "indexes": [
+        {
+          "key": "PRIMARY",
+          "column": "id",
+          "nonUnique": 0,
+          "seq": 1
+        },
+        {
+          "key": "uq_company_period_ptype_generation",
+          "column": "CompanyID",
+          "nonUnique": 0,
+          "seq": 1
+        },
+        {
+          "key": "uq_company_period_ptype_generation",
+          "column": "PMonth",
+          "nonUnique": 0,
+          "seq": 2
+        },
+        {
+          "key": "uq_company_period_ptype_generation",
+          "column": "PYear",
+          "nonUnique": 0,
+          "seq": 3
+        },
+        {
+          "key": "uq_company_period_ptype_generation",
+          "column": "PType",
+          "nonUnique": 0,
+          "seq": 4
+        },
+        {
+          "key": "uq_company_period_ptype_generation",
+          "column": "GenerationNo",
+          "nonUnique": 0,
+          "seq": 5
+        },
+        {
+          "key": "idx_payroll_workflow_status",
+          "column": "Status",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_workflow_period",
+          "column": "CompanyID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_workflow_period",
+          "column": "PYear",
+          "nonUnique": 1,
+          "seq": 2
+        },
+        {
+          "key": "idx_payroll_workflow_period",
+          "column": "PMonth",
+          "nonUnique": 1,
+          "seq": 3
+        },
+        {
+          "key": "idx_payroll_workflow_period",
+          "column": "PType",
+          "nonUnique": 1,
+          "seq": 4
+        },
+        {
+          "key": "idx_payroll_workflow_original_batch",
+          "column": "OriginalWorkflowBatchID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_workflow_reopen_request",
+          "column": "ReopenRequestID",
+          "nonUnique": 1,
+          "seq": 1
+        }
+      ]
+    },
+    {
+      "table": "payroll_workflow_actions",
+      "exists": true,
+      "engine": "InnoDB",
+      "indexes": [
+        {
+          "key": "PRIMARY",
+          "column": "id",
+          "nonUnique": 0,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_workflow_actions_batch",
+          "column": "WorkflowBatchID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_workflow_actions_period",
+          "column": "CompanyID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_workflow_actions_period",
+          "column": "PYear",
+          "nonUnique": 1,
+          "seq": 2
+        },
+        {
+          "key": "idx_payroll_workflow_actions_period",
+          "column": "PMonth",
+          "nonUnique": 1,
+          "seq": 3
+        },
+        {
+          "key": "idx_payroll_workflow_actions_period",
+          "column": "PType",
+          "nonUnique": 1,
+          "seq": 4
+        },
+        {
+          "key": "idx_payroll_workflow_actions_action",
+          "column": "Action",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_workflow_actions_action",
+          "column": "ActionAt",
+          "nonUnique": 1,
+          "seq": 2
+        }
+      ]
+    },
+    {
+      "table": "record_workflow_items",
+      "exists": true,
+      "engine": "InnoDB",
+      "indexes": [
+        {
+          "key": "PRIMARY",
+          "column": "id",
+          "nonUnique": 0,
+          "seq": 1
+        },
+        {
+          "key": "uq_record_workflow_item",
+          "column": "CompanyID",
+          "nonUnique": 0,
+          "seq": 1
+        },
+        {
+          "key": "uq_record_workflow_item",
+          "column": "Module",
+          "nonUnique": 0,
+          "seq": 2
+        },
+        {
+          "key": "uq_record_workflow_item",
+          "column": "SourceTable",
+          "nonUnique": 0,
+          "seq": 3
+        },
+        {
+          "key": "uq_record_workflow_item",
+          "column": "RecordReference",
+          "nonUnique": 0,
+          "seq": 4
+        },
+        {
+          "key": "idx_record_workflow_status",
+          "column": "CompanyID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_record_workflow_status",
+          "column": "Status",
+          "nonUnique": 1,
+          "seq": 2
+        },
+        {
+          "key": "idx_record_workflow_status",
+          "column": "Module",
+          "nonUnique": 1,
+          "seq": 3
+        },
+        {
+          "key": "idx_record_workflow_module",
+          "column": "CompanyID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_record_workflow_module",
+          "column": "Module",
+          "nonUnique": 1,
+          "seq": 2
+        },
+        {
+          "key": "idx_record_workflow_module",
+          "column": "SourceTable",
+          "nonUnique": 1,
+          "seq": 3
+        }
+      ]
+    },
+    {
+      "table": "record_workflow_actions",
+      "exists": true,
+      "engine": "InnoDB",
+      "indexes": [
+        {
+          "key": "PRIMARY",
+          "column": "id",
+          "nonUnique": 0,
+          "seq": 1
+        },
+        {
+          "key": "idx_record_workflow_actions_item",
+          "column": "WorkflowItemID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_record_workflow_actions_item",
+          "column": "ActionAt",
+          "nonUnique": 1,
+          "seq": 2
+        },
+        {
+          "key": "idx_record_workflow_actions_module",
+          "column": "CompanyID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_record_workflow_actions_module",
+          "column": "Module",
+          "nonUnique": 1,
+          "seq": 2
+        },
+        {
+          "key": "idx_record_workflow_actions_module",
+          "column": "ActionAt",
+          "nonUnique": 1,
+          "seq": 3
+        }
+      ]
+    },
+    {
+      "table": "workflow_notifications",
+      "exists": true,
+      "engine": "InnoDB",
+      "indexes": [
+        {
+          "key": "PRIMARY",
+          "column": "id",
+          "nonUnique": 0,
+          "seq": 1
+        },
+        {
+          "key": "uq_workflow_notifications_eventkey",
+          "column": "EventKey",
+          "nonUnique": 0,
+          "seq": 1
+        },
+        {
+          "key": "idx_workflow_notifications_recipient_read",
+          "column": "RecipientUserID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_workflow_notifications_recipient_read",
+          "column": "IsRead",
+          "nonUnique": 1,
+          "seq": 2
+        },
+        {
+          "key": "idx_workflow_notifications_company_role",
+          "column": "CompanyID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_workflow_notifications_company_role",
+          "column": "RecipientRole",
+          "nonUnique": 1,
+          "seq": 2
+        },
+        {
+          "key": "idx_workflow_notifications_created_at",
+          "column": "CreatedAt",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_workflow_notifications_module_reference",
+          "column": "Module",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_workflow_notifications_module_reference",
+          "column": "ReferenceID",
+          "nonUnique": 1,
+          "seq": 2
+        }
+      ]
+    },
+    {
+      "table": "parameter_change_requests",
+      "exists": true,
+      "engine": "InnoDB",
+      "indexes": [
+        {
+          "key": "PRIMARY",
+          "column": "id",
+          "nonUnique": 0,
+          "seq": 1
+        },
+        {
+          "key": "idx_parameter_change_company_status",
+          "column": "CompanyID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_parameter_change_company_status",
+          "column": "Status",
+          "nonUnique": 1,
+          "seq": 2
+        },
+        {
+          "key": "idx_parameter_change_module_status",
+          "column": "ParameterModule",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_parameter_change_module_status",
+          "column": "Status",
+          "nonUnique": 1,
+          "seq": 2
+        },
+        {
+          "key": "idx_parameter_change_source_reference",
+          "column": "SourceTable",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_parameter_change_source_reference",
+          "column": "RecordReference",
+          "nonUnique": 1,
+          "seq": 2
+        },
+        {
+          "key": "idx_parameter_change_submitted_at",
+          "column": "SubmittedAt",
+          "nonUnique": 1,
+          "seq": 1
+        }
+      ]
+    },
+    {
+      "table": "parameter_change_actions",
+      "exists": true,
+      "engine": "InnoDB",
+      "indexes": [
+        {
+          "key": "PRIMARY",
+          "column": "id",
+          "nonUnique": 0,
+          "seq": 1
+        },
+        {
+          "key": "idx_parameter_change_actions_request",
+          "column": "ChangeRequestID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_parameter_change_actions_company",
+          "column": "CompanyID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_parameter_change_actions_company",
+          "column": "ActionAt",
+          "nonUnique": 1,
+          "seq": 2
+        }
+      ]
+    },
+    {
+      "table": "payroll_reversal_requests",
+      "exists": true,
+      "engine": "InnoDB",
+      "indexes": [
+        {
+          "key": "PRIMARY",
+          "column": "id",
+          "nonUnique": 0,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_reversal_requests_batch_status",
+          "column": "WorkflowBatchID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_reversal_requests_batch_status",
+          "column": "Status",
+          "nonUnique": 1,
+          "seq": 2
+        },
+        {
+          "key": "idx_payroll_reversal_requests_company_period",
+          "column": "CompanyID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_reversal_requests_company_period",
+          "column": "PYear",
+          "nonUnique": 1,
+          "seq": 2
+        },
+        {
+          "key": "idx_payroll_reversal_requests_company_period",
+          "column": "PMonth",
+          "nonUnique": 1,
+          "seq": 3
+        },
+        {
+          "key": "idx_payroll_reversal_requests_company_period",
+          "column": "PType",
+          "nonUnique": 1,
+          "seq": 4
+        },
+        {
+          "key": "idx_payroll_reversal_requests_gl_batch",
+          "column": "GLPostingBatchID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_reversal_requests_requested_at",
+          "column": "RequestedAt",
+          "nonUnique": 1,
+          "seq": 1
+        }
+      ]
+    },
+    {
+      "table": "payroll_reversal_actions",
+      "exists": true,
+      "engine": "InnoDB",
+      "indexes": [
+        {
+          "key": "PRIMARY",
+          "column": "id",
+          "nonUnique": 0,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_reversal_actions_request",
+          "column": "ReversalRequestID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_reversal_actions_action",
+          "column": "Action",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_reversal_actions_action",
+          "column": "ActionAt",
+          "nonUnique": 1,
+          "seq": 2
+        }
+      ]
+    },
+    {
+      "table": "payroll_reopen_requests",
+      "exists": true,
+      "engine": "InnoDB",
+      "indexes": [
+        {
+          "key": "PRIMARY",
+          "column": "id",
+          "nonUnique": 0,
+          "seq": 1
+        },
+        {
+          "key": "uq_payroll_reopen_generation",
+          "column": "OriginalWorkflowBatchID",
+          "nonUnique": 0,
+          "seq": 1
+        },
+        {
+          "key": "uq_payroll_reopen_generation",
+          "column": "ProposedGenerationNo",
+          "nonUnique": 0,
+          "seq": 2
+        },
+        {
+          "key": "idx_payroll_reopen_company_status",
+          "column": "CompanyID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_reopen_company_status",
+          "column": "Status",
+          "nonUnique": 1,
+          "seq": 2
+        },
+        {
+          "key": "idx_payroll_reopen_reversal_request",
+          "column": "ReversalRequestID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_reopen_new_batch",
+          "column": "NewWorkflowBatchID",
+          "nonUnique": 1,
+          "seq": 1
+        }
+      ]
+    },
+    {
+      "table": "payroll_reopen_actions",
+      "exists": true,
+      "engine": "InnoDB",
+      "indexes": [
+        {
+          "key": "PRIMARY",
+          "column": "id",
+          "nonUnique": 0,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_reopen_actions_request",
+          "column": "ReopenRequestID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_reopen_actions_request",
+          "column": "ActionAt",
+          "nonUnique": 1,
+          "seq": 2
+        }
+      ]
+    },
+    {
+      "table": "payroll_reversed_row_archive",
+      "exists": true,
+      "engine": "InnoDB",
+      "indexes": [
+        {
+          "key": "PRIMARY",
+          "column": "id",
+          "nonUnique": 0,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_reversed_archive_batch",
+          "column": "OriginalWorkflowBatchID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_reversed_archive_period",
+          "column": "CompanyID",
+          "nonUnique": 1,
+          "seq": 1
+        },
+        {
+          "key": "idx_payroll_reversed_archive_period",
+          "column": "PMonth",
+          "nonUnique": 1,
+          "seq": 2
+        },
+        {
+          "key": "idx_payroll_reversed_archive_period",
+          "column": "PYear",
+          "nonUnique": 1,
+          "seq": 3
+        },
+        {
+          "key": "idx_payroll_reversed_archive_period",
+          "column": "PType",
+          "nonUnique": 1,
+          "seq": 4
+        },
+        {
+          "key": "idx_payroll_reversed_archive_reopen",
+          "column": "ReopenRequestID",
+          "nonUnique": 1,
+          "seq": 1
+        }
+      ]
+    }
+  ],
+  "preflight": {
+    "invalid_emp_status": [
+      {
+        "EmpStatus": "01",
+        "total": 133
+      },
+      {
+        "EmpStatus": "02",
+        "total": 6
+      }
+    ],
+    "payroll_without_rows": [
+      {
+        "total": 0
+      }
+    ],
+    "posted_without_gl_batch": [
+      {
+        "total": 0
+      }
+    ],
+    "reopen_without_reversed_source": [
+      {
+        "total": 0
+      }
+    ],
+    "reversal_without_source_batch": [
+      {
+        "total": 0
+      }
+    ],
+    "notifications_missing_users": [
+      {
+        "total": 0
+      }
+    ],
+    "duplicate_generation_keys": []
+  },
+  "nodeChecks": [
+    {
+      "target": "server.js",
+      "status": "PASS"
+    },
+    {
+      "target": "config/sessionStore.js",
+      "status": "PASS"
+    },
+    {
+      "target": "config/mailer.js",
+      "status": "PASS"
+    },
+    {
+      "target": "middleware/security.js",
+      "status": "PASS"
+    },
+    {
+      "target": "services/environmentValidationService.js",
+      "status": "PASS"
+    },
+    {
+      "target": "services/workflowNotificationService.js",
+      "status": "PASS"
+    },
+    {
+      "target": "services/processEmolumentsService.js",
+      "status": "PASS"
+    },
+    {
+      "target": "services/payrollWorkflowService.js",
+      "status": "PASS"
+    },
+    {
+      "target": "services/payrollGlPostingService.js",
+      "status": "PASS"
+    },
+    {
+      "target": "services/payrollReopenService.js",
+      "status": "PASS"
+    },
+    {
+      "target": "scripts/testGlPostingActivityScope.js",
+      "status": "PASS"
+    },
+    {
+      "target": "scripts/testPersistentSessionStore.js",
+      "status": "PASS"
+    },
+    {
+      "target": "scripts/testCsrfProtection.js",
+      "status": "PASS"
+    },
+    {
+      "target": "scripts/testLoginRateLimiting.js",
+      "status": "PASS"
+    },
+    {
+      "target": "scripts/testPayrollWorkflowFoundation.js",
+      "status": "PASS"
+    },
+    {
+      "target": "scripts/testPhase14PayrollReversalWorkflow.js",
+      "status": "PASS"
+    },
+    {
+      "target": "scripts/testPhase15PayrollReopenWorkflow.js",
+      "status": "PASS"
+    }
+  ],
+  "prd005": {
+    "status": "PASS",
+    "selfContainedTest": true,
+    "productionSafetyGuard": true,
+    "latestIsolatedExecution": {
+      "status": "PASS",
+      "completedAt": "2026-08-27T22:57:58.496Z"
+    },
+    "destructiveSimulationRunAutomatically": false
+  },
+  "sandbox": []
+}

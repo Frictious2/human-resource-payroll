@@ -14,7 +14,13 @@
 
     <main class="main">
         <div class="container-fluid">
-            <h2 class="mb-4">Loan Management</h2>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-1">Loan Management</h2>
+                    <div class="text-muted">Draft loan and repayment adjustments stay read-only until they are returned. Final approval is required before payroll deductions go live.</div>
+                </div>
+                <a href="/data-entry/workflow/records?module=loan" class="btn btn-outline-secondary">Open Workflow Queue</a>
+            </div>
 
             <!-- Tabs -->
             <ul class="nav nav-tabs mb-4" id="loanTabs" role="tablist">
@@ -46,6 +52,8 @@
                                             <th>Loan Date</th>
                                             <th>Loan Amount</th>
                                             <th>Interest</th>
+                                            <th>Status</th>
+                                            <th>Comments</th>
                                             <th>Action</th>
                                         </tr>
                                     </thead>
@@ -57,11 +65,13 @@
                                                 <td><%= new Date(app.EntryDate).toLocaleDateString() %></td>
                                                 <td><%= parseFloat(app.Amount).toFixed(2) %></td>
                                                 <td><%= parseFloat(app.Interest || 0).toFixed(2) %></td>
+                                                <td><span class="badge <%= app.WorkflowStatus === 'FINAL_APPROVED' ? 'bg-success' : app.WorkflowStatus?.includes('RETURNED') ? 'bg-warning text-dark' : app.WorkflowStatus === 'SUBMITTED_TO_MANAGER' || app.WorkflowStatus === 'SUBMITTED_TO_ENTITY_HEAD' ? 'bg-info text-dark' : app.WorkflowStatus === 'FINAL_REJECTED' ? 'bg-danger' : 'bg-secondary' %>"><%= app.WorkflowStatus || 'DRAFT' %></span></td>
+                                                <td><%= app.WorkflowComments || '-' %></td>
                                                 <td>
-                                                    <% if (app.Approved == 1) { %>
-                                                        <span class="badge bg-success">Approved</span>
+                                                    <% if (['DRAFT', 'RETURNED_BY_MANAGER', 'RETURNED_BY_ENTITY_HEAD', 'FINAL_REJECTED'].includes(app.WorkflowStatus || 'DRAFT')) { %>
+                                                        <button class="btn btn-sm btn-outline-primary" onclick='openEditModal(<%- JSON.stringify(app) %>)'>Edit</button>
                                                     <% } else { %>
-                                                        <button class="btn btn-sm btn-outline-primary" onclick="openEditModal(<%= JSON.stringify(app) %>)">Edit</button>
+                                                        <span class="text-muted small">Read only</span>
                                                     <% } %>
                                                 </td>
                                             </tr>
@@ -142,6 +152,7 @@
                 </div>
                 <div class="modal-body">
                     <form id="applicationForm">
+                        <input type="hidden" name="transNo" id="appTransNo">
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">Entry Date</label>
@@ -304,6 +315,9 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        const loanInterestRate = <%- JSON.stringify(Number(loanParams?.AdvanceInt || 0)) %>;
+        const loanDurationThreshold = <%- JSON.stringify(Number(loanParams?.LoanDuration || 0)) %>;
+
         // Set Default Date
         document.getElementById('appEntryDate').value = new Date().toISOString().slice(0, 16);
         document.getElementById('repDate').value = new Date().toISOString().split('T')[0];
@@ -346,9 +360,9 @@
                 let interest = 0;
                 let rate = 0;
                 
-                if (duration > 5) {
-                    rate = 4;
-                    interest = amount * 0.04;
+                if (loanDurationThreshold > 0 && duration > loanDurationThreshold) {
+                    rate = loanInterestRate;
+                    interest = amount * (loanInterestRate / 100);
                 }
 
                 const monthlyRepayment = amount / duration;
@@ -408,6 +422,20 @@
         }
 
         // Submit Application
+        function openEditModal(loan) {
+            document.getElementById('appTransNo').value = loan.TransNo || '';
+            document.getElementById('appEntryDate').value = loan.EntryDate ? new Date(loan.EntryDate).toISOString().slice(0, 16) : '';
+            document.getElementById('appPfno').value = loan.PFNo || '';
+            fetchStaffDetails(loan.PFNo || '');
+            document.querySelector('select[name="lTrans"]').value = loan.LTrans || '';
+            document.getElementById('appAmount').value = loan.Amount || '';
+            document.getElementById('appDuration').value = loan.Duration || '';
+            document.getElementById('appStartDate').value = loan.StartDate ? new Date(loan.StartDate).toISOString().slice(0, 10) : '';
+            document.getElementById('appSurcharge').checked = String(loan.Surcharge || '').toUpperCase() === 'YES';
+            calculateLoan();
+            new bootstrap.Modal(document.getElementById('newApplicationModal')).show();
+        }
+
         document.getElementById('applicationForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
@@ -421,7 +449,7 @@
                 });
                 const result = await res.json();
                 if (result.success) {
-                    alert('Loan application submitted successfully');
+                    alert('Loan draft saved successfully. Submit it from the workflow queue when ready.');
                     location.reload();
                 } else {
                     alert('Error: ' + result.error);
@@ -446,7 +474,7 @@
                 });
                 const result = await res.json();
                 if (result.success) {
-                    alert('Repayment recorded successfully');
+                    alert('Repayment adjustment draft saved successfully. It must pass workflow approval before affecting the loan balance.');
                     location.reload();
                 } else {
                     alert('Error: ' + result.error);

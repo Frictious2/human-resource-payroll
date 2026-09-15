@@ -9,8 +9,8 @@
     <link href="/css/styles.css" rel="stylesheet" />
 </head>
 <body>
-    <%- include('../partials/topbar', { user }) %>
-    <%- include('../partials/sidebar') %>
+    <%- include('../../' + partialsBase + '/topbar', { user }) %>
+    <%- include('../../' + partialsBase + '/sidebar') %>
 
     <main class="main">
         <div class="container-fluid py-3">
@@ -19,7 +19,7 @@
                     <h2 class="mb-0"><%= title %></h2>
                     <nav aria-label="breadcrumb">
                         <ol class="breadcrumb mt-2 mb-0">
-                            <li class="breadcrumb-item"><a href="/data-entry/dashboard" class="text-decoration-none">Home</a></li>
+                            <li class="breadcrumb-item"><a href="<%= dashboardPath %>" class="text-decoration-none">Home</a></li>
                             <li class="breadcrumb-item">Payroll</li>
                             <li class="breadcrumb-item active">Yearly Payments</li>
                         </ol>
@@ -33,7 +33,7 @@
             <div class="card shadow-sm mb-4">
                 <div class="card-body">
                     <h5 class="card-title mb-3">Add / Update Yearly Payment</h5>
-                    <form method="POST" action="/data-entry/payroll/yearly-payments" class="row g-3">
+                    <form method="POST" action="<%= formAction %>" class="row g-3">
                         <div class="col-md-3">
                             <label for="pDate" class="form-label">Entry Date</label>
                             <input type="date" class="form-control" id="pDate" name="pDate" required value="<%= new Date().toISOString().slice(0, 10) %>">
@@ -109,7 +109,7 @@
                 <div class="card-body">
                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
                         <h5 class="card-title mb-0">Existing Yearly Payments</h5>
-                        <form method="GET" action="/data-entry/payroll/yearly-payments" class="row g-2">
+                        <form method="GET" action="<%= listUrl %>" class="row g-2">
                             <div class="col-auto"><input type="text" class="form-control" name="pfNo" placeholder="PFNo" value="<%= filters.pfNo %>"></div>
                             <div class="col-auto">
                                 <select class="form-select" name="payType">
@@ -169,7 +169,7 @@
                 </div>
             </div>
 
-            <footer class="mt-4 py-3 text-center text-muted border-top"><%- include('../partials/footer') %></footer>
+            <footer class="mt-4 py-3 text-center text-muted border-top"><%- include('../../' + partialsBase + '/footer') %></footer>
         </div>
     </main>
 

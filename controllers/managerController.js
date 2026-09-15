@@ -11,31 +11,68 @@ const staffTransfersPagesService = require('../services/staffTransfersPagesServi
 const enquiryReportsService = require('../services/enquiryReportsService');
 const journalReportService = require('../services/journalReportService');
 const managerDashboardService = require('../services/managerDashboardService');
+const managerPayrollWorkflowService = require('../services/managerPayrollWorkflowService');
+const recordWorkflowService = require('../services/recordWorkflowService');
+const workflowNotificationService = require('../services/workflowNotificationService');
+const workQueueService = require('../services/workQueueService');
+const payrollReversalService = require('../services/payrollReversalService');
+const payrollReopenService = require('../services/payrollReopenService');
+
+function getCompanyId(req) {
+    return req.user?.companyId
+        || req.user?.company_id
+        || req.session?.companyId
+        || req.session?.CompanyID
+        || 1;
+}
+
+function getManagerUser(req) {
+    return req.session.user || req.user || { name: 'Manager', role: 'manager' };
+}
+
+async function getRecordWorkflowDashboard(companyId) {
+    await recordWorkflowService.ensureWorkflowTables();
+    await recordWorkflowService.syncAllDraftModules(companyId);
+
+    return {
+        counts: await recordWorkflowService.getWorkflowCountsByStatus(companyId),
+        recent: (await recordWorkflowService.listWorkflowItems(companyId, {})).slice(0, 6)
+    };
+}
 
 const managerController = {
     getDashboard: async (req, res) => {
         try {
-            const companyId = req.user?.companyId
-                || req.user?.company_id
-                || req.session?.companyId
-                || req.session?.CompanyID
-                || 1;
+            const companyId = getCompanyId(req);
+            const user = getManagerUser(req);
 
-            const dashboardData = await managerDashboardService.getManagerDashboardData({ companyId });
+            const [dashboardData, recordWorkflow, unreadNotifications, workQueueData, reversalCounts, reopenCounts] = await Promise.all([
+                managerDashboardService.getManagerDashboardData({ companyId }),
+                getRecordWorkflowDashboard(companyId),
+                workflowNotificationService.getUnreadCount(user.id || 0, companyId),
+                workQueueService.getRoleWorkQueue({ companyId, user, filters: {} }),
+                payrollReversalService.getRoleDashboardSummary(companyId),
+                payrollReopenService.getRoleDashboardSummary(companyId)
+            ]);
 
             res.render('manager/dashboard', {
                 title: 'Manager Dashboard',
                 path: '/manager/dashboard',
-                user: req.session.user || { name: 'Manager' },
+                user,
                 error: null,
-                ...dashboardData
+                ...dashboardData,
+                recordWorkflow,
+                reversalCounts,
+                reopenCounts,
+                unreadNotifications,
+                workQueueSummary: workQueueData.summary
             });
         } catch (error) {
             console.error('Manager dashboard error:', error);
             res.render('manager/dashboard', {
                 title: 'Manager Dashboard',
                 path: '/manager/dashboard',
-                user: req.session.user || { name: 'Manager' },
+                user: getManagerUser(req),
                 company: {},
                 approvalQueue: { modules: [], totalPending: 0, overdueTotal: 0 },
                 peopleSnapshot: {
@@ -60,16 +97,32 @@ const managerController = {
                         unpostedPayrollPeriods: 0,
                         pendingYearlyPayments: 0,
                         pendingPostingBatches: 0,
-                        payrollExceptions: 0
+                        payrollExceptions: 0,
+                        awaitingEndorsement: 0,
+                        endorsedToAuditor: 0,
+                        returnedToFinance: 0,
+                        returnedByAuditor: 0,
+                        auditorEndorsed: 0,
+                        finalApproved: 0,
+                        finalRejected: 0
                     },
                     unpostedPeriods: [],
                     yearlyPending: [],
                     pendingBatches: [],
-                    payrollAudit: { totals: { suspiciousGroups: 0, rows: [] } }
+                    payrollAudit: { totals: { suspiciousGroups: 0, rows: [] } },
+                    recentWorkflowActions: []
                 },
                 departmentSummaries: [],
                 alerts: [],
-                error: 'Failed to load dashboard data'
+                reversalCounts: {},
+                reopenCounts: {},
+                error: 'Failed to load dashboard data',
+                recordWorkflow: {
+                    counts: {},
+                    recent: []
+                },
+                unreadNotifications: 0,
+                workQueueSummary: { totalActionable: 0, payroll: 0, reversals: 0, records: 0, byStatus: {} }
             });
         }
     },
@@ -112,6 +165,121 @@ const managerController = {
         res.status(500).send('Server Error');
     }
   },
+
+    getPayrollEndorsementQueue: async (req, res) => {
+        try {
+            const queue = await managerPayrollWorkflowService.getManagerQueue(getCompanyId(req), {
+                status: req.query.status || '',
+                month: req.query.month || '',
+                year: req.query.year || '',
+                pType: req.query.pType || ''
+            });
+
+            res.render('manager/payroll/endorsement_queue', {
+                title: 'Payroll Endorsement',
+                path: '/manager/payroll/endorsement',
+                user: getManagerUser(req),
+                batches: queue.batches,
+                filters: queue.filters,
+                statusOptions: [
+                    'SUBMITTED_TO_MANAGER',
+                    'SUBMITTED_TO_AUDITOR',
+                    'RETURNED_BY_MANAGER',
+                    'RETURNED_BY_AUDITOR',
+                    'CORRECTION_IN_PROGRESS',
+                    'SUBMITTED_TO_ENTITY_HEAD',
+                    'FINAL_APPROVED',
+                    'FINAL_REJECTED',
+                    'POSTED_TO_ACCOUNTS'
+                ],
+                getStatusBadgeClass: managerPayrollWorkflowService.getStatusBadgeClass,
+                successMessage: req.query.success || '',
+                errorMessage: req.query.error || ''
+            });
+        } catch (error) {
+            console.error('Manager payroll queue error:', error);
+            res.status(error.statusCode || 500).render('manager/payroll/endorsement_queue', {
+                title: 'Payroll Endorsement',
+                path: '/manager/payroll/endorsement',
+                user: getManagerUser(req),
+                batches: [],
+                filters: {
+                    status: req.query.status || 'SUBMITTED_TO_MANAGER',
+                    month: req.query.month || '',
+                    year: req.query.year || '',
+                    pType: req.query.pType || ''
+                },
+                statusOptions: [
+                    'SUBMITTED_TO_MANAGER',
+                    'SUBMITTED_TO_AUDITOR',
+                    'RETURNED_BY_MANAGER',
+                    'RETURNED_BY_AUDITOR',
+                    'CORRECTION_IN_PROGRESS',
+                    'SUBMITTED_TO_ENTITY_HEAD',
+                    'FINAL_APPROVED',
+                    'FINAL_REJECTED',
+                    'POSTED_TO_ACCOUNTS'
+                ],
+                getStatusBadgeClass: managerPayrollWorkflowService.getStatusBadgeClass,
+                successMessage: '',
+                errorMessage: error.message || 'Failed to load payroll endorsement queue.'
+            });
+        }
+    },
+
+    getPayrollEndorsementDetail: async (req, res) => {
+        try {
+            const detail = await managerPayrollWorkflowService.getManagerBatchDetail(getCompanyId(req), req.params.batchId);
+
+            res.render('manager/payroll/endorsement_detail', {
+                title: 'Payroll Endorsement Detail',
+                path: `/manager/payroll/endorsement/${req.params.batchId}`,
+                user: getManagerUser(req),
+                batch: detail.batch,
+                payrollRows: detail.payrollRows,
+                history: detail.history,
+                canAct: detail.canAct,
+                getStatusBadgeClass: managerPayrollWorkflowService.getStatusBadgeClass,
+                successMessage: req.query.success || '',
+                errorMessage: req.query.error || ''
+            });
+        } catch (error) {
+            console.error('Manager payroll detail error:', error);
+            res.status(error.statusCode || 500).send(error.message || 'Failed to load payroll batch detail.');
+        }
+    },
+
+    postPayrollEndorsement: async (req, res) => {
+        try {
+            await managerPayrollWorkflowService.endorseBatch({
+                companyId: getCompanyId(req),
+                batchId: req.params.batchId,
+                user: getManagerUser(req),
+                comments: req.body.comments || ''
+            });
+
+            return res.redirect(`/manager/payroll/endorsement/${req.params.batchId}?success=${encodeURIComponent('Payroll endorsed and forwarded to the Auditor successfully.')}`);
+        } catch (error) {
+            console.error('Manager payroll endorsement error:', error);
+            return res.redirect(`/manager/payroll/endorsement/${req.params.batchId}?error=${encodeURIComponent(error.message || 'Failed to endorse payroll batch.')}`);
+        }
+    },
+
+    postPayrollReturn: async (req, res) => {
+        try {
+            await managerPayrollWorkflowService.returnBatchToFinance({
+                companyId: getCompanyId(req),
+                batchId: req.params.batchId,
+                user: getManagerUser(req),
+                comments: req.body.comments || ''
+            });
+
+            return res.redirect(`/manager/payroll/endorsement/${req.params.batchId}?success=${encodeURIComponent('Payroll returned to the Finance Officer for correction.')}`);
+        } catch (error) {
+            console.error('Manager payroll return error:', error);
+            return res.redirect(`/manager/payroll/endorsement/${req.params.batchId}?error=${encodeURIComponent(error.message || 'Failed to return payroll batch.')}`);
+        }
+    },
 
     getApproveGuarantee: async (req, res) => {
         try {
@@ -170,58 +338,7 @@ const managerController = {
 
     getApproveLoan: async (req, res) => {
         try {
-            // Fetch Pending Loan Applications
-            const [pendingLoans] = await pool.query(`
-                SELECT 
-                    l.TransNo,
-                    l.EntryDate,
-                    l.PFNo,
-                    s.SName,
-                    s.AccountNo,
-                    l.Amount,
-                    l.Interest,
-                    l.Duration,
-                    l.StartDate,
-                    l.ExpDate,
-                    l.Rate,
-                    l.MonthlyRepayment,
-                    l.MonthlyInt,
-                    l.LoanBal,
-                    l.Surcharge,
-                    lc.TransName as LoanType
-                FROM tblloan l
-                LEFT JOIN tblstaff s ON l.PFNo = s.PFNo
-                LEFT JOIN tblloancode lc ON l.LTrans = lc.TCode
-                WHERE l.Approved = 0
-                ORDER BY l.EntryDate DESC
-            `);
-
-            // Fetch Repayment View (All Active Loans for context)
-            const [activeRepayments] = await pool.query(`
-                SELECT 
-                    l.TransNo,
-                    l.PFNo,
-                    s.SName,
-                    l.Amount,
-                    l.EntryDate as LoanDate,
-                    l.Duration,
-                    l.RepaidAmount,
-                    l.LoanBal,
-                    l.StartDate,
-                    l.ExpDate
-                FROM tblloan l
-                LEFT JOIN tblstaff s ON l.PFNo = s.PFNo
-                WHERE l.Approved = 1 AND (l.LoanBal > 0 OR l.RepaidAmount > 0)
-                ORDER BY l.EntryDate DESC
-            `);
-
-            res.render('manager/approve/loan', {
-                title: 'Approve Loans',
-                path: '/manager/approve/loan',
-                user: req.session.user || { name: 'Manager' },
-                pendingLoans,
-                activeRepayments
-            });
+            res.redirect('/manager/record-workflow?module=loan&status=SUBMITTED_TO_MANAGER&success=' + encodeURIComponent('Use the Sensitive Record Endorsement queue for loan workflow actions.'));
         } catch (error) {
             console.error(error);
             res.status(500).send('Server Error');
@@ -230,30 +347,7 @@ const managerController = {
 
     postApproveLoan: async (req, res) => {
         try {
-            const { transNo, action } = req.body;
-            const approvedBy = (req.session.user && req.session.user.name) ? req.session.user.name : 'Manager';
-            const now = new Date();
-
-            let status = 0;
-            if (action === 'approve') status = 1;
-            else if (action === 'reject') status = 2; // Assuming 2 is Rejected
-
-            await controllerAuditHelper.auditUpdate({
-                table: 'tblloan',
-                formName: 'manager/approve/loan',
-                recordId: transNo,
-                fetchQuery: 'SELECT * FROM tblloan WHERE TransNo = ?',
-                fetchParams: [transNo],
-                applyChange: async () => {
-                    await pool.query(`
-                        UPDATE tblloan 
-                        SET Approved = ?, ApprovedBy = ?, DateApproved = ?
-                        WHERE TransNo = ?
-                    `, [status, approvedBy, now, transNo]);
-                }
-            });
-
-            res.json({ success: true });
+            res.status(409).json({ error: 'Use the Sensitive Record Endorsement queue for loan workflow actions.' });
         } catch (error) {
             console.error(error);
             res.status(500).json({ error: 'Server Error' });
@@ -872,32 +966,7 @@ const managerController = {
 
   getTransferApprovals: async (req, res) => {
       try {
-          // Fetch Company Info
-          const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
-          const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
-
-          // Fetch Pending Transfers
-          const query = `
-              SELECT t.PFNO, t.TDate, t.SName, 
-                     dp.Dept AS PrevDeptName, 
-                     dt.Dept AS TDeptName,
-                     t.PrevDept, t.TDept
-              FROM tbltransfer t
-              LEFT JOIN tbldept dp ON t.PrevDept = dp.Code
-              LEFT JOIN tbldept dt ON t.TDept = dt.Code
-              WHERE t.approved = 0
-          `;
-          const [transfers] = await pool.query(query);
-
-          res.render('manager/approve/transfer', {
-              title: 'Approve Transfers',
-              group: 'Approve',
-              path: '/manager/approve/transfer',
-              user: { name: 'Manager' },
-              role: 'manager',
-              companyName,
-              transfers
-          });
+          res.redirect('/manager/record-workflow?module=transfer&status=SUBMITTED_TO_MANAGER');
       } catch (error) {
           console.error(error);
           res.status(500).send('Server Error');
@@ -906,55 +975,7 @@ const managerController = {
 
   postTransferApproval: async (req, res) => {
       try {
-          const { pfno, tDate, newDeptCode, action } = req.body;
-          const user = req.user ? req.user.username : 'manager'; 
-
-          // Helper to format date as YYYY-MM-DD HH:mm:ss without timezone
-          const formatDateTime = (dateStr) => {
-            const d = new Date(dateStr);
-            const pad = (n) => n.toString().padStart(2, '0');
-            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
-                   `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-          };
-
-          const formattedTDate = formatDateTime(tDate);
-          
-          // Convert tDate string to Date object for accurate comparison in WHERE clause
-          const tDateObj = new Date(tDate);
-
-          if (action === 'approve') {
-              // 1. Update tbltransfer
-              const updateTransfer = `
-                  UPDATE tbltransfer 
-                  SET approved = -1, approvedby = ?, dateapproved = NOW()
-                  WHERE PFNO = ? AND TDate = ? AND approved = 0
-              `;
-              await pool.query(updateTransfer, [user, pfno, tDateObj]); // Use Date object for TDate match
-
-              // 2. Update tblstaff
-              // Update CDept and CDeptDate (formatted without timezone)
-              const updateStaff = `
-                  UPDATE tblstaff 
-                  SET CDept = ?, CDeptDate = ?
-                  WHERE PFNO = ?
-              `;
-              await pool.query(updateStaff, [newDeptCode, formattedTDate, pfno]);
-
-              res.json({ success: true, message: 'Transfer approved successfully.' });
-
-          } else if (action === 'reject') {
-              // Update tbltransfer only
-              const updateTransfer = `
-                  UPDATE tbltransfer 
-                  SET approved = 2, approvedby = ?, dateapproved = NOW()
-                  WHERE PFNO = ? AND TDate = ? AND approved = 0
-              `;
-              await pool.query(updateTransfer, [user, pfno, tDateObj]);
-
-              res.json({ success: true, message: 'Transfer rejected.' });
-          } else {
-              res.status(400).json({ error: 'Invalid action' });
-          }
+          res.status(400).json({ error: 'Use the Sensitive Record Endorsement queue for transfer workflow actions.' });
 
       } catch (error) {
           console.error(error);
@@ -1030,29 +1051,7 @@ const managerController = {
 
   getApproveTraining: async (req, res) => {
       try {
-          const [trainings] = await pool.query(`
-              SELECT 
-                  c.PFNo,
-                  s.SName,
-                  c.Course,
-                  c.Duration,
-                  c.Country,
-                  c.StartDate,
-                  sp.Sponsor as SponsorName
-              FROM tblcourse c
-              JOIN tblstaff s ON c.PFNo = s.PFNo
-              LEFT JOIN tblcoursesponsor sp ON c.SponsoredBy = sp.SCode
-              WHERE c.approved = 0
-              ORDER BY c.StartDate DESC
-          `);
-
-          res.render('manager/approve/training', {
-              title: 'Approve Training',
-              path: '/manager/approve/training',
-              user: req.session.user || { name: 'Manager' },
-              role: 'manager',
-              trainings
-          });
+          res.redirect('/manager/record-workflow?module=training&status=SUBMITTED_TO_MANAGER');
       } catch (error) {
           console.error(error);
           res.status(500).send('Server Error');
@@ -1061,53 +1060,7 @@ const managerController = {
 
   getApproveTrainingView: async (req, res) => {
       try {
-          const { pfno, course, startDate } = req.query;
-          
-          if (!pfno || !course || !startDate) {
-              return res.status(400).send('Missing parameters');
-          }
-
-          // Convert startDate to MySQL format for query
-          const dateObj = new Date(startDate);
-          // Simple ISO date string YYYY-MM-DD HH:mm:ss.SSS might not match exactly due to time zones
-          // We'll use a date range or exact match depending on how it's stored.
-          // The previous code used exact match. Let's try that first but be careful.
-          
-          // Better: use date_format in SQL or just exact string if passed correctly.
-          // Let's assume startDate is passed as ISO string or timestamp.
-          
-          const [rows] = await pool.query(`
-              SELECT 
-                  c.*,
-                  s.SName,
-                  d.Dept as DeptName,
-                  j.JobTitle as JobName,
-                  sp.Sponsor as SponsorName,
-                  cl.CLevel as LevelName,
-                  ct.CType as TypeName
-              FROM tblcourse c
-              JOIN tblstaff s ON c.PFNo = s.PFNo
-              LEFT JOIN tbldept d ON s.CDept = d.Code
-              LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code
-              LEFT JOIN tblcoursesponsor sp ON c.SponsoredBy = sp.SCode
-              LEFT JOIN tblcourselevel cl ON c.Level = cl.CLCode
-              LEFT JOIN tblcoursetype ct ON c.Type = ct.CourseCode
-              WHERE c.PFNo = ? AND c.Course = ? AND c.StartDate = ?
-          `, [pfno, course, startDate]);
-
-          if (rows.length === 0) {
-              return res.status(404).send('Training record not found');
-          }
-
-          const training = rows[0];
-
-          res.render('manager/approve/training_view', {
-              title: 'Training Details',
-              path: '/manager/approve/training',
-              user: req.session.user || { name: 'Manager' },
-              role: 'manager',
-              training
-          });
+          res.redirect('/manager/record-workflow?module=training&status=SUBMITTED_TO_MANAGER');
       } catch (error) {
           console.error(error);
           res.status(500).send('Server Error');
@@ -1116,86 +1069,16 @@ const managerController = {
 
   postApproveTraining: async (req, res) => {
       try {
-          const { pfno, course, startDate, action } = req.body;
-          const user = req.user ? req.user.username : 'Manager';
-          
-          // Convert startDate to ISO string (YYYY-MM-DD HH:mm:ss.SSS) for exact matching
-          const formatDate = (d) => {
-             const date = new Date(d);
-             const pad = (n) => n.toString().padStart(2, '0');
-             const pad3 = (n) => n.toString().padStart(3, '0');
-             return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad3(date.getMilliseconds())}`;
-          };
-
-          const exactDate = formatDate(startDate);
-
-          if (action === 'approve') {
-              const query = `
-                  UPDATE tblcourse 
-                  SET approved = -1, approvedby = ?, dateapproved = NOW()
-                  WHERE PFNo = ? AND Course = ? AND StartDate = ?
-              `;
-              const [result] = await pool.query(query, [user, pfno, course, exactDate]);
-              
-              if (result.affectedRows === 0) {
-                   return res.json({ success: false, message: 'Training record not found or already processed.' });
-              }
-              res.json({ success: true, message: 'Training approved.' });
-          } else if (action === 'reject') {
-               const query = `
-                  UPDATE tblcourse 
-                  SET approved = 2, approvedby = ?, dateapproved = NOW()
-                  WHERE PFNo = ? AND Course = ? AND StartDate = ?
-              `;
-              const [result] = await pool.query(query, [user, pfno, course, exactDate]);
-              
-              if (result.affectedRows === 0) {
-                   return res.json({ success: false, message: 'Training record not found or already processed.' });
-              }
-              res.json({ success: true, message: 'Training rejected.' });
-          } else {
-              res.status(400).json({ error: 'Invalid action' });
-          }
+          res.status(400).json({ error: 'Use the Sensitive Record Endorsement queue for training workflow actions.' });
       } catch (error) {
           console.error(error);
-          res.status(500).json({ error: 'Server error' });
+          res.status(500).json({ error: 'Server Error' });
       }
   },
 
   getApproveQuery: async (req, res) => {
       try {
-          const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
-          const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
-
-          // Fetch unapproved queries (Approved = 0)
-          const query = `
-              SELECT 
-                  q.PFNO,
-                  s.SName,
-                  DATE_FORMAT(q.QDate, '%Y-%m-%d %H:%i:%s.%f') as QDateFull,
-                  DATE_FORMAT(q.QDate, '%Y-%m-%d %H:%i:%s') as QDateFormatted,
-                  q.QType as QTypeCode,
-                  qt.QType as QTypeName,
-                  q.MResponse as MResponseCode,
-                  mr.Reaction as MResponseName
-              FROM tblquery q
-              LEFT JOIN tblstaff s ON q.PFNO = s.PFNo
-              LEFT JOIN tblqtype qt ON q.QType = qt.Code
-              LEFT JOIN tblmreaction mr ON q.MResponse = mr.Code
-              WHERE q.Approved = 0
-              ORDER BY q.QDate ASC
-          `;
-          const [rows] = await pool.query(query);
-
-          res.render('manager/approve/query', {
-              title: 'Approve Queries',
-              group: 'Approve',
-              path: '/manager/approve/query',
-              user: { name: 'Manager' },
-              role: 'manager',
-              companyName,
-              queries: rows
-          });
+          res.redirect('/manager/record-workflow?module=salary-query&status=SUBMITTED_TO_MANAGER');
       } catch (error) {
           console.error(error);
           res.status(500).send('Server Error');
@@ -1272,26 +1155,10 @@ const managerController = {
  
   postApproveQuery: async (req, res) => {
       try {
-          const { pfno, qDate } = req.body;
-          
-          // Update Approved = -1, ApprovedBy = User, DateApproved = NOW
-          const query = `
-              UPDATE tblquery 
-              SET Approved = -1, ApprovedBy = ?, DateApproved = NOW()
-              WHERE PFNO = ? AND QDate = ?
-          `;
-          
-          const [result] = await pool.query(query, [
-              req.user ? req.user.username : 'manager', 
-              pfno, 
-              qDate
-          ]);
-
-          if (result.affectedRows === 0) {
-              return res.json({ success: false, message: 'Query not found or already approved.' });
-          }
-
-          res.json({ success: true });
+          return res.status(409).json({
+              success: false,
+              message: 'Use the Sensitive Record Endorsement queue. Manager approval no longer performs final approval for salary queries.'
+          });
       } catch (error) {
           console.error(error);
           res.status(500).json({ error: 'Server error' });
@@ -1301,29 +1168,7 @@ const managerController = {
     // Redundancy Approval
     getApproveRedundancy: async (req, res) => {
         try {
-            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
-            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
-
-            // Fetch Pending Redundancy Requests (Redundant = 2)
-            const query = `
-                SELECT 
-                    s.PFNo,
-                    s.SName,
-                    s.DOE,
-                    d.Dept as Department,
-                    TIMESTAMPDIFF(YEAR, s.DOE, CURDATE()) as Served
-                FROM tblstaff s
-                LEFT JOIN tbldept d ON s.CDept = d.Code
-                WHERE s.Redundant = 2
-            `;
-            const [requests] = await pool.query(query);
-
-            res.render('manager/approve/redundancy', {
-                title: 'Approve Redundancy',
-                user: { name: 'Manager' },
-                companyName,
-                requests
-            });
+            res.redirect('/manager/record-workflow?module=redundancy&status=SUBMITTED_TO_MANAGER');
         } catch (err) {
             console.error(err);
             res.status(500).send('Server Error');
@@ -1377,23 +1222,7 @@ const managerController = {
 
     getApproveSalaryReview: async (req, res) => {
       try {
-          const pageData = await payrollPagesService.getSalaryReviewApprovalData({
-              companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
-              filters: req.query
-          });
-
-          res.render('manager/approve/salary_review', {
-              title: 'Approve Salary Review',
-              path: '/manager/approve/salary-review',
-              user: req.session.user || { name: 'Manager' },
-              role: 'manager',
-              reviewTypes: pageData.reviewTypes,
-              grades: pageData.grades,
-              records: pageData.rows,
-              filters: pageData.filters,
-              success: req.query.success || '',
-              error: req.query.error || ''
-          });
+          res.redirect('/manager/record-workflow?module=salary-review&status=SUBMITTED_TO_MANAGER');
       } catch (error) {
           console.error(error);
           res.status(500).send('Server Error');
@@ -1402,17 +1231,7 @@ const managerController = {
 
     postApproveSalaryReview: async (req, res) => {
       try {
-          await payrollPagesService.decideSalaryReview({
-              companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
-              reviewDate: req.body.reviewDate,
-              revCode: req.body.revCode,
-              startGrade: req.body.startGrade,
-              endGrade: req.body.endGrade,
-              action: req.body.action,
-              approvedBy: req.session.user?.name || 'Manager'
-          });
-
-          res.redirect('/manager/approve/salary-review?success=Salary review decision saved successfully.');
+          res.redirect('/manager/record-workflow?module=salary-review&status=SUBMITTED_TO_MANAGER&error=' + encodeURIComponent('Use the Sensitive Record Endorsement queue for salary review workflow actions.'));
       } catch (error) {
           console.error(error);
           res.redirect(`/manager/approve/salary-review?error=${encodeURIComponent(error.message || 'Failed to process salary review decision.')}`);
@@ -1421,21 +1240,7 @@ const managerController = {
 
     getApproveEndOfService: async (req, res) => {
       try {
-          const pageData = await payrollPagesService.getEndOfServiceApprovalData({
-              companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
-              filters: req.query
-          });
-
-          res.render('manager/approve/end_of_service', {
-              title: 'Approve End of Service',
-              path: '/manager/approve/end-of-service',
-              user: req.session.user || { name: 'Manager' },
-              role: 'manager',
-              rows: pageData.rows,
-              filters: pageData.filters,
-              success: req.query.success || '',
-              error: req.query.error || ''
-          });
+          res.redirect('/manager/record-workflow?module=end-of-service&status=SUBMITTED_TO_MANAGER');
       } catch (error) {
           console.error(error);
           res.status(500).send('Server Error');
@@ -1444,15 +1249,7 @@ const managerController = {
 
     postApproveEndOfService: async (req, res) => {
       try {
-          await payrollPagesService.decideEndOfService({
-              companyId: req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1,
-              pfNo: req.body.pfNo,
-              dateKeyed: req.body.dateKeyed,
-              action: req.body.action,
-              approvedBy: req.session.user?.name || 'Manager'
-          });
-
-          res.redirect('/manager/approve/end-of-service?success=End of service decision saved successfully.');
+          res.redirect('/manager/record-workflow?module=end-of-service&status=SUBMITTED_TO_MANAGER&error=' + encodeURIComponent('Use the Sensitive Record Endorsement queue for end of service workflow actions.'));
       } catch (error) {
           console.error(error);
           res.redirect(`/manager/approve/end-of-service?error=${encodeURIComponent(error.message || 'Failed to process EOS decision.')}`);
@@ -1665,10 +1462,7 @@ const managerController = {
 
   approveRedundancy: async (req, res) => {
         try {
-            const { pfno } = req.body;
-            // Approve Redundancy (Set Redundant = 1, DateRedundant = NOW)
-            await pool.query('UPDATE tblstaff SET Redundant = 1, DateRedundant = NOW() WHERE PFNo = ?', [pfno]);
-            res.redirect('/manager/approve/redundancy');
+            res.redirect('/manager/record-workflow?module=redundancy&status=SUBMITTED_TO_MANAGER&error=' + encodeURIComponent('Use the Sensitive Record Endorsement queue for redundancy workflow actions.'));
         } catch (err) {
             console.error(err);
             res.status(500).send('Server Error');
@@ -1893,37 +1687,7 @@ const managerController = {
 
     getApprovePromotionDemotion: async (req, res) => {
         try {
-            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
-            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
-
-            const query = `
-                SELECT 
-                    p.PFNO,
-                    s.SName,
-                    p.PDate,
-                    p.Mode,
-                    g1.Grade as PrevGradeDesc,
-                    g2.Grade as NewGradeDesc,
-                    j.JobTitle as NewJobTitleDesc
-                FROM tblpromotions p
-                LEFT JOIN tblstaff s ON p.PFNO = s.PFNo
-                LEFT JOIN (SELECT DISTINCT GradeCode, Grade FROM tblgrade) g1 ON p.PrevGrade = g1.GradeCode
-                LEFT JOIN (SELECT DISTINCT GradeCode, Grade FROM tblgrade) g2 ON p.CGrade = g2.GradeCode
-                LEFT JOIN tbljobtitle j ON p.JobTitle = j.Code
-                WHERE p.Approved = 0
-                ORDER BY p.dateKeyed DESC
-            `;
-            const [rows] = await pool.query(query);
-
-            res.render('manager/approve/promotions', {
-                title: 'Approve Promotions / Demotions',
-                group: 'Approve',
-                path: '/manager/approve/promotion-demotion',
-                user: { name: 'Manager' },
-                role: 'manager',
-                companyName,
-                promotions: rows
-            });
+            res.redirect('/manager/record-workflow?module=promotion&status=SUBMITTED_TO_MANAGER');
         } catch (error) {
             console.error(error);
             res.status(500).send('Server Error');
@@ -1932,104 +1696,7 @@ const managerController = {
 
     postApprovePromotion: async (req, res) => {
         try {
-            const { pfno, pDate } = req.body;
-            
-            const connection = await pool.getConnection();
-            try {
-                await connection.beginTransaction();
-
-                // 1. Update Staff Record (Apply Promotion)
-                const updateStaffQuery = `
-                    UPDATE tblstaff s
-                    JOIN tblpromotions p ON s.PFNo = p.PFNO
-                    SET s.CGrade = p.CGrade, 
-                        s.JobTitle = p.JobTitle, 
-                        s.GradeCode = p.CGrade, 
-                        s.CGradeDate = p.PDate
-                    WHERE p.PFNO = ? AND DATE(p.PDate) = DATE(?) AND p.Approved = 0
-                `;
-                
-                await connection.query(updateStaffQuery, [pfno, pDate]);
-
-                // 2. Mark Promotion as Approved
-                const updatePromoQuery = `
-                    UPDATE tblpromotions 
-                    SET Approved = -1, ApprovedBy = ?, Dateapproved = NOW()
-                    WHERE PFNO = ? AND DATE(PDate) = DATE(?)
-                `;
-                
-                await connection.query(updatePromoQuery, [
-                    req.user ? req.user.username : 'manager',
-                    pfno,
-                    pDate
-                ]);
-
-                await connection.commit();
-
-                // --- Generate Letter and Send Email ---
-                
-                // Fetch Staff Details
-                const [staffRows] = await pool.query('SELECT SName, Email FROM tblstaff WHERE PFNo = ?', [pfno]);
-                const staff = staffRows[0];
-
-                // Fetch Company Info
-                const [comRows] = await pool.query('SELECT Com_Name, Address, LogoPath FROM tblcominfo LIMIT 1');
-                const company = comRows[0];
-
-                // Fetch HOD from Parameters
-                const [paramRows] = await pool.query('SELECT HOD FROM tblparams1 LIMIT 1');
-                const hod = paramRows[0] ? paramRows[0].HOD : '';
-
-                // Fetch Promotion Details (for Job Title Description)
-                const [promoRows] = await pool.query(`
-                    SELECT p.Mode, j.JobTitle 
-                    FROM tblpromotions p 
-                    LEFT JOIN tbljobtitle j ON p.JobTitle = j.Code 
-                    WHERE p.PFNO = ? AND DATE(p.PDate) = DATE(?)
-                `, [pfno, pDate]);
-                const promo = promoRows[0];
-
-                let letterHtml = null;
-                const baseUrl = `${req.protocol}://${req.get('host')}`;
-
-                if (staff && promo) {
-                    // Render Letter HTML
-                    letterHtml = await ejs.renderFile(path.join(__dirname, '../views/manager/approve/promotion_letter.ejs'), {
-                        staff,
-                        company,
-                        hod,
-                        promo,
-                        pDate,
-                        baseUrl
-                    });
-
-                    // Send Email if address exists
-                    if (staff.Email) {
-                        const mailOptions = {
-                            from: process.env.SMTP_USER || 'info@hrpayroll.davisasmedia.com',
-                            to: staff.Email,
-                            subject: promo.Mode === 'D' ? 'LETTER OF DEMOTION' : 'LETTER OF PROMOTION',
-                            html: letterHtml
-                        };
-                        
-                        try {
-                            await transporter.sendMail(mailOptions);
-                            console.log(`Email sent to ${staff.Email}`);
-                        } catch (emailErr) {
-                            console.error('Failed to send email:', emailErr);
-                        }
-                    }
-                }
-
-                res.json({ success: true, letterHtml });
-
-            } catch (err) {
-                await connection.rollback();
-                throw err;
-            } finally {
-                connection.release();
-            }
-
+            res.status(400).json({ error: 'Use the Sensitive Record Endorsement queue for promotion workflow actions.' });
         } catch (error) {
             console.error(error);
             res.status(500).json({ error: 'Server error' });
@@ -2038,31 +1705,7 @@ const managerController = {
 
     getApproveExit: async (req, res) => {
         try {
-            const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
-            const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
-
-            const query = `
-                SELECT 
-                    f.PFNo,
-                    s.SName,
-                    f.DateResigned,
-                    f.DateLeft,
-                    r.Reason as ReasonDesc,
-                    f.Reason as ReasonCode
-                FROM tblformer f
-                JOIN tblstaff s ON f.PFNo = s.PFNo
-                LEFT JOIN tblreason r ON f.Reason = r.ReasonCode
-                WHERE f.Approved = 0
-                ORDER BY f.DateKeyed DESC
-            `;
-            const [exitRequests] = await pool.query(query);
-
-            res.render('manager/approve/exit', {
-                title: 'Approve Staff Exit',
-                user: { name: 'Manager' },
-                companyName,
-                exitRequests
-            });
+            res.redirect('/manager/record-workflow?module=staff-exit&status=SUBMITTED_TO_MANAGER');
         } catch (err) {
             console.error(err);
             res.status(500).send('Server Error');
@@ -2071,16 +1714,7 @@ const managerController = {
 
     postApproveExit: async (req, res) => {
         try {
-            const { pfno } = req.body;
-            const operator = req.user ? req.user.username : 'Manager';
-            
-            await pool.query(`
-                UPDATE tblformer 
-                SET Approved = -1, ApprovedBy = ?, DateApproved = NOW() 
-                WHERE PFNo = ?
-            `, [operator, pfno]);
-
-            res.redirect('/manager/approve/exit');
+            res.redirect('/manager/record-workflow?module=staff-exit&status=SUBMITTED_TO_MANAGER&error=' + encodeURIComponent('Use the Sensitive Record Endorsement queue for staff status workflow actions.'));
         } catch (err) {
             console.error(err);
             res.status(500).send('Server Error');
@@ -2249,22 +1883,7 @@ const managerController = {
     // Leave Approval
     getLeaveApplicationApproval: async (req, res) => {
         try {
-            const [pendingLeaves] = await pool.query(`
-                SELECT l.*, s.SName, t.LeaveType 
-                FROM tblleave l 
-                LEFT JOIN tblstaff s ON l.PFNO = s.PFNo 
-                LEFT JOIN tblleavetype t ON l.LType = t.Code
-                WHERE l.Approved = 0
-                ORDER BY l.StartDate DESC
-            `);
-
-            res.render('manager/approve/leave_application', {
-                title: 'Approve Leave Applications',
-                group: 'Approve',
-                path: '/manager/approve/leave-application',
-                user: req.session.user || { name: 'Manager' },
-                pendingLeaves
-            });
+            res.redirect('/manager/record-workflow?module=leave&status=SUBMITTED_TO_MANAGER');
         } catch (error) {
             console.error(error);
             res.status(500).send('Server Error');
@@ -2273,28 +1892,7 @@ const managerController = {
 
     postLeaveApproval: async (req, res) => {
         try {
-            const { id, pfno, action } = req.body;
-            const operator = req.session.user ? req.session.user.name : 'Manager';
-            const now = new Date();
-            
-            // 1 = Approved, 2 = Rejected
-            const status = action === 'approve' ? 1 : 2;
-
-            await controllerAuditHelper.auditUpdate({
-                table: 'tblleave',
-                formName: 'manager/approve/leave-application',
-                recordId: id,
-                fetchQuery: 'SELECT * FROM tblleave WHERE LCount = ?',
-                fetchParams: [id],
-                applyChange: async () => {
-                    await pool.query(
-                        'UPDATE tblleave SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE LCount = ?',
-                        [status, operator, now, now, id]
-                    );
-                }
-            });
-
-            res.json({ success: true });
+            res.status(400).json({ error: 'Use the Sensitive Record Endorsement queue for leave workflow actions.' });
         } catch (error) {
             console.error(error);
             res.status(500).json({ error: 'Server Error' });
@@ -2534,57 +2132,7 @@ const managerController = {
 
     postApproveLoanRepayment: async (req, res) => {
         try {
-            const { repayId, action } = req.body;
-            const user = req.session.user ? req.session.user.name : 'Manager';
-            const now = new Date();
-
-            const connection = await pool.getConnection();
-            try {
-                await connection.beginTransaction();
-
-                if (action === 'approve') {
-                    // 1. Get Repayment Details
-                    const [repayRows] = await connection.query('SELECT * FROM tblloanrepayment WHERE RepayID = ?', [repayId]);
-                    if (repayRows.length === 0) throw new Error('Repayment not found');
-                    const repay = repayRows[0];
-
-                    // 2. Get Loan Details
-                    const [loanRows] = await connection.query('SELECT * FROM tblloan WHERE TransNo = ?', [repay.LoanTransNo]);
-                    if (loanRows.length === 0) throw new Error('Loan not found');
-                    const loan = loanRows[0];
-
-                    // 3. Update Loan Balance
-                    const newRepaid = parseFloat(loan.RepaidAmount || 0) + parseFloat(repay.Amount);
-                    const newBal = parseFloat(loan.LoanBal || 0) - parseFloat(repay.Amount);
-                    const isRepaid = newBal <= 0 ? 1 : 0;
-
-                    await connection.query(
-                        'UPDATE tblloan SET RepaidAmount = ?, LoanBal = ?, Repaid = ? WHERE TransNo = ?',
-                        [newRepaid, newBal, isRepaid, repay.LoanTransNo]
-                    );
-
-                    // 4. Mark Repayment as Approved
-                    await connection.query(
-                        'UPDATE tblloanrepayment SET Approved = 1, ApprovedBy = ?, DateApproved = ? WHERE RepayID = ?',
-                        [user, now, repayId]
-                    );
-                } else {
-                    // Reject: Just mark as Rejected (2)
-                    await connection.query(
-                        'UPDATE tblloanrepayment SET Approved = 2, ApprovedBy = ?, DateApproved = ? WHERE RepayID = ?',
-                        [user, now, repayId]
-                    );
-                }
-
-                await connection.commit();
-                res.json({ success: true });
-
-            } catch (err) {
-                await connection.rollback();
-                throw err;
-            } finally {
-                connection.release();
-            }
+            res.status(409).json({ error: 'Use the Sensitive Record Endorsement queue for loan repayment workflow actions.' });
         } catch (error) {
             console.error(error);
             res.status(500).json({ error: 'Server Error' });
@@ -2763,25 +2311,7 @@ const managerController = {
 
     getApproveIncrement: async (req, res) => {
         try {
-            const [increments] = await pool.query(`
-                SELECT 
-                    i.*,
-                    s.SName,
-                    t.InsType,
-                    DATE_FORMAT(i.IncDate, '%Y-%m-%d %H:%i:%s.%f') as IncDateStr
-                FROM tblincrement i
-                LEFT JOIN tblstaff s ON i.PFNo = s.PFNo
-                LEFT JOIN tblinstype t ON i.Type = t.InsCode
-                WHERE i.Approved = 0
-                ORDER BY i.DateKeyed DESC
-            `);
-
-            res.render('manager/approve/increment', {
-                title: 'Approve Increments',
-                path: '/manager/approve/increment',
-                user: req.session.user || { name: 'Manager' },
-                increments
-            });
+            res.redirect('/manager/record-workflow?module=increment&status=SUBMITTED_TO_MANAGER');
         } catch (error) {
             console.error(error);
             res.status(500).send('Server Error');
@@ -2790,24 +2320,10 @@ const managerController = {
 
     postApproveIncrement: async (req, res) => {
         try {
-            const { pfno, incDate, type, action } = req.body;
-            
-            const status = action === 'approve' ? 1 : 2;
-            const user = req.session.user ? req.session.user.name : 'Manager';
-            
-            // Note: tblincrement doesn't have a unique ID, so we use composite keys
-            // But incDate coming from client might be formatted string.
-            // It's safer if we can pass a unique identifier, but we don't have one.
-            // We'll rely on PFNo, IncDate, and Type.
-
-            await pool.query(
-                `UPDATE tblincrement 
-                 SET Approved = ?, ApprovedBy = ?, DateApproved = CURDATE(), TimeApproved = CURTIME() 
-                 WHERE PFNo = ? AND Type = ? AND IncDate = ? AND Approved = 0`,
-                [status, user, pfno, type, incDate]
-            );
-
-            res.json({ success: true });
+            res.status(409).json({
+                success: false,
+                message: 'Use the Sensitive Record Endorsement queue. Manager approval no longer performs final approval for increment records.'
+            });
         } catch (error) {
             console.error(error);
             res.status(500).json({ error: 'Server Error' });
@@ -2817,32 +2333,7 @@ const managerController = {
     // Acting Allowance Approval
     getApproveActingAllowance: async (req, res) => {
         try {
-            const [actingRecords] = await pool.query(`
-                SELECT 
-                    a.*,
-                    s.SName,
-                    cg.Grade as CurrentGradeName,
-                    cj.JobTitle as CurrentJobTitleName,
-                    ag.Grade as ActingGradeName,
-                    aj.JobTitle as ActingJobTitleName,
-                    d.DeptName as ActingDeptName
-                FROM tblacting a
-                LEFT JOIN tblstaff s ON a.PFNo = s.PFNo
-                LEFT JOIN tblgrade cg ON a.C_Grade = cg.GradeCode
-                LEFT JOIN tbljobtitle cj ON a.JobTitle = cj.Code
-                LEFT JOIN tblgrade ag ON a.A_Grade = ag.GradeCode
-                LEFT JOIN tbljobtitle aj ON a.A_JobTitle = aj.Code
-                LEFT JOIN tbldept d ON a.A_dept = d.DeptCode
-                WHERE a.Approved = 0
-                ORDER BY a.DateKeyed DESC
-            `);
-
-            res.render('manager/approve/acting_allowance', {
-                title: 'Approve Acting Allowance',
-                path: '/manager/approve/acting-allowance',
-                user: req.session.user || { name: 'Manager' },
-                actingRecords
-            });
+            res.redirect('/manager/record-workflow?module=acting&status=SUBMITTED_TO_MANAGER');
         } catch (error) {
             console.error('Acting Allowance Approval Error:', error);
             res.status(500).send('Server Error');
@@ -2851,19 +2342,7 @@ const managerController = {
 
     postApproveActingAllowance: async (req, res) => {
         try {
-            const { refNo, action } = req.body;
-            
-            const status = action === 'approve' ? 1 : 2;
-            const user = req.session.user ? req.session.user.name : 'Manager';
-            
-            await pool.query(
-                `UPDATE tblacting 
-                 SET Approved = ?, ApprovedBy = ?, DateApproved = CURDATE(), TimeApproved = CURTIME() 
-                 WHERE RefNo = ? AND Approved = 0`,
-                [status, user, refNo]
-            );
-
-            res.json({ success: true });
+            res.status(400).json({ error: 'Use the Sensitive Record Endorsement queue for acting workflow actions.' });
         } catch (error) {
             console.error('Approve Acting Allowance Error:', error);
             res.status(500).json({ error: 'Server Error' });

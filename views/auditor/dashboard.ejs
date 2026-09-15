@@ -30,6 +30,26 @@
 
       <div class="row g-3 mb-4">
         <div class="col-12 col-md-6 col-xxl-3">
+          <a href="/work-queue" class="card shadow-sm h-100 text-decoration-none text-reset">
+            <div class="card-body">
+              <div class="text-muted small mb-2">My Work Queue</div>
+              <div class="display-6 fw-semibold"><%= workQueueSummary.totalActionable %></div>
+              <div class="small text-muted"><%= workQueueSummary.payroll %> payroll items awaiting audit action</div>
+            </div>
+          </a>
+        </div>
+        <div class="col-12 col-md-6 col-xxl-3">
+          <a href="/notifications" class="card shadow-sm h-100 text-decoration-none text-reset">
+            <div class="card-body">
+              <div class="text-muted small mb-2">Unread Notifications</div>
+              <div class="display-6 fw-semibold"><%= unreadNotifications %></div>
+            </div>
+          </a>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-4">
+        <div class="col-12 col-md-6 col-xxl-3">
           <div class="card shadow-sm h-100">
             <div class="card-body">
               <div class="text-muted small mb-2">Total Audit Entries</div>
@@ -60,6 +80,62 @@
               <div class="display-6 fw-semibold"><%= metrics.payrollExceptions %></div>
             </div>
           </div>
+        </div>
+        <div class="col-12 col-md-6 col-xxl-3">
+          <a href="/auditor/payroll/review" class="card shadow-sm h-100 text-decoration-none text-reset">
+            <div class="card-body">
+              <div class="text-muted small mb-2">Payroll Awaiting Audit Review</div>
+              <div class="display-6 fw-semibold"><%= metrics.awaitingAuditReview %></div>
+            </div>
+          </a>
+        </div>
+        <div class="col-12 col-md-6 col-xxl-3">
+          <a href="/auditor/payroll/review?status=SUBMITTED_TO_ENTITY_HEAD" class="card shadow-sm h-100 text-decoration-none text-reset">
+            <div class="card-body">
+              <div class="text-muted small mb-2">Sent to Entity Head</div>
+              <div class="display-6 fw-semibold"><%= metrics.endorsedToEntityHead %></div>
+            </div>
+          </a>
+        </div>
+        <div class="col-12 col-md-6 col-xxl-3">
+          <a href="/auditor/payroll/review?status=RETURNED_BY_AUDITOR" class="card shadow-sm h-100 text-decoration-none text-reset">
+            <div class="card-body">
+              <div class="text-muted small mb-2">Returned for Correction</div>
+              <div class="display-6 fw-semibold"><%= metrics.returnedForCorrection %></div>
+            </div>
+          </a>
+        </div>
+        <div class="col-12 col-md-6 col-xxl-3">
+          <a href="/auditor/payroll/review?status=FINAL_APPROVED" class="card shadow-sm h-100 text-decoration-none text-reset">
+            <div class="card-body">
+              <div class="text-muted small mb-2">Finally Approved</div>
+              <div class="display-6 fw-semibold"><%= metrics.finalApproved %></div>
+            </div>
+          </a>
+        </div>
+        <div class="col-12 col-md-6 col-xxl-3">
+          <a href="/auditor/payroll/review?status=FINAL_REJECTED" class="card shadow-sm h-100 text-decoration-none text-reset">
+            <div class="card-body">
+              <div class="text-muted small mb-2">Returned / Rejected</div>
+              <div class="display-6 fw-semibold"><%= metrics.finalRejected %></div>
+            </div>
+          </a>
+        </div>
+        <div class="col-12 col-md-6 col-xxl-3">
+          <a href="/auditor/payroll/reversals" class="card shadow-sm h-100 text-decoration-none text-reset">
+            <div class="card-body">
+              <div class="text-muted small mb-2">Reversals Awaiting Review</div>
+              <div class="display-6 fw-semibold"><%= Number(reversalCounts.SUBMITTED_TO_AUDITOR || 0) %></div>
+            </div>
+          </a>
+        </div>
+        <div class="col-12 col-md-6 col-xxl-3">
+          <a href="/auditor/payroll/reopen" class="card shadow-sm h-100 text-decoration-none text-reset">
+            <div class="card-body">
+              <div class="text-muted small mb-2">Reopen Requests Awaiting Review</div>
+              <div class="display-6 fw-semibold"><%= Number(reopenCounts.SUBMITTED_TO_AUDITOR || 0) %></div>
+            </div>
+          </a>
         </div>
       </div>
 
@@ -181,6 +257,7 @@
 
               <h3 class="h6">Quick Links</h3>
               <div class="list-group list-group-flush">
+                <a href="/auditor/payroll/review" class="list-group-item list-group-item-action px-0">Payroll review queue</a>
                 <a href="/data-entry/reports/payroll/non-active-status-audit" class="list-group-item list-group-item-action px-0">Payroll non-active staff audit</a>
                 <a href="/manager/reports/journal" class="list-group-item list-group-item-action px-0">Journal review</a>
                 <a href="/manager/reports/master-pay-sheet" class="list-group-item list-group-item-action px-0">Master pay sheet</a>
@@ -248,6 +325,49 @@
                       </tbody>
                     </table>
                   </div>
+                </div>
+                <div class="col-12">
+                  <h3 class="h6">Recent Payroll Audit Actions</h3>
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                      <thead class="table-light">
+                        <tr>
+                          <th>Period</th>
+                          <th>Action</th>
+                          <th>Actor</th>
+                          <th>To</th>
+                          <th>At</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <% if (!controlChecks.recentWorkflowActions.length) { %>
+                          <tr><td colspan="5" class="text-center text-muted py-3">No recent payroll audit actions.</td></tr>
+                        <% } %>
+                        <% controlChecks.recentWorkflowActions.forEach(function(row) { %>
+                          <tr>
+                            <td><a href="/auditor/payroll/review/<%= row.WorkflowBatchID %>" class="text-decoration-none"><%= row.PMonth %>/<%= row.PYear %> - <%= row.PType %></a></td>
+                            <td><%= row.Action %></td>
+                            <td><%= row.actorName || row.actorRole || 'System' %></td>
+                            <td><%= row.ToStatus %></td>
+                            <td><%= row.ActionAt ? new Date(row.ActionAt).toLocaleString('en-GB') : 'N/A' %></td>
+                          </tr>
+                        <% }) %>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <h3 class="h6">Latest Payroll Totals Awaiting Review</h3>
+                  <% if (!controlChecks.latestAwaitingTotals) { %>
+                    <p class="text-muted small mb-0">No payroll batch is currently waiting for audit review.</p>
+                  <% } else { %>
+                    <div class="row g-3">
+                      <div class="col-6 col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Period</div><div class="fw-semibold"><%= controlChecks.latestAwaitingTotals.PMonth %>/<%= controlChecks.latestAwaitingTotals.PYear %> - <%= controlChecks.latestAwaitingTotals.PType %></div></div></div>
+                      <div class="col-6 col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Staff</div><div class="fw-semibold"><%= Number(controlChecks.latestAwaitingTotals.TotalStaff || 0).toLocaleString() %></div></div></div>
+                      <div class="col-6 col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Gross</div><div class="fw-semibold"><%= Number(controlChecks.latestAwaitingTotals.TotalGross || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div></div></div>
+                      <div class="col-6 col-md-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Net</div><div class="fw-semibold"><%= Number(controlChecks.latestAwaitingTotals.TotalNet || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div></div></div>
+                    </div>
+                  <% } %>
                 </div>
               </div>
             </div>

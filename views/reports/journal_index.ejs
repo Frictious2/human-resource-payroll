@@ -9,12 +9,18 @@
     <link href="/css/styles.css" rel="stylesheet" />
 </head>
 <body>
-    <% if (role === 'admin') { %>
+    <% if (typeof partialsBase === 'string' && partialsBase) { %>
+        <%- include('../' + partialsBase + '/topbar', { user }) %>
+        <%- include('../' + partialsBase + '/sidebar') %>
+    <% } else if (role === 'admin') { %>
         <%- include('../admin/partials/topbar', { user }) %>
         <%- include('../admin/partials/sidebar') %>
     <% } else if (role === 'manager') { %>
         <%- include('../manager/partials/topbar', { user }) %>
         <%- include('../manager/partials/sidebar') %>
+    <% } else if (role === 'finance') { %>
+        <%- include('../finance/partials/topbar', { user }) %>
+        <%- include('../finance/partials/sidebar') %>
     <% } else { %>
         <%- include('../data_entry/partials/topbar', { user }) %>
         <%- include('../data_entry/partials/sidebar') %>
@@ -34,10 +40,10 @@
                         <div class="modal-header">
                             <h5 class="modal-title" id="journalModalLabel">Journal Report</h5>
                             <!-- Close button redirects to dashboard -->
-                            <a href="/<%= role === 'manager' ? 'manager' : 'data-entry' %>/dashboard" class="btn-close" aria-label="Close"></a>
+                            <a href="<%= typeof closePath !== 'undefined' ? closePath : '/' + (role === 'manager' ? 'manager' : role === 'finance' ? 'finance' : 'data-entry') + '/dashboard' %>" class="btn-close" aria-label="Close"></a>
                         </div>
                         <div class="modal-body">
-                            <form action="/<%= role === 'manager' ? 'manager' : 'data-entry' %>/reports/journal/preview" method="GET" target="_blank">
+                            <form action="<%= typeof previewPath !== 'undefined' ? previewPath : '/' + (role === 'manager' ? 'manager' : role === 'finance' ? 'finance' : 'data-entry') + '/reports/journal/preview' %>" method="GET" target="_blank">
                                 <div class="mb-3">
                                     <label for="glDate" class="form-label">Pick a date</label>
                                     <select class="form-select" id="glDate" name="glDate" required>
@@ -61,7 +67,7 @@
                             </form>
                         </div>
                         <div class="modal-footer">
-                            <a href="/<%= role === 'manager' ? 'manager' : 'data-entry' %>/dashboard" class="btn btn-secondary">Close</a>
+                            <a href="<%= typeof closePath !== 'undefined' ? closePath : '/' + (role === 'manager' ? 'manager' : role === 'finance' ? 'finance' : 'data-entry') + '/dashboard' %>" class="btn btn-secondary">Close</a>
                         </div>
                     </div>
                 </div>

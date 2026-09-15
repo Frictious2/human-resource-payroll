@@ -28,7 +28,10 @@ function normalizeRole(level, source = 'tblpassword') {
     if (normalizedLevel === 'admin') return 'admin';
     if (normalizedLevel === 'manager') return 'manager';
     if (normalizedLevel === 'data entry' || normalizedLevel === 'data-entry' || normalizedLevel === 'user') return 'data-entry';
+    if (normalizedLevel === 'finance officer' || normalizedLevel === 'finance-officer') return 'finance-officer';
+    if (normalizedLevel === 'finance manager' || normalizedLevel === 'finance-manager') return 'finance-manager';
     if (normalizedLevel === 'auditor') return 'auditor';
+    if (normalizedLevel === 'entity head' || normalizedLevel === 'entity-head') return 'entity-head';
     if (normalizedLevel === 'developer') return 'developer';
 
     return null;
@@ -44,8 +47,14 @@ function getDashboardPathForRole(role) {
             return '/manager/dashboard';
         case 'data-entry':
             return '/data-entry/dashboard';
+        case 'finance-officer':
+            return '/finance/dashboard';
+        case 'finance-manager':
+            return '/finance-manager/dashboard';
         case 'auditor':
             return '/auditor/dashboard';
+        case 'entity-head':
+            return '/entity-head/dashboard';
         default:
             return '/login';
     }
@@ -238,5 +247,6 @@ module.exports = {
     createSessionUser,
     ensureSeedDeveloper,
     getDashboardPathForRole,
-    normalizeRole
+    normalizeRole,
+    verifyPassword
 };

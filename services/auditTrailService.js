@@ -85,40 +85,66 @@ function getAuditMetadata(overrides = {}) {
     };
 }
 
-async function getNextAuditTrailId() {
-    const [rows] = await pool.query(
+async function getNextAuditTrailId(executor = pool) {
+    const [rows] = await executor.query(
         'SELECT COALESCE(MAX(AuditTrailID), 0) + 1 AS nextId FROM tblaudittrail'
     );
 
     return rows[0] && rows[0].nextId ? rows[0].nextId : 1;
 }
 
+async function insertAuditEntry(executor, entry, metadata, maxAttempts = 5) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        const auditTrailId = await getNextAuditTrailId(executor);
+
+        try {
+            await executor.query(
+                `INSERT INTO tblaudittrail
+                (AuditTrailID, ChangeDate, UserName, FormName, Action, RecordID, FieldName, OldValue, NewValue, Loggedout, CompanyID)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    auditTrailId,
+                    new Date(),
+                    metadata.userName,
+                    truncateValue(metadata.formName),
+                    entry.action,
+                    resolveRecordId(entry.recordId),
+                    truncateValue(entry.fieldName || null),
+                    maskAuditValue(entry.fieldName, entry.oldValue),
+                    maskAuditValue(entry.fieldName, entry.newValue),
+                    entry.loggedout || 0,
+                    metadata.companyId
+                ]
+            );
+
+            return auditTrailId;
+        } catch (error) {
+            if (error?.code === 'ER_DUP_ENTRY' && attempt < maxAttempts) {
+                continue;
+            }
+            throw error;
+        }
+    }
+
+    throw new Error('Unable to allocate a unique audit trail ID.');
+}
+
 async function writeAuditEntry(entry) {
     try {
         const metadata = getAuditMetadata(entry);
-        const auditTrailId = await getNextAuditTrailId();
-
-        await pool.query(
-            `INSERT INTO tblaudittrail
-            (AuditTrailID, ChangeDate, UserName, FormName, Action, RecordID, FieldName, OldValue, NewValue, Loggedout, CompanyID)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                auditTrailId,
-                new Date(),
-                metadata.userName,
-                truncateValue(metadata.formName),
-                entry.action,
-                resolveRecordId(entry.recordId),
-                truncateValue(entry.fieldName || null),
-                maskAuditValue(entry.fieldName, entry.oldValue),
-                maskAuditValue(entry.fieldName, entry.newValue),
-                entry.loggedout || 0,
-                metadata.companyId
-            ]
-        );
+        await insertAuditEntry(pool, entry, metadata);
     } catch (error) {
         console.error('Audit trail logging failed:', error.message);
     }
+}
+
+async function writeAuditEntryWithExecutor(executor, entry, metadataOverrides = {}) {
+    const metadata = getAuditMetadata({
+        ...entry,
+        ...metadataOverrides
+    });
+
+    await insertAuditEntry(executor || pool, entry, metadata);
 }
 
 async function logCreate({ table, recordId, row, formName }) {
@@ -186,5 +212,6 @@ module.exports = {
     logAuthEvent,
     logCreate,
     logDelete,
-    logUpdate
+    logUpdate,
+    writeAuditEntryWithExecutor
 };
