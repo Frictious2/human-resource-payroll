@@ -3,6 +3,7 @@ const transporter = require('../config/mailer');
 const ejs = require('ejs');
 const path = require('path');
 const controllerAuditHelper = require('../services/controllerAuditHelper');
+const auditTrailService = require('../services/auditTrailService');
 const staffStatusService = require('../services/staffStatusService');
 const payrollPagesService = require('../services/payrollPagesService');
 const leavePagesService = require('../services/leavePagesService');
@@ -28,6 +29,142 @@ function getCompanyId(req) {
 
 function getManagerUser(req) {
     return req.session.user || req.user || { name: 'Manager', role: 'manager' };
+}
+
+function normalizeComparableValue(value) {
+    if (value instanceof Date) {
+        return value.toISOString();
+    }
+    if (value === undefined || value === null) {
+        return null;
+    }
+    return String(value);
+}
+
+function getChangedFields(previousRow, nextRow) {
+    const fieldNames = new Set([
+        ...Object.keys(previousRow || {}),
+        ...Object.keys(nextRow || {})
+    ]);
+
+    return Array.from(fieldNames).filter((fieldName) => (
+        normalizeComparableValue(previousRow ? previousRow[fieldName] : null)
+            !== normalizeComparableValue(nextRow ? nextRow[fieldName] : null)
+    ));
+}
+
+async function auditApprovalUpdate({
+    table,
+    formName,
+    recordId,
+    companyId,
+    userName,
+    fetchQuery,
+    fetchParams,
+    applyChange
+}) {
+    const connection = await pool.getConnection();
+
+    try {
+        await connection.beginTransaction();
+
+        const [previousRows] = await connection.query(fetchQuery, fetchParams);
+        const previousRow = previousRows[0] || null;
+        if (!previousRow) {
+            const error = new Error(`${table} approval record not found or outside your company.`);
+            error.statusCode = 404;
+            throw error;
+        }
+
+        const result = await applyChange(connection, previousRow);
+        if (result && result.affectedRows === 0) {
+            const error = new Error(`${table} approval record not found or already actioned.`);
+            error.statusCode = 404;
+            throw error;
+        }
+
+        const [nextRows] = await connection.query(fetchQuery, fetchParams);
+        const nextRow = nextRows[0] || null;
+        if (!nextRow) {
+            const error = new Error(`${table} approval record could not be reloaded for audit.`);
+            error.statusCode = 500;
+            throw error;
+        }
+
+        const changedFields = getChangedFields(previousRow, nextRow);
+        for (const fieldName of changedFields) {
+            await auditTrailService.writeAuditEntryWithExecutor(
+                connection,
+                {
+                    action: 'Edit',
+                    table,
+                    formName,
+                    recordId,
+                    fieldName,
+                    oldValue: previousRow[fieldName],
+                    newValue: nextRow[fieldName],
+                    companyId: nextRow.CompanyID || previousRow.CompanyID || companyId
+                },
+                {
+                    userName,
+                    formName,
+                    companyId: nextRow.CompanyID || previousRow.CompanyID || companyId
+                }
+            );
+        }
+
+        await connection.commit();
+        return { previousRow, nextRow, changedFields };
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
+}
+
+async function getGradeNotchValidation(gradeCode, notch) {
+    const [rows] = await pool.query(
+        `
+            SELECT
+                g.GradeCode,
+                g.NotchIncr,
+                (
+                    SELECT a.Notches
+                    FROM tblallowance a
+                    WHERE a.Grade = g.GradeCode
+                    ORDER BY a.ScaleDate DESC
+                    LIMIT 1
+                ) AS ScaleNotches
+            FROM tblgrade g
+            WHERE g.GradeCode = ?
+            LIMIT 1
+        `,
+        [gradeCode]
+    );
+
+    if (rows.length === 0) {
+        return {
+            valid: false,
+            reason: `Grade ${gradeCode || '(blank)'} is not configured.`
+        };
+    }
+
+    const requestedNotch = Number(notch) || 0;
+    const gradeLimit = Number(rows[0].NotchIncr) || 0;
+    const scaleLimit = Number(rows[0].ScaleNotches) || 0;
+    const maxNotch = Math.max(gradeLimit, scaleLimit, 1);
+
+    return {
+        valid: requestedNotch <= maxNotch,
+        requestedNotch,
+        maxNotch,
+        gradeLimit,
+        scaleLimit,
+        reason: requestedNotch > maxNotch
+            ? `Notch ${requestedNotch} exceeds maximum ${maxNotch} for grade ${gradeCode}.`
+            : ''
+    };
 }
 
 async function getRecordWorkflowDashboard(companyId) {
@@ -418,7 +555,9 @@ const managerController = {
               path: '/manager/approve/income-setup',
               user: req.session.user || { name: 'Manager' },
               role: 'manager',
-              allowances: rows
+              allowances: rows,
+              success: req.query.success || null,
+              error: req.query.error || null
           });
       } catch (error) {
           console.error(error);
@@ -513,7 +652,7 @@ const managerController = {
           const { grade, scaleDate } = req.query;
           if (!grade || !scaleDate) return res.status(400).send('Missing parameters');
           const [rows] = await pool.query(
-              'SELECT * FROM tblallowance WHERE Grade = ? AND ScaleDate = ?',
+              'SELECT * FROM tblallowance WHERE Grade = ? AND DATE(ScaleDate) = DATE(?)',
               [grade, scaleDate]
           );
           if (rows.length === 0) return res.status(404).send('Record not found');
@@ -542,11 +681,48 @@ const managerController = {
           const user = req.session.user ? req.session.user.name : 'Manager';
           const now = new Date();
           const status = action === 'reject' ? 2 : -1;
-          await pool.query(
-              'UPDATE tblallowance SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE Grade = ? AND ScaleDate = ? AND Approved = 0',
-              [status, user, now, now, gradeCode, scaleDate]
+
+          const [columns] = await pool.query(`
+              SELECT COLUMN_NAME, LOWER(COLUMN_NAME) AS normalized_name
+              FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'tblallowance'
+                AND LOWER(COLUMN_NAME) IN ('approved', 'approvedby', 'dateapproved', 'timeapproved', 'grade', 'scaledate')
+          `);
+          const columnMap = columns.reduce((acc, row) => {
+              acc[row.normalized_name] = row.COLUMN_NAME;
+              return acc;
+          }, {});
+          const requiredColumns = ['approved', 'grade', 'scaledate'];
+          const missingRequired = requiredColumns.filter((name) => !columnMap[name]);
+          if (missingRequired.length) {
+              return res.redirect('/manager/approve/income-setup?error=' + encodeURIComponent('Income setup approval columns are not configured correctly.'));
+          }
+
+          const updates = [`${columnMap.approved} = ?`];
+          const params = [status];
+          if (columnMap.approvedby) {
+              updates.push(`${columnMap.approvedby} = ?`);
+              params.push(user);
+          }
+          if (columnMap.dateapproved) {
+              updates.push(`${columnMap.dateapproved} = ?`);
+              params.push(now);
+          }
+          if (columnMap.timeapproved) {
+              updates.push(`${columnMap.timeapproved} = ?`);
+              params.push(now);
+          }
+          params.push(gradeCode, scaleDate);
+
+          const [result] = await pool.query(
+              `UPDATE tblallowance SET ${updates.join(', ')} WHERE ${columnMap.grade} = ? AND DATE(${columnMap.scaledate}) = DATE(?) AND ${columnMap.approved} = 0`,
+              params
           );
-          res.redirect('/manager/approve/income-setup');
+          if (!result.affectedRows) {
+              return res.redirect('/manager/approve/income-setup?error=' + encodeURIComponent('Income setup was not found or has already been approved/rejected.'));
+          }
+          res.redirect('/manager/approve/income-setup?success=' + encodeURIComponent('Income setup decision saved successfully.'));
       } catch (error) {
           console.error(error);
           res.status(500).send('Server Error');
@@ -665,14 +841,17 @@ const managerController = {
 
   getApproveSalary: async (req, res) => {
       try {
+          const companyId = getCompanyId(req);
           const [rows] = await pool.query(`
-              SELECT s.PFNo, st.SName, d.Dept, s.DateKeyed, s.PDate
-              FROM tblsalary s
-              JOIN tblstaff st ON s.PFNo = st.PFNo
-              LEFT JOIN tbldept d ON st.CDept = d.Code
-              WHERE s.Approved = 0
-              ORDER BY s.DateKeyed DESC
-          `);
+               SELECT s.PFNo, st.SName, d.Dept, s.DateKeyed, s.PDate
+               FROM tblsalary s
+               JOIN tblstaff st ON s.PFNo = st.PFNo
+               LEFT JOIN tbldept d ON st.CDept = d.Code
+               WHERE s.Approved = 0
+                 AND (s.CompanyID = ? OR s.CompanyID IS NULL)
+                 AND (st.CompanyID = ? OR st.CompanyID IS NULL)
+               ORDER BY s.DateKeyed DESC
+           `, [companyId, companyId]);
           res.render('manager/approve/salary_list', {
               title: 'Approve Salary Setup',
               path: '/manager/approve/salary',
@@ -690,6 +869,7 @@ const managerController = {
         try {
             const { pfno, pdate } = req.query;
             if (!pfno || !pdate) return res.redirect('/manager/approve/salary');
+            const companyId = getCompanyId(req);
             
             // Convert ISO string to date-only format
             const formattedPDate = new Date(pdate).toISOString().split('T')[0];
@@ -702,9 +882,11 @@ const managerController = {
                LEFT JOIN tbldept d ON st.CDept = d.Code
                LEFT JOIN tblgrade g ON st.CGrade = g.GradeCode
                LEFT JOIN tbljobtitle j ON st.JobTitle = j.Code
-               WHERE s.PFNo = ? AND s.PDate = ?
+               WHERE s.PFNo = ? AND DATE(s.PDate) = ?
+                 AND (s.CompanyID = ? OR s.CompanyID IS NULL)
+                 AND (st.CompanyID = ? OR st.CompanyID IS NULL)
                LIMIT 1`,
-              [pfno, pdate]
+              [pfno, formattedPDate, companyId, companyId]
           );
           
           if (rows.length === 0) {
@@ -736,21 +918,49 @@ const managerController = {
           const status = action === 'approve' ? -1 : 2;
           const now = new Date();
           const user = req.session.user ? req.session.user.name : 'Manager';
+          const companyId = getCompanyId(req);
           
           // Convert ISO string to date-only format to resolve truncation error
           const formattedPDate = new Date(pdate).toISOString().split('T')[0];
 
-          await pool.query(
-              `UPDATE tblsalary 
-               SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ?
-               WHERE PFNo = ? AND PDate = ?`,
-              [status, user, now, now, pfno, formattedPDate]
-          );
-          
+          await auditApprovalUpdate({
+              table: 'tblsalary',
+              formName: 'manager/approve/salary',
+              recordId: pfno,
+              companyId,
+              userName: user,
+              fetchQuery: `
+                  SELECT s.*
+                  FROM tblsalary s
+                  JOIN tblstaff st ON s.PFNo = st.PFNo
+                  WHERE s.PFNo = ?
+                    AND DATE(s.PDate) = ?
+                    AND (s.CompanyID = ? OR s.CompanyID IS NULL)
+                    AND (st.CompanyID = ? OR st.CompanyID IS NULL)
+                  LIMIT 1
+                  FOR UPDATE
+              `,
+              fetchParams: [pfno, formattedPDate, companyId, companyId],
+              applyChange: async (connection) => {
+                  const [result] = await connection.query(
+                      `UPDATE tblsalary s
+                       JOIN tblstaff st ON s.PFNo = st.PFNo
+                       SET s.Approved = ?, s.ApprovedBy = ?, s.DateApproved = ?, s.TimeApproved = ?
+                       WHERE s.PFNo = ?
+                         AND DATE(s.PDate) = ?
+                         AND s.Approved = 0
+                         AND (s.CompanyID = ? OR s.CompanyID IS NULL)
+                         AND (st.CompanyID = ? OR st.CompanyID IS NULL)`,
+                      [status, user, now, now, pfno, formattedPDate, companyId, companyId]
+                  );
+                  return result;
+              }
+          });
+           
           res.redirect('/manager/approve/salary');
       } catch (error) {
           console.error(error);
-          res.status(500).send('Server Error');
+          res.status(error.statusCode || 500).send(error.statusCode === 404 ? error.message : 'Server Error');
       }
   },
 
@@ -1087,13 +1297,16 @@ const managerController = {
 
   getApproveEntitlement: async (req, res) => {
       try {
+          const companyId = getCompanyId(req);
           const [rows] = await pool.query(`
               SELECT e.PFNo, s.SName, e.PayThrough, e.Bank, e.AccountNo, e.PayingBBAN, e.KeyedIn, e.Operator
               FROM tblentitle e
               LEFT JOIN tblstaff s ON e.PFNo = s.PFNo
               WHERE e.Approved = 0
+                AND (e.CompanyID = ? OR e.CompanyID IS NULL)
+                AND (s.CompanyID = ? OR s.CompanyID IS NULL)
               ORDER BY e.KeyedIn DESC
-          `);
+          `, [companyId, companyId]);
           res.render('manager/approve/entitlement', {
               title: 'Approve Entitlements',
               path: '/manager/approve/entitlement',
@@ -1111,11 +1324,30 @@ const managerController = {
       try {
           const { pfno } = req.query;
           if (!pfno) return res.status(400).send('PFNo is required');
+          const companyId = getCompanyId(req);
           const [paythrough] = await pool.query('SELECT Code, PayThrough FROM tblpaythrough ORDER BY PayThrough');
           const [banks] = await pool.query('SELECT Code, Bank FROM tblbanks ORDER BY Bank');
+          const [companyBBANs] = await pool.query(
+              'SELECT BBAN, Short, Bank FROM tblpayingbank WHERE CompanyID = ? OR CompanyID IS NULL ORDER BY Bank',
+              [companyId]
+          );
           const [items] = await pool.query("SELECT Code, Income FROM tblpayrollitems WHERE Code BETWEEN '01' AND '20' ORDER BY Code");
-          const [eRows] = await pool.query('SELECT * FROM tblentitle WHERE PFNo = ?', [pfno]);
-          const [sRows] = await pool.query('SELECT PFNo, SName FROM tblstaff WHERE PFNo = ?', [pfno]);
+          const [eRows] = await pool.query(
+              `
+                SELECT e.*
+                FROM tblentitle e
+                JOIN tblstaff s ON e.PFNo = s.PFNo
+                WHERE e.PFNo = ?
+                  AND (e.CompanyID = ? OR e.CompanyID IS NULL)
+                  AND (s.CompanyID = ? OR s.CompanyID IS NULL)
+                LIMIT 1
+              `,
+              [pfno, companyId, companyId]
+          );
+          const [sRows] = await pool.query(
+              'SELECT PFNo, SName FROM tblstaff WHERE PFNo = ? AND (CompanyID = ? OR CompanyID IS NULL) LIMIT 1',
+              [pfno, companyId]
+          );
           if (eRows.length === 0) return res.status(404).send('Entitlement not found');
           const entitle = eRows[0];
           const staff = sRows[0] || { PFNo: pfno, SName: pfno };
@@ -1128,6 +1360,7 @@ const managerController = {
               staff,
               paythrough,
               banks,
+              companyBBANs,
               items
           });
       } catch (error) {
@@ -1139,17 +1372,47 @@ const managerController = {
   postApproveEntitlement: async (req, res) => {
       try {
           const { pfno, action } = req.body;
+          const companyId = getCompanyId(req);
           const user = req.session.user ? req.session.user.name : 'Manager';
           const now = new Date();
           const approvedStatus = action === 'reject' ? 2 : -1;
-          await pool.query(
-              'UPDATE tblentitle SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE PFNo = ? AND Approved = 0',
-              [approvedStatus, user, now, now, pfno]
-          );
+          await auditApprovalUpdate({
+              table: 'tblentitle',
+              formName: 'manager/approve/entitlement',
+              recordId: pfno,
+              companyId,
+              userName: user,
+              fetchQuery: `
+                  SELECT e.*
+                  FROM tblentitle e
+                  JOIN tblstaff s ON e.PFNo = s.PFNo
+                  WHERE e.PFNo = ?
+                    AND (e.CompanyID = ? OR e.CompanyID IS NULL)
+                    AND (s.CompanyID = ? OR s.CompanyID IS NULL)
+                  LIMIT 1
+                  FOR UPDATE
+              `,
+              fetchParams: [pfno, companyId, companyId],
+              applyChange: async (connection) => {
+                  const [result] = await connection.query(
+                      `
+                        UPDATE tblentitle e
+                        JOIN tblstaff s ON e.PFNo = s.PFNo
+                        SET e.Approved = ?, e.ApprovedBy = ?, e.DateApproved = ?, e.TimeApproved = ?
+                        WHERE e.PFNo = ?
+                          AND e.Approved = 0
+                          AND (e.CompanyID = ? OR e.CompanyID IS NULL)
+                          AND (s.CompanyID = ? OR s.CompanyID IS NULL)
+                      `,
+                      [approvedStatus, user, now, now, pfno, companyId, companyId]
+                  );
+                  return result;
+              }
+          });
           res.redirect('/manager/approve/entitlement');
       } catch (error) {
           console.error(error);
-          res.status(500).send('Server Error');
+          res.status(error.statusCode || 500).send(error.statusCode === 404 ? error.message : 'Server Error');
       }
   },
  
@@ -1723,6 +1986,7 @@ const managerController = {
 
     getApproveNewStaff: async (req, res) => {
         try {
+            const companyId = getCompanyId(req);
             const [comRows] = await pool.query('SELECT Com_Name FROM tblcominfo LIMIT 1');
             const companyName = comRows[0] ? comRows[0].Com_Name : 'Human Resource Payroll';
 
@@ -1735,9 +1999,10 @@ const managerController = {
                     LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code
                     LEFT JOIN tbldept d ON s.CDept = d.Code
                     WHERE s.Approved = 0
+                      AND (s.CompanyID = ? OR s.CompanyID IS NULL)
                     ORDER BY s.KeyedIn DESC
                 `;
-            const [staffList] = await pool.query(query);
+            const [staffList] = await pool.query(query, [companyId]);
 
             res.render('manager/approve/new_staff', {
                 title: 'Approve New/Edited Staff',
@@ -1757,6 +2022,7 @@ const managerController = {
         try {
             const { pfno } = req.query;
             if (!pfno) return res.status(400).send('PFNo is required');
+            const companyId = getCompanyId(req);
             const [params1] = await pool.query('SELECT RetireAge FROM tblparams1 LIMIT 1');
             const retireAge = params1[0] ? params1[0].RetireAge : 60;
             const [sex] = await pool.query('SELECT * FROM tblsex');
@@ -1771,7 +2037,10 @@ const managerController = {
             const [levels] = await pool.query('SELECT LCode, Level FROM tbllevel ORDER BY Level');
             const [qualifTypes] = await pool.query('SELECT Code, QType FROM tblqualiftype ORDER BY QType');
             const [vehicles] = await pool.query('SELECT VType FROM tblvehicle ORDER BY VType');
-            const [staffRows] = await pool.query('SELECT * FROM tblstaff WHERE PFNo = ?', [pfno]);
+            const [staffRows] = await pool.query(
+                'SELECT * FROM tblstaff WHERE PFNo = ? AND (CompanyID = ? OR CompanyID IS NULL) LIMIT 1',
+                [pfno, companyId]
+            );
             if (staffRows.length === 0) return res.status(404).send('Staff not found');
             const staff = staffRows[0];
             const [lastLeaveRows] = await pool.query('SELECT DATE_FORMAT(MAX(StartDate), "%Y-%m-%d") as LastLeave FROM tblleave WHERE PFNO = ?', [pfno]);
@@ -1808,6 +2077,7 @@ const managerController = {
     postApproveNewStaff: async (req, res) => {
         try {
             const { pfno, action } = req.body;
+            const companyId = getCompanyId(req);
             const user = req.session.user ? req.session.user.name : 'Manager';
             const now = new Date();
 
@@ -1815,32 +2085,20 @@ const managerController = {
 
             if (action === 'approve') {
                 // Validate Notch before approving
-                const [staffRows] = await pool.query('SELECT Notch, CGrade FROM tblstaff WHERE PFNo = ?', [pfno]);
+                const [staffRows] = await pool.query(
+                    'SELECT Notch, CGrade FROM tblstaff WHERE PFNo = ? AND (CompanyID = ? OR CompanyID IS NULL) LIMIT 1',
+                    [pfno, companyId]
+                );
                 if (staffRows.length > 0) {
                     const { Notch, CGrade } = staffRows[0];
-                    const [gradeRows] = await pool.query('SELECT NotchIncr FROM tblgrade WHERE GradeCode = ?', [CGrade]);
-                    const maxNotch = gradeRows.length > 0 ? (gradeRows[0].NotchIncr || 0) : 0;
-                    
-                    if (Notch > maxNotch) {
-                        // Cannot approve invalid data
-                        // We could reject it automatically or return error
-                        // Let's return error for now so manager knows why
-                        // Note: This requires AJAX handling on frontend or error page. 
-                        // Since this is a redirect, we might want to flash a message.
-                        // But for now, let's just log and reject? Or block?
-                        // Let's block.
-                        // Assuming the UI can handle JSON error if we change to JSON?
-                        // The current implementation redirects.
-                        // Let's just update to Reject (2) if invalid?
-                        // No, that changes user intent.
-                        // Let's just log and skip update, or better, fail.
-                        console.error(`Cannot approve staff ${pfno}: Notch ${Notch} exceeds max ${maxNotch}`);
-                        // We will proceed to update tblstaff but maybe set it to Rejected?
-                        // Or just let it fail silently (bad UX).
-                        // Let's just rely on the fact that data entry *should* have caught it.
-                        // But if we want to be strict:
-                        // return res.send('Error: Invalid Notch Configuration');
+                    const validation = await getGradeNotchValidation(CGrade, Notch);
+
+                    if (!validation.valid) {
+                        console.error(`Cannot approve staff ${pfno}: ${validation.reason}`);
+                        return res.status(400).send(`Error: ${validation.reason}`);
                     }
+                } else {
+                    return res.status(404).send('Staff not found or not in your company.');
                 }
             }
 
@@ -1848,12 +2106,12 @@ const managerController = {
                 table: 'tblstaff',
                 formName: 'manager/approve/new-staff',
                 recordId: pfno,
-                fetchQuery: 'SELECT * FROM tblstaff WHERE PFNo = ?',
-                fetchParams: [pfno],
+                fetchQuery: 'SELECT * FROM tblstaff WHERE PFNo = ? AND (CompanyID = ? OR CompanyID IS NULL)',
+                fetchParams: [pfno, companyId],
                 applyChange: async () => {
                     await pool.query(
-                        'UPDATE tblstaff SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE PFNo = ?',
-                        [approvedStatus, user, now, now, pfno]
+                        'UPDATE tblstaff SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE PFNo = ? AND (CompanyID = ? OR CompanyID IS NULL)',
+                        [approvedStatus, user, now, now, pfno, companyId]
                     );
                 }
             });
@@ -1863,12 +2121,12 @@ const managerController = {
                 table: 'tblpayroll',
                 formName: 'manager/approve/new-staff',
                 recordId: pfno,
-                fetchQuery: 'SELECT * FROM tblpayroll WHERE PFNo = ? AND PYear = 0 AND PMonth = 0',
-                fetchParams: [pfno],
+                fetchQuery: 'SELECT * FROM tblpayroll WHERE PFNo = ? AND PYear = 0 AND PMonth = 0 AND (CompanyID = ? OR CompanyID IS NULL)',
+                fetchParams: [pfno, companyId],
                 applyChange: async () => {
                     await pool.query(
-                        'UPDATE tblpayroll SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE PFNo = ? AND PYear = 0',
-                        [approvedStatus, user, now, now, pfno]
+                        'UPDATE tblpayroll SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE PFNo = ? AND PYear = 0 AND (CompanyID = ? OR CompanyID IS NULL)',
+                        [approvedStatus, user, now, now, pfno, companyId]
                     );
                 }
             });

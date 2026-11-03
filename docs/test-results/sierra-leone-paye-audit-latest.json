@@ -1,0 +1,1424 @@
+{
+  "generatedAt": "2026-10-08T21:13:34.009Z",
+  "companyId": 1,
+  "findings": [
+    {
+      "area": "TAX_TABLE_CONFIGURATION",
+      "status": "PASS",
+      "detail": "Effective tbltax row matches the current Sierra Leone monthly resident PAYE rates.",
+      "expectedConfig": {
+        "R1": 600,
+        "R1Tax": 0,
+        "R2": 1200,
+        "R2Tax": 15,
+        "R3": 1800,
+        "R3Tax": 20,
+        "R4": 2400,
+        "R4Tax": 25,
+        "R5Tax": 30
+      },
+      "actual": {
+        "R1": 600,
+        "R1Tax": 0,
+        "R2": 1200,
+        "R2Tax": 15,
+        "R3": 1800,
+        "R3Tax": 20,
+        "R4": 2400,
+        "R4Tax": 25,
+        "R5Tax": 30
+      }
+    },
+    {
+      "area": "BAND_SEMANTICS",
+      "status": "PASS",
+      "detail": "R1-R4 behave as cumulative upper limits. R5Tax is used as the rate above R4; R5 itself is not required by the progressive calculation."
+    },
+    {
+      "area": "PAYE_BAND_ENGINE",
+      "status": "PASS",
+      "detail": "Independent progressive PAYE reference compared against live tbltax configuration."
+    },
+    {
+      "area": "NASSIT_CONFIGURATION",
+      "status": "PASS",
+      "detail": "tblpayrollitems code 32 employee NASSIT rate=5; code 41 institution NASSIT rate=10."
+    },
+    {
+      "area": "ALLWTHRESHOLD",
+      "status": "PASS",
+      "detail": "AllwThreshold remains 500 as legacy metadata. The remediated active monthly PAYE path does not subtract it from chargeable income."
+    },
+    {
+      "area": "TBLSALARY_TAX_CONSISTENCY",
+      "status": "PASS",
+      "detail": "Compares tblsalary.Tax against an independent progressive calculation using tblsalary.Taxable as the chargeable-income field.",
+      "sampleCount": 6,
+      "mismatches": []
+    },
+    {
+      "area": "TBLSALARY_NET_INCOME",
+      "status": "PASS",
+      "detail": "NetIncome should equal TotalIncome minus employee deductions: Tax, NassitEmp, GratEmp, UnionDues, Ded1, Ded3, Ded4, Ded5. Employer NassitInst is not deducted.",
+      "mismatches": []
+    },
+    {
+      "area": "TBLPAYROLL_TAX_CONSISTENCY",
+      "status": "PASS",
+      "detail": "Historical tblpayroll rows are audited but not rewritten. Any mismatches are remediation evidence for reversal/reopen, not a reason to mutate accounting history.",
+      "sampleCount": 17,
+      "mismatches": [
+        {
+          "PFNo": "0496",
+          "period": "12/2098",
+          "PType": "01",
+          "TotalIncome": 18555.43,
+          "Taxable": 17555.15,
+          "storedTax": 4865.53,
+          "referenceTaxUsingStoredTaxable": 4906.55,
+          "storedTaxMatchesStoredTaxable": false,
+          "storedNetIncome": 12490.92,
+          "expectedNetFromStoredComponents": 12490.92,
+          "netMatchesStoredComponents": true
+        },
+        {
+          "PFNo": "0520",
+          "period": "12/2098",
+          "PType": "01",
+          "TotalIncome": 12081.89,
+          "Taxable": 11221.69,
+          "storedTax": 2980.3,
+          "referenceTaxUsingStoredTaxable": 3006.51,
+          "storedTaxMatchesStoredTaxable": false,
+          "storedNetIncome": 8191.12,
+          "expectedNetFromStoredComponents": 8191.12,
+          "netMatchesStoredComponents": true
+        },
+        {
+          "PFNo": "0587",
+          "period": "12/2098",
+          "PType": "01",
+          "TotalIncome": 7955.08,
+          "Taxable": 7246.64,
+          "storedTax": 1792.96,
+          "referenceTaxUsingStoredTaxable": 1813.99,
+          "storedTaxMatchesStoredTaxable": false,
+          "storedNetIncome": 5652.13,
+          "expectedNetFromStoredComponents": 5652.13,
+          "netMatchesStoredComponents": true
+        },
+        {
+          "PFNo": "0684",
+          "period": "12/2098",
+          "PType": "01",
+          "TotalIncome": 11709.95,
+          "Taxable": 10829.45,
+          "storedTax": 2841.02,
+          "referenceTaxUsingStoredTaxable": 2888.84,
+          "storedTaxMatchesStoredTaxable": false,
+          "storedNetIncome": 8035.17,
+          "expectedNetFromStoredComponents": 8035.17,
+          "netMatchesStoredComponents": true
+        },
+        {
+          "PFNo": "0692",
+          "period": "12/2098",
+          "PType": "01",
+          "TotalIncome": 14496.51,
+          "Taxable": 13619.25,
+          "storedTax": 3676.87,
+          "referenceTaxUsingStoredTaxable": 3725.78,
+          "storedTaxMatchesStoredTaxable": false,
+          "storedNetIncome": 9997.61,
+          "expectedNetFromStoredComponents": 9997.61,
+          "netMatchesStoredComponents": true
+        },
+        {
+          "PFNo": "0496",
+          "period": "8/2026",
+          "PType": "01",
+          "TotalIncome": 18555.43,
+          "Taxable": 17555.15,
+          "storedTax": 4865.53,
+          "referenceTaxUsingStoredTaxable": 4906.55,
+          "storedTaxMatchesStoredTaxable": false,
+          "storedNetIncome": 12490.92,
+          "expectedNetFromStoredComponents": 12490.92,
+          "netMatchesStoredComponents": true
+        },
+        {
+          "PFNo": "0520",
+          "period": "8/2026",
+          "PType": "01",
+          "TotalIncome": 12081.89,
+          "Taxable": 11221.69,
+          "storedTax": 2980.3,
+          "referenceTaxUsingStoredTaxable": 3006.51,
+          "storedTaxMatchesStoredTaxable": false,
+          "storedNetIncome": 8191.12,
+          "expectedNetFromStoredComponents": 8191.12,
+          "netMatchesStoredComponents": true
+        },
+        {
+          "PFNo": "0587",
+          "period": "8/2026",
+          "PType": "01",
+          "TotalIncome": 7955.08,
+          "Taxable": 7246.64,
+          "storedTax": 1792.96,
+          "referenceTaxUsingStoredTaxable": 1813.99,
+          "storedTaxMatchesStoredTaxable": false,
+          "storedNetIncome": 5652.13,
+          "expectedNetFromStoredComponents": 5652.13,
+          "netMatchesStoredComponents": true
+        },
+        {
+          "PFNo": "0684",
+          "period": "8/2026",
+          "PType": "01",
+          "TotalIncome": 11709.95,
+          "Taxable": 10829.45,
+          "storedTax": 2841.02,
+          "referenceTaxUsingStoredTaxable": 2888.84,
+          "storedTaxMatchesStoredTaxable": false,
+          "storedNetIncome": 8035.17,
+          "expectedNetFromStoredComponents": 8035.17,
+          "netMatchesStoredComponents": true
+        },
+        {
+          "PFNo": "0692",
+          "period": "8/2026",
+          "PType": "01",
+          "TotalIncome": 14496.51,
+          "Taxable": 13619.25,
+          "storedTax": 3676.87,
+          "referenceTaxUsingStoredTaxable": 3725.78,
+          "storedTaxMatchesStoredTaxable": false,
+          "storedNetIncome": 9997.61,
+          "expectedNetFromStoredComponents": 9997.61,
+          "netMatchesStoredComponents": true
+        }
+      ]
+    },
+    {
+      "area": "TBLPAYROLL_NET_INCOME",
+      "status": "PASS",
+      "detail": "NetIncome should not deduct employer/institution NASSIT.",
+      "mismatches": []
+    },
+    {
+      "area": "PROCESS_EMOLUMENTS_INTEGRATION",
+      "status": "PASS",
+      "detail": "Modern Process Emoluments copies TotalIncome, Taxable, Tax, NassitEmp, NassitInst, and NetIncome from tblsalary into tblpayroll."
+    },
+    {
+      "area": "REPORT_INTEGRATION",
+      "status": "PASS",
+      "detail": "PAYE liability and staff PAYE statement should consume tblpayroll.Tax and exclude reversed generations.",
+      "checks": {
+        "liabilityUsesPayrollTax": true,
+        "staffStatementUsesPayrollTax": true,
+        "statementExcludesReversed": true
+      }
+    },
+    {
+      "area": "TAX_TABLE_GOVERNANCE",
+      "status": "PASS",
+      "detail": "Tax Table updates are routed through parameter-change drafts, but the Admin fetch API is hard-coded to CompanyID=1 if this finding fails.",
+      "checks": {
+        "parameterWorkflowConfigured": true,
+        "adminGetHardcodedCompany": false
+      }
+    },
+    {
+      "area": "COMPANY_ID_ISOLATION",
+      "status": "PASS",
+      "detail": "No unscoped tbltax read found in scanned calculation path."
+    }
+  ],
+  "samples": {
+    "boundaryResults": [
+      {
+        "chargeableIncome": 0,
+        "expected": 0,
+        "fromLiveTaxTable": 0,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 599.99,
+        "expected": 0,
+        "fromLiveTaxTable": 0,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 600,
+        "expected": 0,
+        "fromLiveTaxTable": 0,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 600.01,
+        "expected": 0,
+        "fromLiveTaxTable": 0,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 1000,
+        "expected": 60,
+        "fromLiveTaxTable": 60,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 1199.99,
+        "expected": 90,
+        "fromLiveTaxTable": 90,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 1200,
+        "expected": 90,
+        "fromLiveTaxTable": 90,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 1200.01,
+        "expected": 90,
+        "fromLiveTaxTable": 90,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 1799.99,
+        "expected": 210,
+        "fromLiveTaxTable": 210,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 1800,
+        "expected": 210,
+        "fromLiveTaxTable": 210,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 1800.01,
+        "expected": 210,
+        "fromLiveTaxTable": 210,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 2399.99,
+        "expected": 360,
+        "fromLiveTaxTable": 360,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 2400,
+        "expected": 360,
+        "fromLiveTaxTable": 360,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 2400.01,
+        "expected": 360,
+        "fromLiveTaxTable": 360,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 3000,
+        "expected": 540,
+        "fromLiveTaxTable": 540,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 5000,
+        "expected": 1140,
+        "fromLiveTaxTable": 1140,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 10000,
+        "expected": 2640,
+        "fromLiveTaxTable": 2640,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 100000,
+        "expected": 29640,
+        "fromLiveTaxTable": 29640,
+        "pass": true
+      }
+    ],
+    "workedExamples": [
+      {
+        "chargeableIncome": 600,
+        "expected": 0,
+        "actualFromLiveTaxTable": 0,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 1000,
+        "expected": 60,
+        "actualFromLiveTaxTable": 60,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 1200,
+        "expected": 90,
+        "actualFromLiveTaxTable": 90,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 1800,
+        "expected": 210,
+        "actualFromLiveTaxTable": 210,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 2000,
+        "expected": 260,
+        "actualFromLiveTaxTable": 260,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 2400,
+        "expected": 360,
+        "actualFromLiveTaxTable": 360,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 3000,
+        "expected": 540,
+        "actualFromLiveTaxTable": 540,
+        "pass": true
+      },
+      {
+        "chargeableIncome": 5000,
+        "expected": 1140,
+        "actualFromLiveTaxTable": 1140,
+        "pass": true
+      }
+    ],
+    "nassitIntegration": [
+      {
+        "basicSalary": 1000,
+        "employeeNassitRate": 5,
+        "employerNassitRate": 10,
+        "employeeNassit": 50,
+        "employerNassit": 100,
+        "chargeableIncomeBeforeAllwThreshold": 950,
+        "payeBeforeAllwThreshold": 52.5,
+        "netBeforeOtherDeductions": 897.5
+      },
+      {
+        "basicSalary": 2000,
+        "employeeNassitRate": 5,
+        "employerNassitRate": 10,
+        "employeeNassit": 100,
+        "employerNassit": 200,
+        "chargeableIncomeBeforeAllwThreshold": 1900,
+        "payeBeforeAllwThreshold": 235,
+        "netBeforeOtherDeductions": 1665
+      }
+    ],
+    "tblsalaryComparisons": [
+      {
+        "PFNo": "0489",
+        "PDate": "2026-04-01T00:00:00.000Z",
+        "TotalIncome": 41464.37,
+        "Taxable": 40654.26,
+        "storedTax": 11836.28,
+        "referenceTaxUsingStoredTaxable": 11836.28,
+        "legacyChargeable": 40154.26,
+        "referenceTaxUsingLegacyChargeable": 11686.28,
+        "storedTaxMatchesStoredTaxable": true,
+        "storedTaxMatchesLegacyChargeable": false,
+        "storedNetIncome": 27197.77,
+        "expectedNetFromStoredComponents": 27197.77,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0496",
+        "PDate": "2026-04-01T00:00:00.000Z",
+        "TotalIncome": 23732.81,
+        "Taxable": 23239.94,
+        "storedTax": 6611.98,
+        "referenceTaxUsingStoredTaxable": 6611.98,
+        "legacyChargeable": 22739.94,
+        "referenceTaxUsingLegacyChargeable": 6461.98,
+        "storedTaxMatchesStoredTaxable": true,
+        "storedTaxMatchesLegacyChargeable": false,
+        "storedNetIncome": 15642.21,
+        "expectedNetFromStoredComponents": 15642.21,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0520",
+        "PDate": "2026-04-01T00:00:00.000Z",
+        "TotalIncome": 18000.75,
+        "Taxable": 17657.93,
+        "storedTax": 4937.38,
+        "referenceTaxUsingStoredTaxable": 4937.38,
+        "legacyChargeable": 17157.93,
+        "referenceTaxUsingLegacyChargeable": 4787.38,
+        "storedTaxMatchesStoredTaxable": true,
+        "storedTaxMatchesLegacyChargeable": false,
+        "storedNetIncome": 12034.91,
+        "expectedNetFromStoredComponents": 12034.91,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0587",
+        "PDate": "2026-04-01T00:00:00.000Z",
+        "TotalIncome": 8412.04,
+        "Taxable": 8220.75,
+        "storedTax": 2106.23,
+        "referenceTaxUsingStoredTaxable": 2106.23,
+        "legacyChargeable": 7720.75,
+        "referenceTaxUsingLegacyChargeable": 1956.23,
+        "storedTaxMatchesStoredTaxable": true,
+        "storedTaxMatchesLegacyChargeable": false,
+        "storedNetIncome": 5731.94,
+        "expectedNetFromStoredComponents": 5731.94,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0684",
+        "PDate": "2026-04-01T00:00:00.000Z",
+        "TotalIncome": 18118.75,
+        "Taxable": 17772.84,
+        "storedTax": 4971.85,
+        "referenceTaxUsingStoredTaxable": 4971.85,
+        "legacyChargeable": 17272.84,
+        "referenceTaxUsingLegacyChargeable": 4821.85,
+        "storedTaxMatchesStoredTaxable": true,
+        "storedTaxMatchesLegacyChargeable": false,
+        "storedNetIncome": 12109.17,
+        "expectedNetFromStoredComponents": 12109.17,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0692",
+        "PDate": "2026-04-01T00:00:00.000Z",
+        "TotalIncome": 18620.17,
+        "Taxable": 18261.13,
+        "storedTax": 5118.34,
+        "referenceTaxUsingStoredTaxable": 5118.34,
+        "legacyChargeable": 17761.13,
+        "referenceTaxUsingLegacyChargeable": 4968.34,
+        "storedTaxMatchesStoredTaxable": true,
+        "storedTaxMatchesLegacyChargeable": false,
+        "storedNetIncome": 12424.72,
+        "expectedNetFromStoredComponents": 12424.72,
+        "netMatchesStoredComponents": true
+      }
+    ],
+    "tblpayrollComparisons": [
+      {
+        "PFNo": "0489",
+        "period": "12/2098",
+        "PType": "01",
+        "TotalIncome": 25745.22,
+        "Taxable": 24712.31,
+        "storedTax": 7053.69,
+        "referenceTaxUsingStoredTaxable": 7053.69,
+        "storedTaxMatchesStoredTaxable": true,
+        "storedNetIncome": 17087.8,
+        "expectedNetFromStoredComponents": 17087.8,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0496",
+        "period": "12/2098",
+        "PType": "01",
+        "TotalIncome": 18555.43,
+        "Taxable": 17555.15,
+        "storedTax": 4865.53,
+        "referenceTaxUsingStoredTaxable": 4906.55,
+        "storedTaxMatchesStoredTaxable": false,
+        "storedNetIncome": 12490.92,
+        "expectedNetFromStoredComponents": 12490.92,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0520",
+        "period": "12/2098",
+        "PType": "01",
+        "TotalIncome": 12081.89,
+        "Taxable": 11221.69,
+        "storedTax": 2980.3,
+        "referenceTaxUsingStoredTaxable": 3006.51,
+        "storedTaxMatchesStoredTaxable": false,
+        "storedNetIncome": 8191.12,
+        "expectedNetFromStoredComponents": 8191.12,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0587",
+        "period": "12/2098",
+        "PType": "01",
+        "TotalIncome": 7955.08,
+        "Taxable": 7246.64,
+        "storedTax": 1792.96,
+        "referenceTaxUsingStoredTaxable": 1813.99,
+        "storedTaxMatchesStoredTaxable": false,
+        "storedNetIncome": 5652.13,
+        "expectedNetFromStoredComponents": 5652.13,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0684",
+        "period": "12/2098",
+        "PType": "01",
+        "TotalIncome": 11709.95,
+        "Taxable": 10829.45,
+        "storedTax": 2841.02,
+        "referenceTaxUsingStoredTaxable": 2888.84,
+        "storedTaxMatchesStoredTaxable": false,
+        "storedNetIncome": 8035.17,
+        "expectedNetFromStoredComponents": 8035.17,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0692",
+        "period": "12/2098",
+        "PType": "01",
+        "TotalIncome": 14496.51,
+        "Taxable": 13619.25,
+        "storedTax": 3676.87,
+        "referenceTaxUsingStoredTaxable": 3725.78,
+        "storedTaxMatchesStoredTaxable": false,
+        "storedNetIncome": 9997.61,
+        "expectedNetFromStoredComponents": 9997.61,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0489",
+        "period": "8/2026",
+        "PType": "01",
+        "TotalIncome": 25745.22,
+        "Taxable": 24712.31,
+        "storedTax": 7053.69,
+        "referenceTaxUsingStoredTaxable": 7053.69,
+        "storedTaxMatchesStoredTaxable": true,
+        "storedNetIncome": 17087.8,
+        "expectedNetFromStoredComponents": 17087.8,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0496",
+        "period": "8/2026",
+        "PType": "01",
+        "TotalIncome": 18555.43,
+        "Taxable": 17555.15,
+        "storedTax": 4865.53,
+        "referenceTaxUsingStoredTaxable": 4906.55,
+        "storedTaxMatchesStoredTaxable": false,
+        "storedNetIncome": 12490.92,
+        "expectedNetFromStoredComponents": 12490.92,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0520",
+        "period": "8/2026",
+        "PType": "01",
+        "TotalIncome": 12081.89,
+        "Taxable": 11221.69,
+        "storedTax": 2980.3,
+        "referenceTaxUsingStoredTaxable": 3006.51,
+        "storedTaxMatchesStoredTaxable": false,
+        "storedNetIncome": 8191.12,
+        "expectedNetFromStoredComponents": 8191.12,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0587",
+        "period": "8/2026",
+        "PType": "01",
+        "TotalIncome": 7955.08,
+        "Taxable": 7246.64,
+        "storedTax": 1792.96,
+        "referenceTaxUsingStoredTaxable": 1813.99,
+        "storedTaxMatchesStoredTaxable": false,
+        "storedNetIncome": 5652.13,
+        "expectedNetFromStoredComponents": 5652.13,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0684",
+        "period": "8/2026",
+        "PType": "01",
+        "TotalIncome": 11709.95,
+        "Taxable": 10829.45,
+        "storedTax": 2841.02,
+        "referenceTaxUsingStoredTaxable": 2888.84,
+        "storedTaxMatchesStoredTaxable": false,
+        "storedNetIncome": 8035.17,
+        "expectedNetFromStoredComponents": 8035.17,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0692",
+        "period": "8/2026",
+        "PType": "01",
+        "TotalIncome": 14496.51,
+        "Taxable": 13619.25,
+        "storedTax": 3676.87,
+        "referenceTaxUsingStoredTaxable": 3725.78,
+        "storedTaxMatchesStoredTaxable": false,
+        "storedNetIncome": 9997.61,
+        "expectedNetFromStoredComponents": 9997.61,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0496",
+        "period": "0/0",
+        "PType": "1",
+        "TotalIncome": 0,
+        "Taxable": 0,
+        "storedTax": 0,
+        "referenceTaxUsingStoredTaxable": 0,
+        "storedTaxMatchesStoredTaxable": true,
+        "storedNetIncome": 0,
+        "expectedNetFromStoredComponents": 0,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0520",
+        "period": "0/0",
+        "PType": "1",
+        "TotalIncome": 0,
+        "Taxable": 0,
+        "storedTax": 0,
+        "referenceTaxUsingStoredTaxable": 0,
+        "storedTaxMatchesStoredTaxable": true,
+        "storedNetIncome": 0,
+        "expectedNetFromStoredComponents": 0,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0587",
+        "period": "0/0",
+        "PType": "1",
+        "TotalIncome": 0,
+        "Taxable": 0,
+        "storedTax": 0,
+        "referenceTaxUsingStoredTaxable": 0,
+        "storedTaxMatchesStoredTaxable": true,
+        "storedNetIncome": 0,
+        "expectedNetFromStoredComponents": 0,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0684",
+        "period": "0/0",
+        "PType": "1",
+        "TotalIncome": 0,
+        "Taxable": 0,
+        "storedTax": 0,
+        "referenceTaxUsingStoredTaxable": 0,
+        "storedTaxMatchesStoredTaxable": true,
+        "storedNetIncome": 0,
+        "expectedNetFromStoredComponents": 0,
+        "netMatchesStoredComponents": true
+      },
+      {
+        "PFNo": "0692",
+        "period": "0/0",
+        "PType": "1",
+        "TotalIncome": 0,
+        "Taxable": 0,
+        "storedTax": 0,
+        "referenceTaxUsingStoredTaxable": 0,
+        "storedTaxMatchesStoredTaxable": true,
+        "storedNetIncome": 0,
+        "expectedNetFromStoredComponents": 0,
+        "netMatchesStoredComponents": true
+      }
+    ]
+  },
+  "taxTableColumns": [
+    {
+      "field": "BankID",
+      "type": "varchar(4)",
+      "nullable": "YES",
+      "default": null
+    },
+    {
+      "field": "TaxDate",
+      "type": "datetime(3)",
+      "nullable": "NO",
+      "default": null
+    },
+    {
+      "field": "R1",
+      "type": "int(11)",
+      "nullable": "YES",
+      "default": null
+    },
+    {
+      "field": "R1Tax",
+      "type": "double",
+      "nullable": "YES",
+      "default": null
+    },
+    {
+      "field": "R2",
+      "type": "int(11)",
+      "nullable": "YES",
+      "default": null
+    },
+    {
+      "field": "R2Tax",
+      "type": "double",
+      "nullable": "YES",
+      "default": null
+    },
+    {
+      "field": "R3",
+      "type": "int(11)",
+      "nullable": "YES",
+      "default": null
+    },
+    {
+      "field": "R3Tax",
+      "type": "double",
+      "nullable": "YES",
+      "default": null
+    },
+    {
+      "field": "R4",
+      "type": "int(11)",
+      "nullable": "YES",
+      "default": null
+    },
+    {
+      "field": "R4Tax",
+      "type": "double",
+      "nullable": "YES",
+      "default": null
+    },
+    {
+      "field": "R5",
+      "type": "int(11)",
+      "nullable": "YES",
+      "default": null
+    },
+    {
+      "field": "R5Tax",
+      "type": "double",
+      "nullable": "YES",
+      "default": null
+    },
+    {
+      "field": "R6",
+      "type": "int(11)",
+      "nullable": "YES",
+      "default": null
+    },
+    {
+      "field": "R6Tax",
+      "type": "double",
+      "nullable": "YES",
+      "default": null
+    },
+    {
+      "field": "R7",
+      "type": "int(11)",
+      "nullable": "YES",
+      "default": null
+    },
+    {
+      "field": "R7Tax",
+      "type": "double",
+      "nullable": "YES",
+      "default": null
+    },
+    {
+      "field": "RentThreshold",
+      "type": "decimal(18,2)",
+      "nullable": "YES",
+      "default": null
+    },
+    {
+      "field": "AllwThreshold",
+      "type": "decimal(18,2)",
+      "nullable": "YES",
+      "default": null
+    },
+    {
+      "field": "NRA",
+      "type": "varchar(255)",
+      "nullable": "YES",
+      "default": null
+    },
+    {
+      "field": "Withholding_Tax",
+      "type": "double",
+      "nullable": "YES",
+      "default": null
+    },
+    {
+      "field": "CompanyID",
+      "type": "int(11)",
+      "nullable": "YES",
+      "default": null
+    }
+  ],
+  "taxRows": [
+    {
+      "BankID": "0004",
+      "TaxDate": "2020-12-28T00:00:00.000Z",
+      "R1": 600,
+      "R1Tax": 0,
+      "R2": 1200,
+      "R2Tax": 15,
+      "R3": 1800,
+      "R3Tax": 20,
+      "R4": 2400,
+      "R4Tax": 25,
+      "R5": 99000,
+      "R5Tax": 30,
+      "R6": 0,
+      "R6Tax": 0,
+      "R7": 0,
+      "R7Tax": 0,
+      "RentThreshold": "0.00",
+      "AllwThreshold": "500.00",
+      "NRA": null,
+      "Withholding_Tax": 6.5,
+      "CompanyID": 1
+    }
+  ],
+  "effectiveTaxRow": {
+    "BankID": "0004",
+    "TaxDate": "2020-12-28T00:00:00.000Z",
+    "R1": 600,
+    "R1Tax": 0,
+    "R2": 1200,
+    "R2Tax": 15,
+    "R3": 1800,
+    "R3Tax": 20,
+    "R4": 2400,
+    "R4Tax": 25,
+    "R5": 99000,
+    "R5Tax": 30,
+    "R6": 0,
+    "R6Tax": 0,
+    "R7": 0,
+    "R7Tax": 0,
+    "RentThreshold": "0.00",
+    "AllwThreshold": "500.00",
+    "NRA": null,
+    "Withholding_Tax": 6.5,
+    "CompanyID": 1
+  },
+  "payrollItems": [
+    {
+      "Code": "01",
+      "Income": "SALARY",
+      "Taxable": -1,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "01",
+      "Fixed": 0,
+      "Percent": "0.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "02",
+      "Income": "RENT",
+      "Taxable": -1,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "01",
+      "Fixed": 0,
+      "Percent": "75.00",
+      "Freq": "Y",
+      "CompanyID": 1
+    },
+    {
+      "Code": "03",
+      "Income": "TRANSPORT",
+      "Taxable": -1,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "01",
+      "Fixed": -1,
+      "Percent": "0.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "04",
+      "Income": "WELFARE",
+      "Taxable": -1,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "01",
+      "Fixed": -1,
+      "Percent": "0.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "05",
+      "Income": "INDUCEMENT",
+      "Taxable": -1,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "01",
+      "Fixed": 0,
+      "Percent": "15.00",
+      "Freq": "Y",
+      "CompanyID": 1
+    },
+    {
+      "Code": "06",
+      "Income": "COLA",
+      "Taxable": -1,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "01",
+      "Fixed": -1,
+      "Percent": "0.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "07",
+      "Income": "BIKE ALLOWANCE",
+      "Taxable": -1,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "26",
+      "TAmount": "30.00",
+      "Mode": "01",
+      "Fixed": 0,
+      "Percent": "0.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "08",
+      "Income": "EOS",
+      "Taxable": -1,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "01",
+      "Fixed": 0,
+      "Percent": "0.00",
+      "Freq": null,
+      "CompanyID": 1
+    },
+    {
+      "Code": "09",
+      "Income": "BONUS",
+      "Taxable": -1,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "01",
+      "Fixed": 0,
+      "Percent": "0.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "10",
+      "Income": "CAR MAINTENANCE",
+      "Taxable": -1,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "01",
+      "Fixed": -1,
+      "Percent": "0.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "11",
+      "Income": "RESPONSIBILITY",
+      "Taxable": -1,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "01",
+      "Fixed": 0,
+      "Percent": "20.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "12",
+      "Income": "MAID",
+      "Taxable": -1,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "01",
+      "Fixed": 0,
+      "Percent": "20.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "13",
+      "Income": "LEAVE",
+      "Taxable": -1,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "1.00",
+      "Mode": "01",
+      "Fixed": 0,
+      "Percent": "20.00",
+      "Freq": "Y",
+      "CompanyID": 1
+    },
+    {
+      "Code": "14",
+      "Income": "ACTING",
+      "Taxable": -1,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "3",
+      "TAmount": "2.00",
+      "Mode": "01",
+      "Fixed": 0,
+      "Percent": "1.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "15",
+      "Income": "LONG SERVICE",
+      "Taxable": -1,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "01",
+      "Fixed": 0,
+      "Percent": "10.00",
+      "Freq": "Y",
+      "CompanyID": 1
+    },
+    {
+      "Code": "16",
+      "Income": "PROFESSIONAL",
+      "Taxable": -1,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "01",
+      "Fixed": 0,
+      "Percent": "5.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "17",
+      "Income": "RISK",
+      "Taxable": -1,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "01",
+      "Fixed": 0,
+      "Percent": "10.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "18",
+      "Income": "EX-GRACIA",
+      "Taxable": -1,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "01",
+      "Fixed": 0,
+      "Percent": "25.00",
+      "Freq": null,
+      "CompanyID": 1
+    },
+    {
+      "Code": "19",
+      "Income": "ACADEMIC",
+      "Taxable": -1,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "01",
+      "Fixed": 0,
+      "Percent": "10.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "20",
+      "Income": "ADD2",
+      "Taxable": 0,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "01",
+      "Fixed": 0,
+      "Percent": "0.00",
+      "Freq": null,
+      "CompanyID": 1
+    },
+    {
+      "Code": "21",
+      "Income": "ADD3",
+      "Taxable": 0,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "01",
+      "Fixed": 0,
+      "Percent": "0.00",
+      "Freq": null,
+      "CompanyID": 1
+    },
+    {
+      "Code": "31",
+      "Income": "INCOME TAX",
+      "Taxable": 0,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "02",
+      "Fixed": 0,
+      "Percent": "0.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "32",
+      "Income": "NASSIT-EMP",
+      "Taxable": 0,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "02",
+      "Fixed": 0,
+      "Percent": "5.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "33",
+      "Income": "PROV-EMP",
+      "Taxable": 0,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "02",
+      "Fixed": 0,
+      "Percent": "10.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "34",
+      "Income": "LOAN DED",
+      "Taxable": 0,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "02",
+      "Fixed": 0,
+      "Percent": "0.00",
+      "Freq": null,
+      "CompanyID": 1
+    },
+    {
+      "Code": "35",
+      "Income": "UNION DUES",
+      "Taxable": 0,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "02",
+      "Fixed": 0,
+      "Percent": "0.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "36",
+      "Income": "INTEREST",
+      "Taxable": 0,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "02",
+      "Fixed": 0,
+      "Percent": "0.00",
+      "Freq": null,
+      "CompanyID": 1
+    },
+    {
+      "Code": "37",
+      "Income": "DED04",
+      "Taxable": 0,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "02",
+      "Fixed": 0,
+      "Percent": "0.00",
+      "Freq": null,
+      "CompanyID": 1
+    },
+    {
+      "Code": "38",
+      "Income": "DED05",
+      "Taxable": 0,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "02",
+      "Fixed": 0,
+      "Percent": "0.00",
+      "Freq": null,
+      "CompanyID": 1
+    },
+    {
+      "Code": "39",
+      "Income": "DED06",
+      "Taxable": 0,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "02",
+      "Fixed": 0,
+      "Percent": "0.00",
+      "Freq": null,
+      "CompanyID": 1
+    },
+    {
+      "Code": "40",
+      "Income": "GUARANTEE",
+      "Taxable": 0,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "02",
+      "Fixed": 0,
+      "Percent": "0.00",
+      "Freq": null,
+      "CompanyID": 1
+    },
+    {
+      "Code": "41",
+      "Income": "NASSIT-INST",
+      "Taxable": 0,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "03",
+      "Fixed": 0,
+      "Percent": "10.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "42",
+      "Income": "PROV-INST",
+      "Taxable": 0,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "03",
+      "Fixed": 0,
+      "Percent": "20.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "43",
+      "Income": "OTH01",
+      "Taxable": 0,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "03",
+      "Fixed": 0,
+      "Percent": "0.00",
+      "Freq": null,
+      "CompanyID": 1
+    },
+    {
+      "Code": "44",
+      "Income": "OTH02",
+      "Taxable": 0,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "03",
+      "Fixed": 0,
+      "Percent": "0.00",
+      "Freq": null,
+      "CompanyID": 1
+    },
+    {
+      "Code": "45",
+      "Income": "OTH03",
+      "Taxable": 0,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "03",
+      "Fixed": 0,
+      "Percent": "0.00",
+      "Freq": null,
+      "CompanyID": 1
+    }
+  ],
+  "summary": {
+    "status": "SIERRA LEONE PAYE AUDIT: PASS AFTER CORRECTIONS",
+    "failedAreas": []
+  }
+}

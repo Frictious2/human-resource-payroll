@@ -1,0 +1,125 @@
+{
+  "generatedAt": "2026-10-08T23:14:46.267Z",
+  "companyId": 1,
+  "entitlementViews": [
+    {
+      "pfno": "0489",
+      "status": "PASS"
+    },
+    {
+      "pfno": "0496",
+      "status": "PASS"
+    },
+    {
+      "pfno": "0692",
+      "status": "PASS"
+    },
+    {
+      "pfno": "0520",
+      "status": "PASS"
+    },
+    {
+      "pfno": "0684",
+      "status": "PASS"
+    },
+    {
+      "pfno": "0587",
+      "status": "PASS"
+    }
+  ],
+  "emptyBbanRender": "PASS",
+  "gradeNotchValidation": [
+    {
+      "PFNo": "0489",
+      "SName": "Matilda Jusu",
+      "CGrade": "0100",
+      "GradeCode": "0100",
+      "Notch": 1,
+      "Approved": 1,
+      "NotchIncr": 0,
+      "ScaleNotches": "0.00",
+      "ConfiguredMaximumNotch": 1,
+      "ValidationResult": "PASS"
+    },
+    {
+      "PFNo": "0496",
+      "SName": "Festus C. Campbell",
+      "CGrade": "0400",
+      "GradeCode": "0400",
+      "Notch": 4,
+      "Approved": 1,
+      "NotchIncr": 7,
+      "ScaleNotches": "7.00",
+      "ConfiguredMaximumNotch": 7,
+      "ValidationResult": "PASS"
+    },
+    {
+      "PFNo": "0692",
+      "SName": "Georgiana James",
+      "CGrade": "0600",
+      "GradeCode": "0600",
+      "Notch": 3,
+      "Approved": 1,
+      "NotchIncr": 7,
+      "ScaleNotches": "7.00",
+      "ConfiguredMaximumNotch": 7,
+      "ValidationResult": "PASS"
+    },
+    {
+      "PFNo": "0520",
+      "SName": "Abass .P. Renner",
+      "CGrade": "0700",
+      "GradeCode": "0700",
+      "Notch": 9,
+      "Approved": 1,
+      "NotchIncr": 10,
+      "ScaleNotches": "10.00",
+      "ConfiguredMaximumNotch": 10,
+      "ValidationResult": "PASS"
+    },
+    {
+      "PFNo": "0684",
+      "SName": "Chernor Sankoh",
+      "CGrade": "0600",
+      "GradeCode": "0600",
+      "Notch": 1,
+      "Approved": 1,
+      "NotchIncr": 7,
+      "ScaleNotches": "7.00",
+      "ConfiguredMaximumNotch": 7,
+      "ValidationResult": "PASS"
+    },
+    {
+      "PFNo": "0587",
+      "SName": "Basiru A. Waheed -sawyer",
+      "CGrade": "1000",
+      "GradeCode": "1000",
+      "Notch": 4,
+      "Approved": 1,
+      "NotchIncr": 10,
+      "ScaleNotches": "10.00",
+      "ConfiguredMaximumNotch": 10,
+      "ValidationResult": "PASS"
+    }
+  ],
+  "invalidNotchRejected": "PASS",
+  "missingGradeConfigurationRejected": "PASS",
+  "pendingCounts": {
+    "pendingEntitlement": 6,
+    "pendingSalary": 6
+  },
+  "salaryTotals": {
+    "Salary": 50840.69,
+    "Allowances": "77508.20",
+    "Gross": "128348.89",
+    "PAYE": "35582.06",
+    "Net": "85140.72"
+  },
+  "augustPayroll": {
+    "RowsCount": 6,
+    "Salary": "45296.78",
+    "Gross": "90544.08",
+    "Net": "61454.75"
+  },
+  "status": "PASS"
+}

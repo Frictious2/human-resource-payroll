@@ -2381,7 +2381,18 @@ const taxTablePage = async (req, res) => {
 
 const getTaxTable = async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM tbltax WHERE CompanyID = 1 LIMIT 1');
+        const companyId = getAdminCompanyId(req);
+        const [rows] = await pool.query(
+            `
+                SELECT *
+                FROM tbltax
+                WHERE CompanyID = ? OR CompanyID IS NULL
+                ORDER BY CASE WHEN CompanyID = ? THEN 0 ELSE 1 END,
+                         TaxDate DESC
+                LIMIT 1
+            `,
+            [companyId, companyId]
+        );
         res.json({ data: rows[0] || {} });
     } catch (err) {
         console.error(err);

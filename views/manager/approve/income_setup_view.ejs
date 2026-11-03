@@ -83,6 +83,7 @@
                                 <% (items || []).forEach(it => { 
                                     const code = it.Code;
                                     const get = (name) => record[name] ?? null;
+                                    const checked = (value) => Number(value) === -1 || Number(value) === 1;
                                     const tax = get('Taxable' + code);
                                     const thresh = get('Thresh' + code);
                                     const tpercent = get('TPercent' + code);
@@ -94,12 +95,12 @@
                                 %>
                                     <tr>
                                         <td><%= it.Income %></td>
-                                        <td><input type="checkbox" class="form-check-input" <%= tax === -1 ? 'checked' : '' %> disabled></td>
-                                        <td><input type="checkbox" class="form-check-input" <%= thresh === -1 ? 'checked' : '' %> disabled></td>
-                                        <td><input type="checkbox" class="form-check-input" <%= tpercent === -1 ? 'checked' : '' %> disabled></td>
+                                        <td><input type="checkbox" class="form-check-input" <%= checked(tax) ? 'checked' : '' %> disabled></td>
+                                        <td><input type="checkbox" class="form-check-input" <%= checked(thresh) ? 'checked' : '' %> disabled></td>
+                                        <td><input type="checkbox" class="form-check-input" <%= checked(tpercent) ? 'checked' : '' %> disabled></td>
                                         <td><input type="text" class="form-control" value="<%= tpercentage ?? '' %>" disabled></td>
                                         <td><input type="text" class="form-control" value="<%= tamount ?? '' %>" disabled></td>
-                                        <td><input type="checkbox" class="form-check-input" <%= fix === -1 ? 'checked' : '' %> disabled></td>
+                                        <td><input type="checkbox" class="form-check-input" <%= checked(fix) ? 'checked' : '' %> disabled></td>
                                         <td><input type="text" class="form-control" value="<%= amount ?? '' %>" disabled></td>
                                         <td><input type="text" class="form-control" value="<%= rate ?? '' %>" disabled></td>
                                         <td><input type="text" class="form-control" value="<%= it.Freq || '-' %>" disabled></td>
@@ -112,8 +113,8 @@
                     <div class="mt-4 d-flex justify-content-between">
                         <a href="/manager/approve/income-setup" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Back</a>
                         <form action="/manager/approve/income-setup" method="POST" class="d-inline">
-                            <input type="hidden" name="gradeCode" value="<%= record.GradeCode %>">
-                            <input type="hidden" name="scaleDate" value="<%= record.ScaleDate %>">
+                            <input type="hidden" name="gradeCode" value="<%= record.Grade %>">
+                            <input type="hidden" name="scaleDate" value="<%= record.ScaleDate ? new Date(record.ScaleDate).toISOString().slice(0, 10) : '' %>">
                             <button type="submit" name="action" value="approve" class="btn btn-success">
                                 <i class="bi bi-check-circle"></i> Approve
                             </button>

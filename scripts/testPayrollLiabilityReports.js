@@ -69,9 +69,41 @@ async function request(pathname, options = {}) {
     });
 }
 
+async function resolveTestPfNo(companyId) {
+    if (process.env.TEST_PFNO) {
+        return process.env.TEST_PFNO;
+    }
+
+    const [rows] = await pool.query(
+        `
+            SELECT s.PFNo
+            FROM tblstaff s
+            WHERE (s.CompanyID = ? OR s.CompanyID IS NULL)
+              AND EXISTS (
+                  SELECT 1
+                  FROM tblpayroll p
+                  WHERE p.PFNo = s.PFNo
+                    AND (p.CompanyID = ? OR p.CompanyID IS NULL)
+                    AND COALESCE(p.Tax, 0) <> 0
+              )
+            ORDER BY s.PFNo
+            LIMIT 1
+        `,
+        [companyId, companyId]
+    );
+
+    if (!rows.length) {
+        const error = new Error('Payroll Liability test requires at least one company-scoped staff record with PAYE payroll rows.');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    return rows[0].PFNo;
+}
+
 async function main() {
     const companyId = Number(process.env.TEST_COMPANY_ID || 1);
-    const pfNo = process.env.TEST_PFNO || '0300';
+    const pfNo = await resolveTestPfNo(companyId);
 
     const financeIndex = await reportService.getFinanceIndexPageData({ companyId });
     assert.ok(financeIndex.company.Com_Name, 'Finance liabilities page should load company information.');

@@ -21,6 +21,19 @@
                 </div>
             </div>
 
+            <% if (success) { %>
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <%= success %>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            <% } %>
+            <% if (error) { %>
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <%= error %>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            <% } %>
+
             <div class="card shadow-sm">
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -39,6 +52,7 @@
                             <tbody>
                                 <% if ((allowances || []).length > 0) { %>
                                     <% allowances.forEach(a => { %>
+                                        <% const scaleDateValue = a.ScaleDate ? new Date(a.ScaleDate).toISOString().slice(0, 10) : ''; %>
                                         <tr>
                                             <td><%= a.ScaleDate ? new Date(a.ScaleDate).toLocaleDateString() : '-' %></td>
                                             <td><%= a.Grade || '-' %></td>
@@ -47,7 +61,7 @@
                                             <td><%= a.Notches || '-' %></td>
                                             <td><%= a.Increment || '-' %></td>
                                             <td class="text-end">
-                                                <a class="btn btn-sm btn-primary" href="/manager/approve/income-setup/view?grade=<%= a.Grade %>&scaleDate=<%= a.ScaleDate %>">
+                                                <a class="btn btn-sm btn-primary" href="/manager/approve/income-setup/view?grade=<%= encodeURIComponent(a.Grade || '') %>&scaleDate=<%= encodeURIComponent(scaleDateValue) %>">
                                                     <i class="bi bi-eye"></i> View
                                                 </a>
                                             </td>

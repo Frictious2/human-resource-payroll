@@ -120,7 +120,7 @@
                             <tr><td>Taxable</td><td class="text-end">${fmtMoney(row.Taxable)}</td></tr>
                             <tr><td>Tax</td><td class="text-end">${fmtMoney(row.Tax)}</td></tr>
                             <tr><td>NASSIT Employee</td><td class="text-end">${fmtMoney(row.NassitEmp)}</td></tr>
-                            <tr><td>Gratuity Employee</td><td class="text-end">${fmtMoney(row.GratEmp)}</td></tr>
+                            <tr><td>Employee Provident Fund</td><td class="text-end">${fmtMoney(row.GratEmp)}</td></tr>
                             <tr><td>Other Deductions</td><td class="text-end">${fmtMoney(deductions - Number(row.Tax || 0) - Number(row.NassitEmp || 0) - Number(row.GratEmp || 0))}</td></tr>
                             <tr class="fw-semibold"><td>Net Income</td><td class="text-end">${fmtMoney(row.NetIncome)}</td></tr>
                         </tbody>

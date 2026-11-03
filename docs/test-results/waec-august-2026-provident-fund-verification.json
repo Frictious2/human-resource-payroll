@@ -1,0 +1,405 @@
+{
+  "generatedAt": "2026-10-09T14:56:55.632Z",
+  "companyId": 1,
+  "workbook": "C:\\Users\\David M. Gegbai\\Downloads\\AUGUST. STAFF SALARY AND PAYSLIP-2026.xlsx",
+  "worksheet": "AUG. PAYROLL",
+  "provEmpItem": {
+    "Code": "33",
+    "Income": "PROV-EMP",
+    "Taxable": 0,
+    "Threshhold": 0,
+    "TPercent": 0,
+    "TPercentage": "0",
+    "TAmount": "0.00",
+    "Mode": "02",
+    "AddBack": 0,
+    "Fixed": 0,
+    "Percent": "10.00",
+    "Freq": "M",
+    "CompanyID": 1
+  },
+  "relatedItems": [
+    {
+      "Code": "33",
+      "Income": "PROV-EMP",
+      "Taxable": 0,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "02",
+      "AddBack": 0,
+      "Fixed": 0,
+      "Percent": "10.00",
+      "Freq": "M",
+      "CompanyID": 1
+    },
+    {
+      "Code": "42",
+      "Income": "PROV-INST",
+      "Taxable": 0,
+      "Threshhold": 0,
+      "TPercent": 0,
+      "TPercentage": "0",
+      "TAmount": "0.00",
+      "Mode": "03",
+      "AddBack": 0,
+      "Fixed": 0,
+      "Percent": "20.00",
+      "Freq": "M",
+      "CompanyID": 1
+    }
+  ],
+  "employees": [
+    {
+      "pfNo": "0489",
+      "name": "Matilda Jusu",
+      "excel": {
+        "pfNo": "0489",
+        "name": "Matilda Jusu",
+        "designation": "HNO",
+        "basic": 16202.12,
+        "allowances": 25262.25,
+        "gross": 41464.37,
+        "taxable": 40654.26,
+        "paye": 11686.28,
+        "employeeNassit": 810.11,
+        "providentFund": 1620.21,
+        "netPay": 27347.77,
+        "totalDeduction": 14116.6,
+        "otherDeductions": 0
+      },
+      "approvedSalary": {
+        "basic": 16202.12,
+        "providentFund": 1620.21,
+        "employerProvident": 3240.42,
+        "employeeNassit": 810.11,
+        "employerNassit": 1620.21,
+        "paye": 11836.28,
+        "totalDeduction": 14266.6,
+        "reconstructedDeduction": 14266.6,
+        "netPay": 27197.77,
+        "reconstructedNet": 27197.77,
+        "approved": -1,
+        "companyId": 1
+      },
+      "augustPayrollBatch161": {
+        "basic": 10658.21,
+        "providentFund": 1065.82,
+        "netPay": 17087.8,
+        "approved": -1,
+        "postedToGl": 0
+      },
+      "checks": {
+        "excelProvidentIs10Percent": true,
+        "approvedProvidentIs10Percent": true,
+        "approvedProvidentMatchesExcel": true,
+        "deductionIncludesProvident": true,
+        "netPayDeductsProvident": true,
+        "employerNassitExcludedFromNetDeduction": true,
+        "augustBatchStillOutdated": true
+      },
+      "variances": {
+        "approvedProvidentVsExcel": 0,
+        "approvedNetVsExcel": -150,
+        "approvedPayeVsExcel": 150,
+        "augustProvidentVsApproved": -554.39
+      }
+    },
+    {
+      "pfNo": "0496",
+      "name": "Festus C. Campbell",
+      "excel": {
+        "pfNo": "0496",
+        "name": "Festus C. Campbell",
+        "designation": "P.H.R.M.O",
+        "basic": 9857.49,
+        "allowances": 13875.32,
+        "gross": 23732.81,
+        "taxable": 23239.94,
+        "paye": 6461.98,
+        "employeeNassit": 492.87,
+        "providentFund": 985.75,
+        "netPay": 15792.21,
+        "totalDeduction": 7940.6,
+        "otherDeductions": 0
+      },
+      "approvedSalary": {
+        "basic": 9857.49,
+        "providentFund": 985.75,
+        "employerProvident": 1971.5,
+        "employeeNassit": 492.87,
+        "employerNassit": 985.75,
+        "paye": 6611.98,
+        "totalDeduction": 8090.6,
+        "reconstructedDeduction": 8090.6,
+        "netPay": 15642.21,
+        "reconstructedNet": 15642.21,
+        "approved": -1,
+        "companyId": 1
+      },
+      "augustPayrollBatch161": {
+        "basic": 9857.49,
+        "providentFund": 795.99,
+        "netPay": 12490.92,
+        "approved": -1,
+        "postedToGl": 0
+      },
+      "checks": {
+        "excelProvidentIs10Percent": true,
+        "approvedProvidentIs10Percent": true,
+        "approvedProvidentMatchesExcel": true,
+        "deductionIncludesProvident": true,
+        "netPayDeductsProvident": true,
+        "employerNassitExcludedFromNetDeduction": true,
+        "augustBatchStillOutdated": true
+      },
+      "variances": {
+        "approvedProvidentVsExcel": 0,
+        "approvedNetVsExcel": -150,
+        "approvedPayeVsExcel": 150,
+        "augustProvidentVsApproved": -189.76
+      }
+    },
+    {
+      "pfNo": "0692",
+      "name": "Georgiana James",
+      "excel": {
+        "pfNo": "0692",
+        "name": "Georgiana James",
+        "designation": "Snr. Acct. II/AR II",
+        "basic": 7180.72,
+        "allowances": 11439.46,
+        "gross": 18620.18,
+        "taxable": 18261.14,
+        "paye": 4968.34,
+        "employeeNassit": 359.04,
+        "providentFund": 718.07,
+        "netPay": 12574.73,
+        "totalDeduction": 6045.45,
+        "otherDeductions": 0
+      },
+      "approvedSalary": {
+        "basic": 7180.72,
+        "providentFund": 718.07,
+        "employerProvident": 1436.14,
+        "employeeNassit": 359.04,
+        "employerNassit": 718.07,
+        "paye": 5118.34,
+        "totalDeduction": 6195.45,
+        "reconstructedDeduction": 6195.45,
+        "netPay": 12424.72,
+        "reconstructedNet": 12424.72,
+        "approved": -1,
+        "companyId": 1
+      },
+      "augustPayrollBatch161": {
+        "basic": 7180.72,
+        "providentFund": 544.69,
+        "netPay": 9997.61,
+        "approved": -1,
+        "postedToGl": 0
+      },
+      "checks": {
+        "excelProvidentIs10Percent": true,
+        "approvedProvidentIs10Percent": true,
+        "approvedProvidentMatchesExcel": true,
+        "deductionIncludesProvident": true,
+        "netPayDeductsProvident": true,
+        "employerNassitExcludedFromNetDeduction": true,
+        "augustBatchStillOutdated": true
+      },
+      "variances": {
+        "approvedProvidentVsExcel": 0,
+        "approvedNetVsExcel": -150.01,
+        "approvedPayeVsExcel": 150,
+        "augustProvidentVsApproved": -173.38
+      }
+    },
+    {
+      "pfNo": "0520",
+      "name": "Abass Renner",
+      "excel": {
+        "pfNo": "0520",
+        "name": "Abass Renner",
+        "designation": "Ag Head HRMO I/AR I",
+        "basic": 6856.42,
+        "allowances": 11144.34,
+        "gross": 18000.76,
+        "taxable": 17657.94,
+        "paye": 4787.38,
+        "employeeNassit": 342.82,
+        "providentFund": 685.64,
+        "netPay": 12184.92,
+        "totalDeduction": 5815.84,
+        "otherDeductions": 0
+      },
+      "approvedSalary": {
+        "basic": 6856.42,
+        "providentFund": 685.64,
+        "employerProvident": 1371.28,
+        "employeeNassit": 342.82,
+        "employerNassit": 685.64,
+        "paye": 4937.38,
+        "totalDeduction": 5965.84,
+        "reconstructedDeduction": 5965.84,
+        "netPay": 12034.91,
+        "reconstructedNet": 12034.91,
+        "approved": -1,
+        "companyId": 1
+      },
+      "augustPayrollBatch161": {
+        "basic": 6856.42,
+        "providentFund": 603.65,
+        "netPay": 8191.12,
+        "approved": -1,
+        "postedToGl": 0
+      },
+      "checks": {
+        "excelProvidentIs10Percent": true,
+        "approvedProvidentIs10Percent": true,
+        "approvedProvidentMatchesExcel": true,
+        "deductionIncludesProvident": true,
+        "netPayDeductsProvident": true,
+        "employerNassitExcludedFromNetDeduction": true,
+        "augustBatchStillOutdated": true
+      },
+      "variances": {
+        "approvedProvidentVsExcel": 0,
+        "approvedNetVsExcel": -150.01,
+        "approvedPayeVsExcel": 150,
+        "augustProvidentVsApproved": -81.99
+      }
+    },
+    {
+      "pfNo": "0684",
+      "name": "Chernor Sankoh",
+      "excel": {
+        "pfNo": "0684",
+        "name": "Chernor Sankoh",
+        "designation": "Ag.Head  Of Audit/AR II",
+        "basic": 6918.19,
+        "allowances": 11200.55,
+        "gross": 18118.74,
+        "taxable": 17772.83,
+        "paye": 4821.85,
+        "employeeNassit": 345.91,
+        "providentFund": 691.82,
+        "netPay": 12259.16,
+        "totalDeduction": 5859.58,
+        "otherDeductions": 0
+      },
+      "approvedSalary": {
+        "basic": 6918.19,
+        "providentFund": 691.82,
+        "employerProvident": 1383.64,
+        "employeeNassit": 345.91,
+        "employerNassit": 691.82,
+        "paye": 4971.85,
+        "totalDeduction": 6009.58,
+        "reconstructedDeduction": 6009.58,
+        "netPay": 12109.17,
+        "reconstructedNet": 12109.17,
+        "approved": -1,
+        "companyId": 1
+      },
+      "augustPayrollBatch161": {
+        "basic": 6918.19,
+        "providentFund": 554.51,
+        "netPay": 8035.17,
+        "approved": -1,
+        "postedToGl": 0
+      },
+      "checks": {
+        "excelProvidentIs10Percent": true,
+        "approvedProvidentIs10Percent": true,
+        "approvedProvidentMatchesExcel": true,
+        "deductionIncludesProvident": true,
+        "netPayDeductsProvident": true,
+        "employerNassitExcludedFromNetDeduction": true,
+        "augustBatchStillOutdated": true
+      },
+      "variances": {
+        "approvedProvidentVsExcel": 0,
+        "approvedNetVsExcel": -149.99,
+        "approvedPayeVsExcel": 150,
+        "augustProvidentVsApproved": -137.31
+      }
+    },
+    {
+      "pfNo": "0587",
+      "name": "Basiru A. Waheed Sawyer",
+      "excel": {
+        "pfNo": "0587",
+        "name": "Basiru A. Waheed Sawyer",
+        "designation": "SAO",
+        "basic": 3825.75,
+        "allowances": 4586.29,
+        "gross": 8412.04,
+        "taxable": 8220.74,
+        "paye": 1956.22,
+        "employeeNassit": 191.29,
+        "providentFund": 382.57,
+        "netPay": 5881.95,
+        "totalDeduction": 2530.09,
+        "otherDeductions": 0.01
+      },
+      "approvedSalary": {
+        "basic": 3825.75,
+        "providentFund": 382.58,
+        "employerProvident": 765.15,
+        "employeeNassit": 191.29,
+        "employerNassit": 382.58,
+        "paye": 2106.23,
+        "totalDeduction": 2680.1,
+        "reconstructedDeduction": 2680.1,
+        "netPay": 5731.94,
+        "reconstructedNet": 5731.94,
+        "approved": -1,
+        "companyId": 1
+      },
+      "augustPayrollBatch161": {
+        "basic": 3825.75,
+        "providentFund": 338.66,
+        "netPay": 5652.13,
+        "approved": -1,
+        "postedToGl": 0
+      },
+      "checks": {
+        "excelProvidentIs10Percent": true,
+        "approvedProvidentIs10Percent": true,
+        "approvedProvidentMatchesExcel": true,
+        "deductionIncludesProvident": true,
+        "netPayDeductsProvident": true,
+        "employerNassitExcludedFromNetDeduction": true,
+        "augustBatchStillOutdated": true
+      },
+      "variances": {
+        "approvedProvidentVsExcel": 0.01,
+        "approvedNetVsExcel": -150.01,
+        "approvedPayeVsExcel": 150.01,
+        "augustProvidentVsApproved": -43.92
+      }
+    }
+  ],
+  "totals": {
+    "excel": {
+      "basic": 50840.69,
+      "providentFund": 5084.06,
+      "employeeNassit": 2542.04,
+      "paye": 34682.05,
+      "totalDeduction": 42308.16,
+      "netPay": 86040.74
+    },
+    "salary": {
+      "basic": 50840.69,
+      "providentFund": 5084.07,
+      "employeeNassit": 2542.04,
+      "paye": 35582.06,
+      "totalDeduction": 43208.17,
+      "netPay": 85140.72
+    }
+  },
+  "materialFailures": [],
+  "status": "WAEC PROVIDENT FUND VERIFICATION: PASS WITH CORRECTIONS"
+}

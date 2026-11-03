@@ -1,5 +1,4 @@
 const session = require('express-session');
-const MySQLStore = require('express-mysql-session')(session);
 const pool = require('./db');
 
 const SESSION_TABLE = 'sessions';
@@ -73,8 +72,112 @@ function getSessionStoreOptions() {
     };
 }
 
+function getExpirySeconds(sess = {}) {
+    const cookie = sess.cookie || {};
+    if (cookie.expires) {
+        const expires = new Date(cookie.expires).getTime();
+        if (Number.isFinite(expires)) {
+            return Math.floor(expires / 1000);
+        }
+    }
+
+    const maxAge = Number(cookie.maxAge);
+    const effectiveMaxAge = Number.isFinite(maxAge) && maxAge >= 0
+        ? maxAge
+        : getSessionMaxAgeMs();
+    return Math.floor((Date.now() + effectiveMaxAge) / 1000);
+}
+
+class MysqlSessionStore extends session.Store {
+    constructor(connection = pool) {
+        super();
+        this.connection = connection;
+    }
+
+    async onReady() {
+        await ensureSessionTableExists(this.connection);
+        return true;
+    }
+
+    async getSession(sessionId) {
+        const [rows] = await this.connection.query(
+            `SELECT data, expires
+             FROM ${SESSION_TABLE}
+             WHERE session_id = ?
+             LIMIT 1`,
+            [sessionId]
+        );
+        const row = rows[0];
+        if (!row) {
+            return null;
+        }
+
+        if (Number(row.expires || 0) <= Math.floor(Date.now() / 1000)) {
+            await this.destroySession(sessionId);
+            return null;
+        }
+
+        return JSON.parse(row.data);
+    }
+
+    get(sessionId, callback) {
+        const operation = this.getSession(sessionId);
+        if (typeof callback === 'function') {
+            operation.then((payload) => callback(null, payload)).catch((error) => callback(error));
+            return undefined;
+        }
+        return operation;
+    }
+
+    async setSession(sessionId, sess) {
+        const expires = getExpirySeconds(sess);
+        await this.connection.query(
+            `REPLACE INTO ${SESSION_TABLE} (session_id, expires, data)
+             VALUES (?, ?, ?)`,
+            [sessionId, expires, JSON.stringify(sess)]
+        );
+    }
+
+    set(sessionId, sess, callback) {
+        const operation = this.setSession(sessionId, sess);
+        if (typeof callback === 'function') {
+            operation.then(() => callback(null)).catch((error) => callback(error));
+            return undefined;
+        }
+        return operation;
+    }
+
+    async destroySession(sessionId) {
+        await this.connection.query(
+            `DELETE FROM ${SESSION_TABLE}
+             WHERE session_id = ?`,
+            [sessionId]
+        );
+    }
+
+    destroy(sessionId, callback) {
+        const operation = this.destroySession(sessionId);
+        if (typeof callback === 'function') {
+            operation.then(() => callback(null)).catch((error) => callback(error));
+            return undefined;
+        }
+        return operation;
+    }
+
+    touch(sessionId, sess, callback) {
+        return this.set(sessionId, sess, callback);
+    }
+
+    close(callback) {
+        if (typeof callback === 'function') {
+            callback(null);
+        }
+        return Promise.resolve();
+    }
+}
+
 function createSessionStore() {
-    return new MySQLStore(getSessionStoreOptions(), pool);
+    return new MysqlSessionStore(pool);
 }
 
 async function ensureSessionTableExists(connection = pool) {
@@ -111,7 +214,7 @@ function getSessionStoreDescriptor(store) {
         return 'unavailable';
     }
 
-    if (store.constructor && store.constructor.name === 'MySQLStore') {
+    if (store.constructor && (store.constructor.name === 'MysqlSessionStore' || store.constructor.name === 'MySQLStore')) {
         return 'MySQL';
     }
 
@@ -128,6 +231,7 @@ module.exports = {
     getTrustProxySetting,
     getSessionCookieConfig,
     getSessionStoreOptions,
+    MysqlSessionStore,
     createSessionStore,
     ensureSessionTableExists,
     initializeSessionStore,

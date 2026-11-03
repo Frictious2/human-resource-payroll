@@ -15,6 +15,9 @@ const {
         if (req.body && typeof req.body._csrf === 'string') {
             return req.body._csrf;
         }
+        if (req.query && typeof req.query._csrf === 'string' && req.is('multipart/form-data')) {
+            return req.query._csrf;
+        }
         return req.get('x-csrf-token') || undefined;
     },
     errorConfig: {

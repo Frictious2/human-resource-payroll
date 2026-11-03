@@ -94,7 +94,7 @@
                     </ul>
                 </div>
                 <div class="card-body">
-                    <form action="/data-entry/staff/new-edit" method="POST" id="staffForm" enctype="multipart/form-data">
+                    <form action="/data-entry/staff/new-edit?_csrf=<%= encodeURIComponent(csrfToken || '') %>" method="POST" id="staffForm" enctype="multipart/form-data">
                         <div class="tab-content" id="staffTabsContent">
                             
                             <!-- Section 1: Personal Details -->

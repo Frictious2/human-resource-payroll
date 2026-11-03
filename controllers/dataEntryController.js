@@ -14,6 +14,8 @@ const dataEntryDashboardService = require('../services/dataEntryDashboardService
 const recordWorkflowService = require('../services/recordWorkflowService');
 const workflowNotificationService = require('../services/workflowNotificationService');
 const workQueueService = require('../services/workQueueService');
+const payrollSetupAutoCalculationService = require('../services/payrollSetupAutoCalculationService');
+const payeTaxService = require('../services/payeTaxService');
 const { getWorkspaceContext } = require('../utils/workspaceContext');
 
 function roundCurrency(value) {
@@ -56,6 +58,17 @@ async function syncDraftWorkflowRecord(req, module, recordReference, record, pre
         recordReference,
         record,
         previousReference,
+        user: getViewUser(req),
+        connection
+    });
+}
+
+async function syncAndSubmitWorkflowRecord(req, module, recordReference, record, previousReference = null, connection = null) {
+    const workflowItem = await syncDraftWorkflowRecord(req, module, recordReference, record, previousReference, connection);
+    return recordWorkflowService.submitRecord({
+        companyId: getCompanyId(req),
+        module,
+        workflowItemId: workflowItem.id,
         user: getViewUser(req),
         connection
     });
@@ -427,7 +440,9 @@ const dataEntryController = {
                 grades,
                 currencies,
                 items,
-                allowances
+                allowances,
+                success: req.query.success || null,
+                error: req.query.error || null
             });
         } catch (error) {
             console.error(error);
@@ -461,6 +476,7 @@ const dataEntryController = {
     },
  
     postPayrollIncomeSetup: async (req, res) => {
+        const connection = await pool.getConnection();
         try {
             const {
                 scaleDate,
@@ -471,73 +487,127 @@ const dataEntryController = {
                 notches,
                 increment
             } = req.body;
+
+            if (!gradeCode || !scaleDate) {
+                return res.redirect('/data-entry/payroll/income-setup?error=Grade and scale date are required.');
+            }
  
             const now = new Date();
-            const operator = 'Data Entry Officer';
+            const viewUser = getViewUser(req, 'Data Entry Officer');
+            const operator = viewUser.name || viewUser.FullName || viewUser.Username || 'Data Entry Officer';
  
             // Discover available columns in tblallowance to build resilient INSERT/UPDATE
-            const [colsRows] = await pool.query(`
+            const [colsRows] = await connection.query(`
                 SELECT COLUMN_NAME 
                 FROM information_schema.COLUMNS 
-                WHERE TABLE_NAME = 'tblallowance'
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'tblallowance'
             `);
-            const colSet = new Set(colsRows.map(r => r.COLUMN_NAME));
- 
-            const baseData = {
-                ScaleDate: scaleDate || null,
-                Grade: gradeCode || null,
-                PayCurrency: currencyCode || null,
-                StartLevel: startLevel || null,
-                EndLevel: endLevel || null,
-                Notches: notches || null,
-                Increment: increment || null,
-                KeyedIn: now,
-                Operator: operator,
-                TimeKeyed: now,
-                Approved: 0
+            const columnMap = colsRows.reduce((acc, row) => {
+                acc[String(row.COLUMN_NAME).toLowerCase()] = row.COLUMN_NAME;
+                return acc;
+            }, {});
+            const resolveColumn = (name) => columnMap[String(name).toLowerCase()];
+            const assignIfColumnExists = (target, name, value) => {
+                const column = resolveColumn(name);
+                if (column) {
+                    target[column] = value;
+                }
             };
+ 
+            const baseData = {};
+            assignIfColumnExists(baseData, 'ScaleDate', scaleDate || null);
+            assignIfColumnExists(baseData, 'Grade', gradeCode || null);
+            assignIfColumnExists(baseData, 'PayCurrency', currencyCode || null);
+            assignIfColumnExists(baseData, 'StartLevel', startLevel || null);
+            assignIfColumnExists(baseData, 'EndLevel', endLevel || null);
+            assignIfColumnExists(baseData, 'Notches', notches || null);
+            assignIfColumnExists(baseData, 'Increment', increment || null);
+            assignIfColumnExists(baseData, 'KeyedIn', now);
+            assignIfColumnExists(baseData, 'Operator', operator);
+            assignIfColumnExists(baseData, 'TimeKeyed', now);
+            assignIfColumnExists(baseData, 'Approved', 0);
+            assignIfColumnExists(baseData, 'ApprovedBy', null);
+            assignIfColumnExists(baseData, 'DateApproved', null);
+            assignIfColumnExists(baseData, 'TimeApproved', null);
+            assignIfColumnExists(baseData, 'CompanyID', getCompanyId(req));
+
+            const readNumeric = (name) => {
+                const value = req.body[name];
+                return value === '' || value === null || value === undefined ? null : value;
+            };
+
+            const readFlag = (name) => (req.body[name] ? -1 : 0);
+
+            for (let i = 1; i <= 20; i += 1) {
+                const code = String(i).padStart(2, '0');
+                const dynamicFields = {
+                    [`Taxable${code}`]: readFlag(`tax_${code}`),
+                    [`Thresh${code}`]: readFlag(`thresh_${code}`),
+                    [`TPercent${code}`]: readFlag(`tpercent_${code}`),
+                    [`TPercentage${code}`]: readNumeric(`tpercentage_${code}`),
+                    [`TAmount${code}`]: readNumeric(`tamount_${code}`),
+                    [`Percent${code}`]: readFlag(`fix_${code}`),
+                    [`Amount${code}`]: readNumeric(`amount_${code}`),
+                    [`Rate${code}`]: readNumeric(`rate_${code}`)
+                };
+
+                Object.entries(dynamicFields).forEach(([field, value]) => {
+                    assignIfColumnExists(baseData, field, value);
+                });
+            }
  
             const fields = [];
             const values = [];
             Object.entries(baseData).forEach(([k, v]) => {
-                if (colSet.has(k)) {
-                    fields.push(k);
-                    values.push(v);
-                }
+                fields.push(k);
+                values.push(v);
             });
  
             // Upsert by GradeCode + ScaleDate if possible
             let whereClause = '';
             const whereParams = [];
-            if (colSet.has('Grade') && colSet.has('ScaleDate')) {
-                whereClause = 'WHERE Grade = ? AND ScaleDate = ?';
+            const gradeColumn = resolveColumn('Grade');
+            const scaleDateColumn = resolveColumn('ScaleDate');
+            if (gradeColumn && scaleDateColumn) {
+                whereClause = `WHERE ${gradeColumn} = ? AND DATE(${scaleDateColumn}) = DATE(?)`;
                 whereParams.push(gradeCode || null, scaleDate || null);
             }
  
+            await connection.beginTransaction();
+
             let existing = [];
             if (whereClause) {
-                const [ex] = await pool.query(`SELECT * FROM tblallowance ${whereClause}`, whereParams);
+                const [ex] = await connection.query(`SELECT * FROM tblallowance ${whereClause}`, whereParams);
                 existing = ex;
             }
  
             if (existing.length > 0) {
                 const setClause = fields.map(f => `${f} = ?`).join(', ');
-                await pool.query(
+                await connection.query(
                     `UPDATE tblallowance SET ${setClause} ${whereClause}`,
                     [...values, ...whereParams]
                 );
             } else {
                 const placeholders = fields.map(() => '?').join(', ');
-                await pool.query(
+                await connection.query(
                     `INSERT INTO tblallowance (${fields.join(', ')}) VALUES (${placeholders})`,
                     values
                 );
             }
- 
-            res.redirect('/data-entry/payroll/income-setup');
+
+            await connection.commit();
+            res.redirect('/data-entry/payroll/income-setup?success=Income setup saved and sent to Manager for approval.');
         } catch (error) {
+            try {
+                await connection.rollback();
+            } catch (rollbackError) {
+                console.error('Income setup rollback failed:', rollbackError);
+            }
             console.error(error);
-            res.status(500).send('Server Error');
+            res.redirect('/data-entry/payroll/income-setup?error=' + encodeURIComponent(error.message || 'Server Error'));
+        } finally {
+            connection.release();
         }
     },
  
@@ -686,6 +756,7 @@ const dataEntryController = {
     getPayrollSetupByStaff: async (req, res) => {
         try {
             const { pfno } = req.params;
+            const companyId = getCompanyId(req);
             const [sRows] = await pool.query(`
                 SELECT 
                     s.PFNo, 
@@ -700,23 +771,28 @@ const dataEntryController = {
                 LEFT JOIN tblgrade g ON s.CGrade = g.GradeCode
                 LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code
                 WHERE s.PFNo = ?
+                  AND (s.CompanyID = ? OR s.CompanyID IS NULL)
                   AND ${staffStatusService.getActiveStaffFilter('s')}
-            `, [pfno]);
+                LIMIT 1
+            `, [pfno, companyId]);
             const staff = sRows[0] || null;
-            const [rows] = await pool.query(
-                'SELECT * FROM tblsalary WHERE PFNo = ? ORDER BY PDate DESC LIMIT 1',
-                [pfno]
-            );
-            const salary = rows.length > 0 ? rows[0] : { isDerivedOnly: true };
+            let salary = { isDerivedOnly: true };
 
             if (staff) {
-                const compensation = await calculateStaffCompensation(staff.GradeCode, staff.Notch);
-                salary.Salary = compensation.monthlySalary;
-                salary.Annual = compensation.annualSalary;
-                salary.StartSalary = compensation.startSalary;
-                salary.EndSalary = compensation.endSalary;
-                salary.Increment = compensation.increment;
-                salary.NotchLimit = compensation.maxNotch;
+                const calculation = await payrollSetupAutoCalculationService.calculatePayrollSetupForStaff({
+                    companyId,
+                    pfNo: pfno,
+                    payrollDate: new Date()
+                });
+                salary = {
+                    ...(calculation.latestSalary || {}),
+                    ...calculation.fields,
+                    StartSalary: calculation.compensation.startSalary,
+                    EndSalary: calculation.compensation.endSalary,
+                    Increment: calculation.compensation.increment,
+                    NotchLimit: calculation.compensation.maxNotch,
+                    isAutoCalculated: true
+                };
             }
 
             res.json({ staff, salary });
@@ -747,36 +823,36 @@ const dataEntryController = {
                 ded3,
                 ded4
             } = req.body;
-
-            const [sRows] = await pool.query('SELECT PFNo, CDept as Dept, CGrade as GradeCode, JobTitle as JobTitleCode FROM tblstaff WHERE PFNo = ?', [pfno]);
-            if (sRows.length === 0) {
-                return res.status(400).send('Staff not found');
-            }
-            const staff = sRows[0];
-
+            const companyId = getCompanyId(req);
             const now = new Date();
             const submittedDate = (() => {
                 if (!pdate) return now;
                 const d = new Date(pdate);
                 return isNaN(d.getTime()) ? now : d;
             })();
-            const operator = 'Data Entry Officer';
+            const operator = getViewUser(req).name || 'Data Entry Officer';
 
-            const [existingRows] = await pool.query(
-                'SELECT PFNo, PDate FROM tblsalary WHERE PFNo = ? AND PDate = ? LIMIT 1',
-                [pfno, submittedDate]
+            const [sRows] = await pool.query(
+                `
+                    SELECT PFNo, CDept AS Dept, CGrade AS GradeCode, JobTitle AS JobTitleCode
+                    FROM tblstaff
+                    WHERE PFNo = ?
+                      AND (CompanyID = ? OR CompanyID IS NULL)
+                    LIMIT 1
+                `,
+                [pfno, companyId]
             );
+            if (sRows.length === 0) {
+                return res.status(400).send('Staff not found');
+            }
+            const staff = sRows[0];
 
             const getAllw = (code) => {
-                const key = 'allw' + code;
-                const val = req.body[key];
-                return val === '' || val == null ? null : val;
+                const value = req.body[`allw${code}`];
+                return value === '' || value == null ? null : roundCurrency(value);
             };
 
-            const round2 = (val) => {
-                if (val === '' || val === null || val === undefined) return null;
-                return Math.round(parseFloat(val) * 100) / 100;
-            };
+            const getAmount = (value) => (value === '' || value == null ? null : roundCurrency(value));
 
             const baseFields = {
                 PDate: submittedDate,
@@ -784,8 +860,8 @@ const dataEntryController = {
                 Dept: staff.Dept,
                 Grade: staff.GradeCode,
                 JobTitle: staff.JobTitleCode,
-                Annual: round2(annual),
-                Salary: round2(salary),
+                Annual: getAmount(annual),
+                Salary: getAmount(salary),
                 Allw02: getAllw('02'),
                 Allw03: getAllw('03'),
                 Allw04: getAllw('04'),
@@ -805,35 +881,99 @@ const dataEntryController = {
                 Allw18: getAllw('18'),
                 Allw19: getAllw('19'),
                 Allw20: getAllw('20'),
-                TotalIncome: totalIncome || null,
-                Taxable: taxable || null,
-                Tax: tax || null,
-                NassitEmp: nassitEmp || null,
-                NassitInst: nassitInst || null,
-                GratEmp: gratEmp || null,
-                GratInst: gratInst || null,
-                TotalDeduction: totalDeduction || null,
-                NetIncome: netIncome || null,
-                Ded1: ded1 || null,
-                UnionDues: unionDues || null,
-                Ded3: ded3 || null,
-                Ded4: ded4 || null,
+                TotAllw: roundCurrency(Array.from({ length: 19 }, (_, index) => getAllw(String(index + 2).padStart(2, '0')) || 0).reduce((sum, value) => sum + value, 0)),
+                TotalIncome: getAmount(totalIncome),
+                Taxable: getAmount(taxable),
+                Tax: getAmount(tax),
+                NassitEmp: getAmount(nassitEmp),
+                NassitInst: getAmount(nassitInst),
+                GratEmp: getAmount(gratEmp),
+                GratInst: getAmount(gratInst),
+                Ded1: getAmount(ded1),
+                UnionDues: getAmount(unionDues),
+                Ded3: getAmount(ded3),
+                Ded4: getAmount(ded4),
+                TotalDeduction: getAmount(totalDeduction),
+                NetIncome: getAmount(netIncome),
                 Operator: operator,
                 DateKeyed: now,
                 TimeKeyed: now,
                 Approved: 0
             };
 
+            const [payrollItems] = await pool.query(
+                `
+                    SELECT Code, Taxable
+                    FROM tblpayrollitems
+                    WHERE CompanyID = ? OR CompanyID IS NULL
+                    ORDER BY CASE WHEN CompanyID = ? THEN 0 ELSE 1 END, Code
+                `,
+                [companyId, companyId]
+            );
+            const itemTaxable = new Map();
+            payrollItems.forEach((item) => {
+                const code = String(item.Code || '').padStart(2, '0');
+                if (!itemTaxable.has(code)) {
+                    itemTaxable.set(code, item.Taxable === true || item.Taxable === 1 || item.Taxable === -1 || item.Taxable === '1' || item.Taxable === '-1');
+                }
+            });
+            const taxableEarnings = roundCurrency(
+                (itemTaxable.get('01') ? Number(baseFields.Salary || 0) : 0)
+                + Array.from({ length: 19 }, (_, index) => {
+                    const code = String(index + 2).padStart(2, '0');
+                    return itemTaxable.get(code) ? Number(baseFields[`Allw${code}`] || 0) : 0;
+                }).reduce((sum, value) => sum + value, 0)
+            );
+            const paye = await payeTaxService.calculateMonthlyPaye({
+                companyId,
+                payrollDate: submittedDate,
+                taxableEarnings,
+                employeeNassit: baseFields.NassitEmp || 0
+            });
+            baseFields.Taxable = paye.chargeableIncome;
+            baseFields.Tax = paye.tax;
+            baseFields.TotalDeduction = roundCurrency(
+                Number(baseFields.Tax || 0)
+                + Number(baseFields.NassitEmp || 0)
+                + Number(baseFields.GratEmp || 0)
+                + Number(baseFields.Ded1 || 0)
+                + Number(baseFields.UnionDues || 0)
+                + Number(baseFields.Ded3 || 0)
+                + Number(baseFields.Ded4 || 0)
+            );
+            baseFields.NetIncome = roundCurrency(Number(baseFields.TotalIncome || 0) - Number(baseFields.TotalDeduction || 0));
+
+            const [existingRows] = await pool.query(
+                `
+                    SELECT PFNo, Dept, PType
+                    FROM tblsalary
+                    WHERE PFNo = ?
+                      AND (CompanyID = ? OR CompanyID IS NULL)
+                    ORDER BY PDate DESC
+                    LIMIT 1
+                `,
+                [pfno, companyId]
+            );
+
             if (existingRows.length > 0) {
+                const existing = existingRows[0];
                 const fields = Object.keys(baseFields);
-                const setClause = fields.map(f => `${f} = ?`).join(', ');
-                const values = fields.map(f => baseFields[f]);
+                const setClause = fields.map((field) => `${field} = ?`).join(', ');
+                const values = fields.map((field) => baseFields[field]);
                 await pool.query(
-                    `UPDATE tblsalary SET ${setClause} WHERE PFNo = ? AND PDate = ?`,
-                    [...values, pfno, submittedDate]
+                    `
+                        UPDATE tblsalary
+                        SET ${setClause}
+                        WHERE PFNo = ?
+                          AND Dept = ?
+                          AND PType = ?
+                          AND (CompanyID = ? OR CompanyID IS NULL)
+                    `,
+                    [...values, existing.PFNo, existing.Dept, existing.PType, companyId]
                 );
             } else {
-                const extra = {
+                const allFields = {
+                    ...baseFields,
                     PType: '01',
                     Paid: 0,
                     FullPay: 0,
@@ -841,12 +981,11 @@ const dataEntryController = {
                     WithoutPay: 0,
                     Linked: 0,
                     Posted: 0,
-                    CompanyID: 1
+                    CompanyID: companyId
                 };
-                const allFields = { ...baseFields, ...extra };
                 const cols = Object.keys(allFields);
                 const placeholders = cols.map(() => '?').join(', ');
-                const values = cols.map(f => allFields[f]);
+                const values = cols.map((field) => allFields[field]);
                 await pool.query(
                     `INSERT INTO tblsalary (${cols.join(', ')}) VALUES (${placeholders})`,
                     values
@@ -3551,7 +3690,7 @@ const dataEntryController = {
             const recordReference = buildWorkflowReference('training', { pfno, course, startDate });
             const record = await recordWorkflowService.fetchModuleRecord(getCompanyId(req), 'training', recordReference);
             if (record) {
-                await syncDraftWorkflowRecord(req, 'training', recordReference, record);
+                await syncAndSubmitWorkflowRecord(req, 'training', recordReference, record);
             }
 
             res.json({ success: true, message: 'Training added successfully.' });
@@ -3600,7 +3739,7 @@ const dataEntryController = {
             const recordReference = buildWorkflowReference('training', { pfno, course, startDate });
             const record = await recordWorkflowService.fetchModuleRecord(getCompanyId(req), 'training', recordReference);
             if (record) {
-                await syncDraftWorkflowRecord(req, 'training', recordReference, record, previousReference);
+                await syncAndSubmitWorkflowRecord(req, 'training', recordReference, record, previousReference);
             }
 
             res.json({ success: true, message: 'Training updated successfully.' });
@@ -3717,11 +3856,17 @@ const dataEntryController = {
             await recordWorkflowService.ensureWorkflowTables();
             const recordReference = recordWorkflowService.buildReference(pfno, qDate);
             const sourceRecord = await recordWorkflowService.fetchModuleRecord(companyId, 'salary-query', recordReference);
-            await recordWorkflowService.ensureDraftItemForExistingRecord({
+            const workflowItem = await recordWorkflowService.ensureDraftItemForExistingRecord({
                 companyId,
                 module: 'salary-query',
                 recordReference,
                 record: sourceRecord,
+                user: workflowUser
+            });
+            await recordWorkflowService.submitRecord({
+                companyId,
+                module: 'salary-query',
+                workflowItemId: workflowItem.id,
                 user: workflowUser
             });
 
@@ -3778,12 +3923,18 @@ const dataEntryController = {
 
             const recordReference = recordWorkflowService.buildReference(pfno, qDate);
             const sourceRecord = await recordWorkflowService.fetchModuleRecord(companyId, 'salary-query', recordReference);
-            await recordWorkflowService.ensureDraftItemForExistingRecord({
+            const workflowItem = await recordWorkflowService.ensureDraftItemForExistingRecord({
                 companyId,
                 module: 'salary-query',
                 recordReference,
                 previousReference,
                 record: sourceRecord,
+                user: workflowUser
+            });
+            await recordWorkflowService.submitRecord({
+                companyId,
+                module: 'salary-query',
+                workflowItemId: workflowItem.id,
                 user: workflowUser
             });
 
@@ -3932,7 +4083,7 @@ const dataEntryController = {
 
             const record = await recordWorkflowService.fetchModuleRecord(getCompanyId(req), 'transfer', recordReference);
             if (record) {
-                await syncDraftWorkflowRecord(req, 'transfer', recordReference, record);
+                await syncAndSubmitWorkflowRecord(req, 'transfer', recordReference, record);
             }
 
             res.json({ success: true });
@@ -4531,7 +4682,7 @@ const dataEntryController = {
 
             const record = await recordWorkflowService.fetchModuleRecord(getCompanyId(req), 'redundancy', recordReference);
             if (record) {
-                await syncDraftWorkflowRecord(req, 'redundancy', recordReference, record);
+                await syncAndSubmitWorkflowRecord(req, 'redundancy', recordReference, record);
             }
             res.redirect('/data-entry/staff/redundancy');
         } catch (err) {
@@ -4736,7 +4887,7 @@ const dataEntryController = {
 
             const record = await recordWorkflowService.fetchModuleRecord(getCompanyId(req), 'promotion', recordReference);
             if (record) {
-                await syncDraftWorkflowRecord(req, 'promotion', recordReference, record, previousReference);
+                await syncAndSubmitWorkflowRecord(req, 'promotion', recordReference, record, previousReference);
             }
 
             res.redirect('/data-entry/staff/promotion-demotion');
@@ -4861,7 +5012,7 @@ const dataEntryController = {
 
             const record = await recordWorkflowService.fetchModuleRecord(getCompanyId(req), 'staff-exit', recordReference);
             if (record) {
-                await syncDraftWorkflowRecord(req, 'staff-exit', recordReference, record);
+                await syncAndSubmitWorkflowRecord(req, 'staff-exit', recordReference, record);
             }
 
             res.redirect('/data-entry/staff/exit?success=Record saved successfully');
@@ -5013,9 +5164,10 @@ const dataEntryController = {
             const pMonth = month;
             const pYear = year;
             const payCode = code;
+            const companyId = getCompanyId(req);
 
             // Get Company Info for PayingBank/BBAN
-            const [comInfo] = await conn.query('SELECT AccNo, PayingBank FROM tblcominfo LIMIT 1');
+            const [comInfo] = await conn.query('SELECT AccNo, PayingBank FROM tblcominfo WHERE CompanyID = ? LIMIT 1', [companyId]);
             const payingBBAN = comInfo.length > 0 ? comInfo[0].AccNo : '';
             const payingBank = comInfo.length > 0 ? comInfo[0].PayingBank : '';
 
@@ -5471,9 +5623,12 @@ const dataEntryController = {
                 // Source: tblSalary vs tblSalaryHistory difference
                 // Logic: Calculate differences, apply progressive tax, insert into tblPayroll
 
-                // 1. Get Tax Rates
-                const [taxRows] = await conn.query('SELECT * FROM tbltax LIMIT 1');
-                const taxRates = taxRows[0];
+                // 1. Get Company/effective-date scoped Tax Rates
+                const taxRates = await payeTaxService.getEffectiveTaxConfig({
+                    companyId,
+                    payrollDate: sqlDate,
+                    connection: conn
+                });
 
                 // 2. Get Salary Differences
                 const [diffRows] = await conn.query(`
@@ -5532,43 +5687,7 @@ const dataEntryController = {
 
                     const dbTotal = dbSal + dbAllw02 + dbAllw03 + dbAllw04 + dbAllw05 + dbAllw06 + dbAllw07 + dbAllw08 + dbAllw09 + dbAllw10 + dbAllw11 + dbAllw12 + dbAllw13 + dbAllw14 + dbAllw15 + dbAllw16 + dbAllw17 + dbAllw18 + dbAllw19 + dbAllw20;
 
-                    // Calculate Tax (Progressive)
-                    let tax = 0;
-                    let remaining = dbTotal;
-
-                    // Band 1
-                    if (remaining > 0) {
-                        const taxable = Math.min(remaining, taxRates.R1);
-                        tax += taxable * (taxRates.R1Tax / 100);
-                        remaining -= taxable;
-                    }
-                    // Band 2
-                    if (remaining > 0) {
-                        const band2Width = taxRates.R2 - taxRates.R1;
-                        const taxable = Math.min(remaining, band2Width);
-                        tax += taxable * (taxRates.R2Tax / 100);
-                        remaining -= taxable;
-                    }
-                    // Band 3
-                    if (remaining > 0) {
-                        const band3Width = taxRates.R3 - taxRates.R2;
-                        const taxable = Math.min(remaining, band3Width);
-                        tax += taxable * (taxRates.R3Tax / 100);
-                        remaining -= taxable;
-                    }
-                    // Band 4
-                    if (remaining > 0) {
-                        const band4Width = taxRates.R4 - taxRates.R3;
-                        const taxable = Math.min(remaining, band4Width);
-                        tax += taxable * (taxRates.R4Tax / 100);
-                        remaining -= taxable;
-                    }
-                    // Band 5 (Over R4)
-                    if (remaining > 0) {
-                        tax += remaining * (taxRates.R5Tax / 100);
-                    }
-
-                    tax = Math.round(tax * 100) / 100;
+                    const tax = payeTaxService.calculateProgressivePaye(dbTotal, taxRates);
                     const netIncome = dbTotal - tax;
 
                     await conn.query(`
@@ -5804,7 +5923,7 @@ const dataEntryController = {
             const recordReference = recordWorkflowService.buildReference(leaveId);
             const record = await recordWorkflowService.fetchModuleRecord(getCompanyId(req), 'leave', recordReference);
             if (record) {
-                await syncDraftWorkflowRecord(req, 'leave', recordReference, record);
+                await syncAndSubmitWorkflowRecord(req, 'leave', recordReference, record);
             }
              
             res.json({ success: true });
@@ -6450,11 +6569,17 @@ const dataEntryController = {
                 );
                 const sourceRecord = await recordWorkflowService.fetchModuleRecord(companyId, 'increment', recordReference);
                 if (sourceRecord) {
-                    await recordWorkflowService.ensureDraftItemForExistingRecord({
+                    const workflowItem = await recordWorkflowService.ensureDraftItemForExistingRecord({
                         companyId,
                         module: 'increment',
                         recordReference,
                         record: sourceRecord,
+                        user: workflowUser
+                    });
+                    await recordWorkflowService.submitRecord({
+                        companyId,
+                        module: 'increment',
+                        workflowItemId: workflowItem.id,
                         user: workflowUser
                     });
                 }
@@ -6641,7 +6766,7 @@ const dataEntryController = {
             const recordReference = buildWorkflowReference('acting', { pfno, sDate });
             const record = await recordWorkflowService.fetchModuleRecord(getCompanyId(req), 'acting', recordReference);
             if (record) {
-                await syncDraftWorkflowRecord(req, 'acting', recordReference, record, previousReference);
+                await syncAndSubmitWorkflowRecord(req, 'acting', recordReference, record, previousReference);
             }
 
             res.json({ success: true, message: 'Acting allowance saved successfully' });

@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const pool = require('../config/db');
 const workflowNotificationService = require('./workflowNotificationService');
+const payrollSetupAutoCalculationService = require('./payrollSetupAutoCalculationService');
 
 const RECORD_WORKFLOW_STATUSES = Object.freeze({
     DRAFT: 'DRAFT',
@@ -1715,7 +1716,7 @@ function resolveExitEmpStatus(reasonCode) {
     return '02';
 }
 
-async function applyModuleFinalActivation(connection, companyId, module, recordReference, sourceRecord) {
+async function applyModuleFinalActivation(connection, companyId, module, recordReference, sourceRecord, actorName = 'Workflow Approval') {
     switch (module) {
         case 'loan-repayment': {
             const [loanRows] = await connection.query(
@@ -1792,6 +1793,14 @@ async function applyModuleFinalActivation(connection, companyId, module, recordR
                     Number(companyId) || 1
                 ]
             );
+            await payrollSetupAutoCalculationService.upsertAutoCalculatedSalarySetup({
+                companyId,
+                pfNo: sourceRecord.PFNO,
+                payrollDate: sourceRecord.PDate || new Date(),
+                approvedBy: actorName,
+                executor: connection,
+                approved: -1
+            });
             break;
         }
         case 'acting': {
@@ -1893,7 +1902,7 @@ async function entityHeadApproveRecord({ companyId, workflowItemId, user, commen
         }
 
         await applyLegacyFinalApproval(executor, companyId, item.Module, item.RecordReference, actor.name);
-        await applyModuleFinalActivation(executor, companyId, item.Module, item.RecordReference, sourceRecord);
+        await applyModuleFinalActivation(executor, companyId, item.Module, item.RecordReference, sourceRecord, actor.name);
 
         await updateWorkflowItem(executor, item.id, {
             Status: RECORD_WORKFLOW_STATUSES.FINAL_APPROVED,

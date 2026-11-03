@@ -1,6 +1,14 @@
 const pool = require('../config/db');
 const staffStatusService = require('./staffStatusService');
 
+const dedupedGradeLookupSql = `
+    (
+        SELECT GradeCode, MAX(Grade) AS Grade
+        FROM tblgrade
+        GROUP BY GradeCode
+    )
+`;
+
 function normalizeText(value) {
     const text = String(value || '').trim();
     return text || '';
@@ -161,9 +169,9 @@ async function getDashboardData({ companyId, entityScope }) {
                     FROM tblpromotions p
                     INNER JOIN tblstaff s
                         ON s.PFNo = p.PFNO
-                    LEFT JOIN tblgrade pg
+                    LEFT JOIN ${dedupedGradeLookupSql} pg
                         ON pg.GradeCode = p.PrevGrade
-                    LEFT JOIN tblgrade cg
+                    LEFT JOIN ${dedupedGradeLookupSql} cg
                         ON cg.GradeCode = p.CGrade
                     WHERE (p.CompanyID = ? OR p.CompanyID IS NULL)
                       AND (s.CompanyID = ? OR s.CompanyID IS NULL)
@@ -287,7 +295,7 @@ async function getStaffOverviewData({ companyId, entityScope, filters = {} }) {
                 FROM tblstaff s
                 LEFT JOIN tbldept d
                     ON d.Code = s.CDept
-                LEFT JOIN tblgrade g
+                LEFT JOIN ${dedupedGradeLookupSql} g
                     ON g.GradeCode = s.CGrade
                 LEFT JOIN tbljobtitle j
                     ON j.Code = s.JobTitle
@@ -659,9 +667,9 @@ async function getTransferPromotionSummaryData({ companyId, entityScope, filters
                 ON s.PFNo = p.PFNO
             LEFT JOIN tbldept d
                 ON d.Code = s.CDept
-            LEFT JOIN tblgrade pg
+            LEFT JOIN ${dedupedGradeLookupSql} pg
                 ON pg.GradeCode = p.PrevGrade
-            LEFT JOIN tblgrade cg
+            LEFT JOIN ${dedupedGradeLookupSql} cg
                 ON cg.GradeCode = p.CGrade
             WHERE ${promotionConditions.join('\n              AND ')}
         ) scope_rows

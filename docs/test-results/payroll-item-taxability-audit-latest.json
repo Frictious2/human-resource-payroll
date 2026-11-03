@@ -1,0 +1,1069 @@
+{
+  "generatedAt": "2026-10-08T21:13:33.315Z",
+  "companyId": 1,
+  "findings": [
+    {
+      "area": "PAYROLL_ITEM_INVENTORY",
+      "status": "PASS",
+      "detail": "Found 36 payroll items. Frequencies: M, Y, (blank/null)."
+    },
+    {
+      "area": "TAXABLE_FLAG_SEMANTICS",
+      "status": "PASS",
+      "detail": "tblpayrollitems.Taxable uses non-zero legacy truth semantics. Current data uses -1 for taxable and 0 for non-taxable; Admin create/update writes 1/0, and code treats any non-zero as taxable."
+    },
+    {
+      "area": "MONTHLY_CALCULATION_MAPPING",
+      "status": "PASS",
+      "detail": "Monthly taxability is applied upstream in payroll setup; Process Emoluments snapshots tblsalary values into tblpayroll.",
+      "checks": {
+        "monthlyServiceReadsTaxable": true,
+        "manualSaveReadsTaxable": true,
+        "processCopiesTax": true
+      }
+    },
+    {
+      "area": "YEARLY_CALCULATION_MAPPING",
+      "status": "PASS",
+      "detail": "Yearly-payment service uses Payroll Item Taxable to set TaxableAmount and applies its separate 30% yearly tax rule.",
+      "checks": {
+        "yearlyReadsTaxable": true
+      }
+    },
+    {
+      "area": "PAYROLL_ITEM_GOVERNANCE",
+      "status": "PASS",
+      "detail": "Payroll Items are registered with the parameter-change workflow.",
+      "checks": {
+        "payrollItemsGoverned": true
+      }
+    },
+    {
+      "area": "MONTHLY_TAXABLE_ITEM_INCLUSION",
+      "status": "PASS",
+      "detail": "Synthetic taxable NLe500 allowance increases PAYE from NLe235 to NLe360 for a NLe2,000 salary with 5% employee NASSIT."
+    },
+    {
+      "area": "MONTHLY_NON_TAXABLE_ITEM_EXCLUSION",
+      "status": "PASS",
+      "detail": "Synthetic non-taxable NLe500 allowance increases TotalIncome but does not increase PAYE chargeable income."
+    },
+    {
+      "area": "NASSIT_INTERACTION",
+      "status": "PASS",
+      "detail": "Employee NASSIT is deducted before PAYE; employer NASSIT is not part of the employee net-pay calculation."
+    },
+    {
+      "area": "YEARLY_TAXABILITY",
+      "status": "PASS",
+      "detail": "Rent, Inducement, and Leave yearly scenarios show Taxable flag controls TaxableAmount/TaxAmount under the existing yearly flat-tax rule."
+    },
+    {
+      "area": "DATABASE_PERSISTENCE_PATHS",
+      "status": "PASS",
+      "detail": "Monthly persistence path copies tblsalary to tblpayroll; yearly application writes Taxable/Tax/NetIncome to tblyearlypayments.",
+      "checks": {
+        "processCopiesTax": true,
+        "yearlyApplyWritesToLegacy": true
+      }
+    },
+    {
+      "area": "REPORT_INTEGRATION",
+      "status": "PASS",
+      "detail": "PAYE liability report consumes authoritative tblpayroll.Tax and does not recalculate Payroll Item taxability.",
+      "checks": {
+        "reportsUsePayrollTax": true
+      }
+    },
+    {
+      "area": "ADMIN_CONFIGURATION_PERSISTENCE",
+      "status": "PASS",
+      "detail": "Admin Payroll Items UI exposes Taxable checkbox. Create/update paths persist boolean-like values; application treats any non-zero value as taxable.",
+      "checks": {
+        "adminCreateStoresOneZero": true,
+        "adminUpdateBooleanFields": true,
+        "adminUiCheckbox": true
+      }
+    },
+    {
+      "area": "COMPANY_ISOLATION",
+      "status": "PASS",
+      "detail": "Active monthly and yearly item lookup paths prefer company-specific Payroll Item rows and fall back to NULL company rows.",
+      "checks": {
+        "companyScopedPayrollItems": true,
+        "companyScopedManualSave": true,
+        "companyScopedYearly": true
+      }
+    }
+  ],
+  "matrices": {
+    "payrollItems": [
+      {
+        "Code": "01",
+        "Description": "SALARY",
+        "Frequency": "M",
+        "TaxableRaw": -1,
+        "TaxableMeaning": "Taxable",
+        "Fixed": false,
+        "Mode": "01",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Salary",
+        "UsedBy": "Basic salary / tblsalary.Salary"
+      },
+      {
+        "Code": "02",
+        "Description": "RENT",
+        "Frequency": "Y",
+        "TaxableRaw": -1,
+        "TaxableMeaning": "Taxable",
+        "Fixed": false,
+        "Mode": "01",
+        "Percentage": 75,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Allw02",
+        "UsedBy": "Monthly/yearly earning column Allw02 or yearly payment PType 02"
+      },
+      {
+        "Code": "03",
+        "Description": "TRANSPORT",
+        "Frequency": "M",
+        "TaxableRaw": -1,
+        "TaxableMeaning": "Taxable",
+        "Fixed": true,
+        "Mode": "01",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Allw03",
+        "UsedBy": "Monthly/yearly earning column Allw03 or yearly payment PType 03"
+      },
+      {
+        "Code": "04",
+        "Description": "WELFARE",
+        "Frequency": "M",
+        "TaxableRaw": -1,
+        "TaxableMeaning": "Taxable",
+        "Fixed": true,
+        "Mode": "01",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Allw04",
+        "UsedBy": "Monthly/yearly earning column Allw04 or yearly payment PType 04"
+      },
+      {
+        "Code": "05",
+        "Description": "INDUCEMENT",
+        "Frequency": "Y",
+        "TaxableRaw": -1,
+        "TaxableMeaning": "Taxable",
+        "Fixed": false,
+        "Mode": "01",
+        "Percentage": 15,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Allw05",
+        "UsedBy": "Monthly/yearly earning column Allw05 or yearly payment PType 05"
+      },
+      {
+        "Code": "06",
+        "Description": "COLA",
+        "Frequency": "M",
+        "TaxableRaw": -1,
+        "TaxableMeaning": "Taxable",
+        "Fixed": true,
+        "Mode": "01",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Allw06",
+        "UsedBy": "Monthly/yearly earning column Allw06 or yearly payment PType 06"
+      },
+      {
+        "Code": "07",
+        "Description": "BIKE ALLOWANCE",
+        "Frequency": "M",
+        "TaxableRaw": -1,
+        "TaxableMeaning": "Taxable",
+        "Fixed": false,
+        "Mode": "01",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 26,
+        "ThresholdAmount": 30,
+        "CompanyID": 1,
+        "PayrollColumn": "Allw07",
+        "UsedBy": "Monthly/yearly earning column Allw07 or yearly payment PType 07"
+      },
+      {
+        "Code": "08",
+        "Description": "EOS",
+        "Frequency": null,
+        "TaxableRaw": -1,
+        "TaxableMeaning": "Taxable",
+        "Fixed": false,
+        "Mode": "01",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Allw08",
+        "UsedBy": "Monthly/yearly earning column Allw08 or yearly payment PType 08"
+      },
+      {
+        "Code": "09",
+        "Description": "BONUS",
+        "Frequency": "M",
+        "TaxableRaw": -1,
+        "TaxableMeaning": "Taxable",
+        "Fixed": false,
+        "Mode": "01",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Allw09",
+        "UsedBy": "Monthly/yearly earning column Allw09 or yearly payment PType 09"
+      },
+      {
+        "Code": "10",
+        "Description": "CAR MAINTENANCE",
+        "Frequency": "M",
+        "TaxableRaw": -1,
+        "TaxableMeaning": "Taxable",
+        "Fixed": true,
+        "Mode": "01",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Allw10",
+        "UsedBy": "Monthly/yearly earning column Allw10 or yearly payment PType 10"
+      },
+      {
+        "Code": "11",
+        "Description": "RESPONSIBILITY",
+        "Frequency": "M",
+        "TaxableRaw": -1,
+        "TaxableMeaning": "Taxable",
+        "Fixed": false,
+        "Mode": "01",
+        "Percentage": 20,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Allw11",
+        "UsedBy": "Monthly/yearly earning column Allw11 or yearly payment PType 11"
+      },
+      {
+        "Code": "12",
+        "Description": "MAID",
+        "Frequency": "M",
+        "TaxableRaw": -1,
+        "TaxableMeaning": "Taxable",
+        "Fixed": false,
+        "Mode": "01",
+        "Percentage": 20,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Allw12",
+        "UsedBy": "Monthly/yearly earning column Allw12 or yearly payment PType 12"
+      },
+      {
+        "Code": "13",
+        "Description": "LEAVE",
+        "Frequency": "Y",
+        "TaxableRaw": -1,
+        "TaxableMeaning": "Taxable",
+        "Fixed": false,
+        "Mode": "01",
+        "Percentage": 20,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 1,
+        "CompanyID": 1,
+        "PayrollColumn": "Allw13",
+        "UsedBy": "Monthly/yearly earning column Allw13 or yearly payment PType 13"
+      },
+      {
+        "Code": "14",
+        "Description": "ACTING",
+        "Frequency": "M",
+        "TaxableRaw": -1,
+        "TaxableMeaning": "Taxable",
+        "Fixed": false,
+        "Mode": "01",
+        "Percentage": 1,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 3,
+        "ThresholdAmount": 2,
+        "CompanyID": 1,
+        "PayrollColumn": "Allw14",
+        "UsedBy": "Monthly/yearly earning column Allw14 or yearly payment PType 14"
+      },
+      {
+        "Code": "15",
+        "Description": "LONG SERVICE",
+        "Frequency": "Y",
+        "TaxableRaw": -1,
+        "TaxableMeaning": "Taxable",
+        "Fixed": false,
+        "Mode": "01",
+        "Percentage": 10,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Allw15",
+        "UsedBy": "Monthly/yearly earning column Allw15 or yearly payment PType 15"
+      },
+      {
+        "Code": "16",
+        "Description": "PROFESSIONAL",
+        "Frequency": "M",
+        "TaxableRaw": -1,
+        "TaxableMeaning": "Taxable",
+        "Fixed": false,
+        "Mode": "01",
+        "Percentage": 5,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Allw16",
+        "UsedBy": "Monthly/yearly earning column Allw16 or yearly payment PType 16"
+      },
+      {
+        "Code": "17",
+        "Description": "RISK",
+        "Frequency": "M",
+        "TaxableRaw": -1,
+        "TaxableMeaning": "Taxable",
+        "Fixed": false,
+        "Mode": "01",
+        "Percentage": 10,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Allw17",
+        "UsedBy": "Monthly/yearly earning column Allw17 or yearly payment PType 17"
+      },
+      {
+        "Code": "18",
+        "Description": "EX-GRACIA",
+        "Frequency": null,
+        "TaxableRaw": -1,
+        "TaxableMeaning": "Taxable",
+        "Fixed": false,
+        "Mode": "01",
+        "Percentage": 25,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Allw18",
+        "UsedBy": "Monthly/yearly earning column Allw18 or yearly payment PType 18"
+      },
+      {
+        "Code": "19",
+        "Description": "ACADEMIC",
+        "Frequency": "M",
+        "TaxableRaw": -1,
+        "TaxableMeaning": "Taxable",
+        "Fixed": false,
+        "Mode": "01",
+        "Percentage": 10,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Allw19",
+        "UsedBy": "Monthly/yearly earning column Allw19 or yearly payment PType 19"
+      },
+      {
+        "Code": "20",
+        "Description": "ADD2",
+        "Frequency": null,
+        "TaxableRaw": 0,
+        "TaxableMeaning": "Non-taxable",
+        "Fixed": false,
+        "Mode": "01",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Allw20",
+        "UsedBy": "Monthly/yearly earning column Allw20 or yearly payment PType 20"
+      },
+      {
+        "Code": "21",
+        "Description": "ADD3",
+        "Frequency": null,
+        "TaxableRaw": 0,
+        "TaxableMeaning": "Non-taxable",
+        "Fixed": false,
+        "Mode": "01",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "No direct monthly payroll column confirmed",
+        "UsedBy": "Unknown/legacy"
+      },
+      {
+        "Code": "31",
+        "Description": "INCOME TAX",
+        "Frequency": "M",
+        "TaxableRaw": 0,
+        "TaxableMeaning": "Non-taxable",
+        "Fixed": false,
+        "Mode": "02",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Tax",
+        "UsedBy": "PAYE deduction / tblsalary.Tax / tblpayroll.Tax"
+      },
+      {
+        "Code": "32",
+        "Description": "NASSIT-EMP",
+        "Frequency": "M",
+        "TaxableRaw": 0,
+        "TaxableMeaning": "Non-taxable",
+        "Fixed": false,
+        "Mode": "02",
+        "Percentage": 5,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "NassitEmp",
+        "UsedBy": "Employee NASSIT / NassitEmp"
+      },
+      {
+        "Code": "33",
+        "Description": "PROV-EMP",
+        "Frequency": "M",
+        "TaxableRaw": 0,
+        "TaxableMeaning": "Non-taxable",
+        "Fixed": false,
+        "Mode": "02",
+        "Percentage": 10,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "GratEmp",
+        "UsedBy": "Employee provident/gratuity / GratEmp"
+      },
+      {
+        "Code": "34",
+        "Description": "LOAN DED",
+        "Frequency": null,
+        "TaxableRaw": 0,
+        "TaxableMeaning": "Non-taxable",
+        "Fixed": false,
+        "Mode": "02",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Ded1 / Ded4 depending loan path",
+        "UsedBy": "Employee deduction columns / supporting deduction tables"
+      },
+      {
+        "Code": "35",
+        "Description": "UNION DUES",
+        "Frequency": "M",
+        "TaxableRaw": 0,
+        "TaxableMeaning": "Non-taxable",
+        "Fixed": false,
+        "Mode": "02",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "UnionDues",
+        "UsedBy": "Employee deduction columns / supporting deduction tables"
+      },
+      {
+        "Code": "36",
+        "Description": "INTEREST",
+        "Frequency": null,
+        "TaxableRaw": 0,
+        "TaxableMeaning": "Non-taxable",
+        "Fixed": false,
+        "Mode": "02",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Ded3",
+        "UsedBy": "Employee deduction columns / supporting deduction tables"
+      },
+      {
+        "Code": "37",
+        "Description": "DED04",
+        "Frequency": null,
+        "TaxableRaw": 0,
+        "TaxableMeaning": "Non-taxable",
+        "Fixed": false,
+        "Mode": "02",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Ded4",
+        "UsedBy": "Employee deduction columns / supporting deduction tables"
+      },
+      {
+        "Code": "38",
+        "Description": "DED05",
+        "Frequency": null,
+        "TaxableRaw": 0,
+        "TaxableMeaning": "Non-taxable",
+        "Fixed": false,
+        "Mode": "02",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "Ded5",
+        "UsedBy": "Employee deduction columns / supporting deduction tables"
+      },
+      {
+        "Code": "39",
+        "Description": "DED06",
+        "Frequency": null,
+        "TaxableRaw": 0,
+        "TaxableMeaning": "Non-taxable",
+        "Fixed": false,
+        "Mode": "02",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "No direct monthly payroll column confirmed",
+        "UsedBy": "Employee deduction columns / supporting deduction tables"
+      },
+      {
+        "Code": "40",
+        "Description": "GUARANTEE",
+        "Frequency": null,
+        "TaxableRaw": 0,
+        "TaxableMeaning": "Non-taxable",
+        "Fixed": false,
+        "Mode": "02",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "No direct monthly payroll column confirmed",
+        "UsedBy": "Employee deduction columns / supporting deduction tables"
+      },
+      {
+        "Code": "41",
+        "Description": "NASSIT-INST",
+        "Frequency": "M",
+        "TaxableRaw": 0,
+        "TaxableMeaning": "Non-taxable",
+        "Fixed": false,
+        "Mode": "03",
+        "Percentage": 10,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "NassitInst",
+        "UsedBy": "Employer NASSIT / NassitInst"
+      },
+      {
+        "Code": "42",
+        "Description": "PROV-INST",
+        "Frequency": "M",
+        "TaxableRaw": 0,
+        "TaxableMeaning": "Non-taxable",
+        "Fixed": false,
+        "Mode": "03",
+        "Percentage": 20,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "GratInst",
+        "UsedBy": "Employer provident/gratuity / GratInst"
+      },
+      {
+        "Code": "43",
+        "Description": "OTH01",
+        "Frequency": null,
+        "TaxableRaw": 0,
+        "TaxableMeaning": "Non-taxable",
+        "Fixed": false,
+        "Mode": "03",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "No direct monthly payroll column confirmed",
+        "UsedBy": "Other employer/liability item"
+      },
+      {
+        "Code": "44",
+        "Description": "OTH02",
+        "Frequency": null,
+        "TaxableRaw": 0,
+        "TaxableMeaning": "Non-taxable",
+        "Fixed": false,
+        "Mode": "03",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "No direct monthly payroll column confirmed",
+        "UsedBy": "Other employer/liability item"
+      },
+      {
+        "Code": "45",
+        "Description": "OTH03",
+        "Frequency": null,
+        "TaxableRaw": 0,
+        "TaxableMeaning": "Non-taxable",
+        "Fixed": false,
+        "Mode": "03",
+        "Percentage": 0,
+        "ThresholdFlag": false,
+        "ThresholdPercentFlag": false,
+        "ThresholdPercentage": 0,
+        "ThresholdAmount": 0,
+        "CompanyID": 1,
+        "PayrollColumn": "No direct monthly payroll column confirmed",
+        "UsedBy": "Other employer/liability item"
+      }
+    ]
+  },
+  "tests": {
+    "monthly": {
+      "salaryOnly": {
+        "salary": 2000,
+        "allowances": [],
+        "totalIncome": 2000,
+        "taxableEarnings": 2000,
+        "employeeNassit": 100,
+        "chargeableIncome": 1900,
+        "paye": 235,
+        "otherDeduction": 0,
+        "netIncome": 1665
+      },
+      "taxableFixedAllowance": {
+        "salary": 2000,
+        "allowances": [
+          {
+            "code": "99",
+            "label": "Synthetic taxable fixed",
+            "amount": 500,
+            "taxable": true
+          }
+        ],
+        "totalIncome": 2500,
+        "taxableEarnings": 2500,
+        "employeeNassit": 100,
+        "chargeableIncome": 2400,
+        "paye": 360,
+        "otherDeduction": 0,
+        "netIncome": 2040
+      },
+      "nonTaxableFixedAllowance": {
+        "salary": 2000,
+        "allowances": [
+          {
+            "code": "99",
+            "label": "Synthetic non-taxable fixed",
+            "amount": 500,
+            "taxable": false
+          }
+        ],
+        "totalIncome": 2500,
+        "taxableEarnings": 2000,
+        "employeeNassit": 100,
+        "chargeableIncome": 1900,
+        "paye": 235,
+        "otherDeduction": 0,
+        "netIncome": 2165
+      },
+      "taxablePercentageAllowance": {
+        "salary": 2000,
+        "allowances": [
+          {
+            "code": "11",
+            "label": "Synthetic taxable percentage 20%",
+            "amount": 400,
+            "taxable": true
+          }
+        ],
+        "totalIncome": 2400,
+        "taxableEarnings": 2400,
+        "employeeNassit": 100,
+        "chargeableIncome": 2300,
+        "paye": 335,
+        "otherDeduction": 0,
+        "netIncome": 1965
+      },
+      "nonTaxablePercentageAllowance": {
+        "salary": 2000,
+        "allowances": [
+          {
+            "code": "11",
+            "label": "Synthetic non-taxable percentage 20%",
+            "amount": 400,
+            "taxable": false
+          }
+        ],
+        "totalIncome": 2400,
+        "taxableEarnings": 2000,
+        "employeeNassit": 100,
+        "chargeableIncome": 1900,
+        "paye": 235,
+        "otherDeduction": 0,
+        "netIncome": 2065
+      },
+      "mixedAllowances": {
+        "salary": 2000,
+        "allowances": [
+          {
+            "code": "11",
+            "label": "Taxable allowance",
+            "amount": 500,
+            "taxable": true
+          },
+          {
+            "code": "12",
+            "label": "Non-taxable allowance",
+            "amount": 500,
+            "taxable": false
+          }
+        ],
+        "totalIncome": 3000,
+        "taxableEarnings": 2500,
+        "employeeNassit": 100,
+        "chargeableIncome": 2400,
+        "paye": 360,
+        "otherDeduction": 0,
+        "netIncome": 2540
+      },
+      "taxableWithOtherDeduction": {
+        "salary": 2000,
+        "allowances": [
+          {
+            "code": "11",
+            "label": "Taxable allowance",
+            "amount": 500,
+            "taxable": true
+          }
+        ],
+        "totalIncome": 2500,
+        "taxableEarnings": 2500,
+        "employeeNassit": 100,
+        "chargeableIncome": 2400,
+        "paye": 360,
+        "otherDeduction": 100,
+        "netIncome": 1940
+      },
+      "highIncome": {
+        "salary": 10000,
+        "allowances": [
+          {
+            "code": "11",
+            "label": "Taxable allowance",
+            "amount": 2000,
+            "taxable": true
+          }
+        ],
+        "totalIncome": 12000,
+        "taxableEarnings": 12000,
+        "employeeNassit": 500,
+        "chargeableIncome": 11500,
+        "paye": 3090,
+        "otherDeduction": 0,
+        "netIncome": 8410
+      }
+    },
+    "yearly": {
+      "13": {
+        "label": "LEAVE",
+        "taxableConfigScenario": {
+          "baseSalary": 2000,
+          "percent": 20,
+          "months": 12,
+          "monthlyAmount": 400,
+          "totalIncome": 4800,
+          "taxableAmount": 4800,
+          "taxAmount": 1440,
+          "netIncome": 3360
+        },
+        "nonTaxableConfigScenario": {
+          "baseSalary": 2000,
+          "percent": 20,
+          "months": 12,
+          "monthlyAmount": 400,
+          "totalIncome": 4800,
+          "taxableAmount": 0,
+          "taxAmount": 0,
+          "netIncome": 4800
+        },
+        "liveTaxableFlag": true,
+        "livePercent": 20,
+        "liveFrequency": "Y"
+      },
+      "02": {
+        "label": "RENT",
+        "taxableConfigScenario": {
+          "baseSalary": 2000,
+          "percent": 75,
+          "months": 6,
+          "monthlyAmount": 1500,
+          "totalIncome": 9000,
+          "taxableAmount": 9000,
+          "taxAmount": 2700,
+          "netIncome": 6300
+        },
+        "nonTaxableConfigScenario": {
+          "baseSalary": 2000,
+          "percent": 75,
+          "months": 6,
+          "monthlyAmount": 1500,
+          "totalIncome": 9000,
+          "taxableAmount": 0,
+          "taxAmount": 0,
+          "netIncome": 9000
+        },
+        "liveTaxableFlag": true,
+        "livePercent": 75,
+        "liveFrequency": "Y"
+      },
+      "05": {
+        "label": "INDUCEMENT",
+        "taxableConfigScenario": {
+          "baseSalary": 2000,
+          "percent": 15,
+          "months": 12,
+          "monthlyAmount": 300,
+          "totalIncome": 3600,
+          "taxableAmount": 3600,
+          "taxAmount": 1080,
+          "netIncome": 2520
+        },
+        "nonTaxableConfigScenario": {
+          "baseSalary": 2000,
+          "percent": 15,
+          "months": 12,
+          "monthlyAmount": 300,
+          "totalIncome": 3600,
+          "taxableAmount": 0,
+          "taxAmount": 0,
+          "netIncome": 3600
+        },
+        "liveTaxableFlag": true,
+        "livePercent": 15,
+        "liveFrequency": "Y"
+      }
+    }
+  },
+  "schema": [
+    {
+      "field": "Code",
+      "type": "varchar(2)",
+      "nullable": "NO",
+      "default": null,
+      "key": "PRI"
+    },
+    {
+      "field": "Income",
+      "type": "varchar(50)",
+      "nullable": "YES",
+      "default": null,
+      "key": ""
+    },
+    {
+      "field": "Taxable",
+      "type": "tinyint(4)",
+      "nullable": "NO",
+      "default": null,
+      "key": ""
+    },
+    {
+      "field": "Threshhold",
+      "type": "tinyint(4)",
+      "nullable": "NO",
+      "default": null,
+      "key": ""
+    },
+    {
+      "field": "TPercent",
+      "type": "tinyint(4)",
+      "nullable": "NO",
+      "default": null,
+      "key": ""
+    },
+    {
+      "field": "TPercentage",
+      "type": "decimal(18,0)",
+      "nullable": "YES",
+      "default": null,
+      "key": ""
+    },
+    {
+      "field": "TAmount",
+      "type": "decimal(18,2)",
+      "nullable": "YES",
+      "default": null,
+      "key": ""
+    },
+    {
+      "field": "Mode",
+      "type": "varchar(2)",
+      "nullable": "YES",
+      "default": null,
+      "key": "MUL"
+    },
+    {
+      "field": "AddBack",
+      "type": "tinyint(4)",
+      "nullable": "NO",
+      "default": null,
+      "key": ""
+    },
+    {
+      "field": "Fixed",
+      "type": "tinyint(4)",
+      "nullable": "NO",
+      "default": null,
+      "key": ""
+    },
+    {
+      "field": "Percent",
+      "type": "decimal(18,2)",
+      "nullable": "YES",
+      "default": null,
+      "key": ""
+    },
+    {
+      "field": "Freq",
+      "type": "varchar(1)",
+      "nullable": "YES",
+      "default": null,
+      "key": ""
+    },
+    {
+      "field": "CompanyID",
+      "type": "int(11)",
+      "nullable": "YES",
+      "default": null,
+      "key": ""
+    }
+  ],
+  "counts": {
+    "total": 36,
+    "monthly": 19,
+    "yearly": 4,
+    "otherOrUnknownFrequency": 13,
+    "taxable": 19,
+    "nonTaxable": 17
+  },
+  "specialPayments": {
+    "14": "Acting is monthly Allw14/sensitive-record source; taxability follows monthly allowance if included in setup.",
+    "15": "Long Service is yearly legacy item but not one of the confirmed Phase 16B annual batch types.",
+    "33": "Provident employee deduction/liability, not taxable earning.",
+    "40": "Guarantee deduction/other item, not taxable earning.",
+    "41": "Employer NASSIT liability, not taxable earning.",
+    "42": "Employer provident/gratuity liability, not taxable earning.",
+    "04": "Welfare is present as monthly Allw04 and yearly legacy PType 04 paths exist in older Data Entry controller code; current confirmed yearly workflow scope is Rent/Inducement/Leave.",
+    "06": "COLA is monthly Allw06.",
+    "07": "Backlog uses difference-based calculation and progressive PAYE on the income delta; not generic Payroll Item Taxable.",
+    "08": "EOS uses separate EOS benefit service/statutory calculation; not generic Payroll Item Taxable.",
+    "09": "Bonus uses tblbonus/BTaxable; separate treatment."
+  },
+  "historicalImpact": {
+    "status": "INDETERMINATE_WITHOUT_HISTORICAL_CONFIG_SNAPSHOTS",
+    "detail": "Historical payroll rows preserve stored Taxable/Tax. Because historical Payroll Item taxability effective dates are not tracked in tblpayrollitems, this audit does not assert historical taxability correctness from current flags."
+  },
+  "cleanup": {
+    "status": "PASS",
+    "detail": "Audit used read-only inventory and isolated in-memory scenarios; no production payroll/payroll-item rows were modified."
+  },
+  "summary": {
+    "status": "PAYROLL ITEM TAXABILITY AUDIT: PASS",
+    "failedAreas": [],
+    "assertionFailures": []
+  }
+}

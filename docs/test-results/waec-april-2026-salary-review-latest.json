@@ -1,0 +1,1127 @@
+{
+  "generatedAt": "2026-10-08T21:12:32.192Z",
+  "mode": "APPLY",
+  "companyId": 1,
+  "effectiveDate": "2026-04-01",
+  "augustPayrollTouched": false,
+  "approvalModel": "Data Entry submissions created with Approved = 0; Manager approval required in application.",
+  "employees": [
+    {
+      "pf": "0489",
+      "name": "Matilda Jusu",
+      "designation": "HNO",
+      "scale": "1.01",
+      "gradeNotch": {
+        "grade": "0100",
+        "notch": 1
+      },
+      "jobTitle": {
+        "oldCode": "0101",
+        "oldName": null,
+        "action": "No job-title code changed automatically; designation text requires WAEC/code mapping confirmation unless already matched."
+      },
+      "staffChanges": [
+        {
+          "field": "Notch",
+          "oldValue": 4,
+          "newValue": 1
+        }
+      ],
+      "entitlementChanges": [
+        {
+          "field": "Allw04",
+          "oldValue": -1,
+          "newValue": 0
+        },
+        {
+          "field": "Allw14",
+          "oldValue": -1,
+          "newValue": 0
+        },
+        {
+          "field": "Allw16",
+          "oldValue": 0,
+          "newValue": -1
+        },
+        {
+          "field": "Allw19",
+          "oldValue": -1,
+          "newValue": 0
+        }
+      ],
+      "salaryChanges": [
+        {
+          "field": "PDate",
+          "oldValue": "2024-03-13 00:00:00.000",
+          "newValue": "2026-04-01"
+        },
+        {
+          "field": "Grade",
+          "oldValue": "0300",
+          "newValue": "0100"
+        },
+        {
+          "field": "JobTitle",
+          "oldValue": "0301",
+          "newValue": "0101"
+        },
+        {
+          "field": "Annual",
+          "oldValue": 127898.4921875,
+          "newValue": 194425.38
+        },
+        {
+          "field": "Salary",
+          "oldValue": 10658.2075,
+          "newValue": 16202.12
+        },
+        {
+          "field": "Allw03",
+          "oldValue": "5265.00",
+          "newValue": 8190
+        },
+        {
+          "field": "Allw06",
+          "oldValue": "600.00",
+          "newValue": 750
+        },
+        {
+          "field": "Allw10",
+          "oldValue": "360.00",
+          "newValue": 4411.09
+        },
+        {
+          "field": "Allw11",
+          "oldValue": "2131.64",
+          "newValue": 3240.42
+        },
+        {
+          "field": "Allw12",
+          "oldValue": "2131.64",
+          "newValue": 3240.42
+        },
+        {
+          "field": "Allw16",
+          "oldValue": "0.00",
+          "newValue": 1620.21
+        },
+        {
+          "field": "Allw17",
+          "oldValue": "532.91",
+          "newValue": 810.11
+        },
+        {
+          "field": "Allw19",
+          "oldValue": "1065.82",
+          "newValue": 0
+        },
+        {
+          "field": "TotAllw",
+          "oldValue": "15087.01",
+          "newValue": 25262.25
+        },
+        {
+          "field": "TotalIncome",
+          "oldValue": "25745.22",
+          "newValue": 41464.37
+        },
+        {
+          "field": "Taxable",
+          "oldValue": "24712.31",
+          "newValue": 40654.26
+        },
+        {
+          "field": "Tax",
+          "oldValue": "7053.69",
+          "newValue": 11836.28
+        },
+        {
+          "field": "NassitEmp",
+          "oldValue": "532.91",
+          "newValue": 810.11
+        },
+        {
+          "field": "NassitInst",
+          "oldValue": "1065.82",
+          "newValue": 1620.21
+        },
+        {
+          "field": "GratEmp",
+          "oldValue": "1065.82",
+          "newValue": 1620.21
+        },
+        {
+          "field": "GratInst",
+          "oldValue": "2664.55",
+          "newValue": 3240.42
+        },
+        {
+          "field": "UnionDues",
+          "oldValue": "5.00",
+          "newValue": 0
+        },
+        {
+          "field": "TotalDeduction",
+          "oldValue": 8657.4245,
+          "newValue": 14266.6
+        },
+        {
+          "field": "NetIncome",
+          "oldValue": "17087.80",
+          "newValue": 27197.77
+        },
+        {
+          "field": "Operator",
+          "oldValue": "user",
+          "newValue": "WAEC April 2026 Salary Review"
+        },
+        {
+          "field": "Approved",
+          "oldValue": -1,
+          "newValue": 0
+        }
+      ],
+      "salaryCalculation": {
+        "Salary": 16202.12,
+        "TotAllw": 25262.25,
+        "TotalIncome": 41464.37,
+        "Taxable": 40654.26,
+        "Tax": 11836.28,
+        "NassitEmp": 810.11,
+        "NassitInst": 1620.21,
+        "GratEmp": 1620.21,
+        "TotalDeduction": 14266.6,
+        "NetIncome": 27197.77
+      },
+      "excelReference": {
+        "TotalIncome": 41464.37,
+        "Taxable": 40654.26,
+        "Tax": 11686.28,
+        "NetIncome": 27347.77
+      },
+      "remainingExcelVarianceAfterCanonicalTax": {
+        "TotalIncome": 0,
+        "Taxable": 0,
+        "Tax": 150,
+        "NetIncome": -150
+      },
+      "approvalState": "SUBMITTED_TO_MANAGER"
+    },
+    {
+      "pf": "0496",
+      "name": "Festus C. Campbell",
+      "designation": "P.H.R.M.O",
+      "scale": "4.04",
+      "gradeNotch": {
+        "grade": "0400",
+        "notch": 4
+      },
+      "jobTitle": {
+        "oldCode": "0401",
+        "oldName": null,
+        "action": "No job-title code changed automatically; designation text requires WAEC/code mapping confirmation unless already matched."
+      },
+      "staffChanges": [
+        {
+          "field": "Notch",
+          "oldValue": 3,
+          "newValue": 4
+        }
+      ],
+      "entitlementChanges": [
+        {
+          "field": "Allw04",
+          "oldValue": -1,
+          "newValue": 0
+        },
+        {
+          "field": "Allw16",
+          "oldValue": 0,
+          "newValue": -1
+        },
+        {
+          "field": "Allw19",
+          "oldValue": -1,
+          "newValue": 0
+        }
+      ],
+      "salaryChanges": [
+        {
+          "field": "PDate",
+          "oldValue": "2024-03-13 00:00:00.000",
+          "newValue": "2026-04-01"
+        },
+        {
+          "field": "Annual",
+          "oldValue": 118289.92,
+          "newValue": 118289.93
+        },
+        {
+          "field": "Allw03",
+          "oldValue": "3510.00",
+          "newValue": 4095
+        },
+        {
+          "field": "Allw11",
+          "oldValue": "1591.98",
+          "newValue": 1971.5
+        },
+        {
+          "field": "Allw12",
+          "oldValue": "1591.98",
+          "newValue": 1971.5
+        },
+        {
+          "field": "Allw14",
+          "oldValue": "0.00",
+          "newValue": 3548.7
+        },
+        {
+          "field": "Allw16",
+          "oldValue": "0.00",
+          "newValue": 985.75
+        },
+        {
+          "field": "Allw17",
+          "oldValue": "397.99",
+          "newValue": 492.87
+        },
+        {
+          "field": "Allw19",
+          "oldValue": "795.99",
+          "newValue": 0
+        },
+        {
+          "field": "TotAllw",
+          "oldValue": "8697.95",
+          "newValue": 13875.32
+        },
+        {
+          "field": "TotalIncome",
+          "oldValue": "16657.85",
+          "newValue": 23732.81
+        },
+        {
+          "field": "Taxable",
+          "oldValue": "15759.86",
+          "newValue": 23239.94
+        },
+        {
+          "field": "Tax",
+          "oldValue": "4367.95",
+          "newValue": 6611.98
+        },
+        {
+          "field": "NassitEmp",
+          "oldValue": "397.99",
+          "newValue": 492.87
+        },
+        {
+          "field": "NassitInst",
+          "oldValue": "795.99",
+          "newValue": 985.75
+        },
+        {
+          "field": "GratEmp",
+          "oldValue": "795.99",
+          "newValue": 985.75
+        },
+        {
+          "field": "GratInst",
+          "oldValue": "1989.97",
+          "newValue": 1971.5
+        },
+        {
+          "field": "UnionDues",
+          "oldValue": "5.00",
+          "newValue": 0
+        },
+        {
+          "field": "TotalDeduction",
+          "oldValue": 5566.945500000002,
+          "newValue": 8090.6
+        },
+        {
+          "field": "NetIncome",
+          "oldValue": "11090.92",
+          "newValue": 15642.21
+        },
+        {
+          "field": "Operator",
+          "oldValue": "user",
+          "newValue": "WAEC April 2026 Salary Review"
+        },
+        {
+          "field": "Approved",
+          "oldValue": -1,
+          "newValue": 0
+        }
+      ],
+      "salaryCalculation": {
+        "Salary": 9857.49,
+        "TotAllw": 13875.32,
+        "TotalIncome": 23732.81,
+        "Taxable": 23239.94,
+        "Tax": 6611.98,
+        "NassitEmp": 492.87,
+        "NassitInst": 985.75,
+        "GratEmp": 985.75,
+        "TotalDeduction": 8090.6,
+        "NetIncome": 15642.21
+      },
+      "excelReference": {
+        "TotalIncome": 23732.81,
+        "Taxable": 23239.94,
+        "Tax": 6461.98,
+        "NetIncome": 15792.21
+      },
+      "remainingExcelVarianceAfterCanonicalTax": {
+        "TotalIncome": 0,
+        "Taxable": 0,
+        "Tax": 150,
+        "NetIncome": -150
+      },
+      "approvalState": "SUBMITTED_TO_MANAGER"
+    },
+    {
+      "pf": "0692",
+      "name": "Georgiana James",
+      "designation": "Snr. Acct. II/AR II",
+      "scale": "6.03",
+      "gradeNotch": {
+        "grade": "0600",
+        "notch": 3
+      },
+      "jobTitle": {
+        "oldCode": "0601",
+        "oldName": null,
+        "action": "No job-title code changed automatically; designation text requires WAEC/code mapping confirmation unless already matched."
+      },
+      "staffChanges": [
+        {
+          "field": "Notch",
+          "oldValue": 2,
+          "newValue": 3
+        }
+      ],
+      "entitlementChanges": [
+        {
+          "field": "Allw16",
+          "oldValue": 0,
+          "newValue": -1
+        },
+        {
+          "field": "Allw19",
+          "oldValue": -1,
+          "newValue": 0
+        }
+      ],
+      "salaryChanges": [
+        {
+          "field": "PDate",
+          "oldValue": "2024-03-13 00:00:00.000",
+          "newValue": "2026-04-01"
+        },
+        {
+          "field": "Allw03",
+          "oldValue": "3510.00",
+          "newValue": 4095
+        },
+        {
+          "field": "Allw11",
+          "oldValue": "1089.38",
+          "newValue": 1436.14
+        },
+        {
+          "field": "Allw12",
+          "oldValue": "1089.38",
+          "newValue": 1436.14
+        },
+        {
+          "field": "Allw14",
+          "oldValue": "0.00",
+          "newValue": 2585.06
+        },
+        {
+          "field": "Allw16",
+          "oldValue": "0.00",
+          "newValue": 718.07
+        },
+        {
+          "field": "Allw17",
+          "oldValue": "272.34",
+          "newValue": 359.04
+        },
+        {
+          "field": "Allw19",
+          "oldValue": "544.69",
+          "newValue": 0
+        },
+        {
+          "field": "TotAllw",
+          "oldValue": "7315.80",
+          "newValue": 11439.45
+        },
+        {
+          "field": "TotalIncome",
+          "oldValue": "12762.72",
+          "newValue": 18620.17
+        },
+        {
+          "field": "Taxable",
+          "oldValue": "11990.38",
+          "newValue": 18261.13
+        },
+        {
+          "field": "Tax",
+          "oldValue": "3237.11",
+          "newValue": 5118.34
+        },
+        {
+          "field": "NassitEmp",
+          "oldValue": "272.34",
+          "newValue": 359.04
+        },
+        {
+          "field": "NassitInst",
+          "oldValue": "544.69",
+          "newValue": 718.07
+        },
+        {
+          "field": "GratEmp",
+          "oldValue": "544.69",
+          "newValue": 718.07
+        },
+        {
+          "field": "GratInst",
+          "oldValue": "1361.73",
+          "newValue": 1436.14
+        },
+        {
+          "field": "UnionDues",
+          "oldValue": "5.00",
+          "newValue": 0
+        },
+        {
+          "field": "TotalDeduction",
+          "oldValue": 4059.1535,
+          "newValue": 6195.45
+        },
+        {
+          "field": "NetIncome",
+          "oldValue": "8703.58",
+          "newValue": 12424.72
+        },
+        {
+          "field": "Operator",
+          "oldValue": "user",
+          "newValue": "WAEC April 2026 Salary Review"
+        },
+        {
+          "field": "Approved",
+          "oldValue": -1,
+          "newValue": 0
+        }
+      ],
+      "salaryCalculation": {
+        "Salary": 7180.72,
+        "TotAllw": 11439.45,
+        "TotalIncome": 18620.17,
+        "Taxable": 18261.13,
+        "Tax": 5118.34,
+        "NassitEmp": 359.04,
+        "NassitInst": 718.07,
+        "GratEmp": 718.07,
+        "TotalDeduction": 6195.45,
+        "NetIncome": 12424.72
+      },
+      "excelReference": {
+        "TotalIncome": 18620.18,
+        "Taxable": 18261.14,
+        "Tax": 4968.34,
+        "NetIncome": 12574.73
+      },
+      "remainingExcelVarianceAfterCanonicalTax": {
+        "TotalIncome": -0.01,
+        "Taxable": -0.01,
+        "Tax": 150,
+        "NetIncome": -150.01
+      },
+      "approvalState": "SUBMITTED_TO_MANAGER"
+    },
+    {
+      "pf": "0520",
+      "name": "Abass Renner",
+      "designation": "Ag Head HRMO I/AR I",
+      "scale": "7.09",
+      "gradeNotch": {
+        "grade": "0700",
+        "notch": 9
+      },
+      "jobTitle": {
+        "oldCode": "0701",
+        "oldName": null,
+        "action": "No job-title code changed automatically; designation text requires WAEC/code mapping confirmation unless already matched."
+      },
+      "staffChanges": [
+        {
+          "field": "Notch",
+          "oldValue": 8,
+          "newValue": 9
+        }
+      ],
+      "entitlementChanges": [
+        {
+          "field": "Allw04",
+          "oldValue": -1,
+          "newValue": 0
+        },
+        {
+          "field": "Allw11",
+          "oldValue": 0,
+          "newValue": -1
+        },
+        {
+          "field": "Allw12",
+          "oldValue": 0,
+          "newValue": -1
+        },
+        {
+          "field": "Allw14",
+          "oldValue": 0,
+          "newValue": -1
+        },
+        {
+          "field": "Allw16",
+          "oldValue": 0,
+          "newValue": -1
+        },
+        {
+          "field": "Allw19",
+          "oldValue": -1,
+          "newValue": 0
+        }
+      ],
+      "salaryChanges": [
+        {
+          "field": "PDate",
+          "oldValue": "2024-03-13 00:00:00.000",
+          "newValue": "2026-04-01"
+        },
+        {
+          "field": "Annual",
+          "oldValue": 82277.05,
+          "newValue": 82277.03
+        },
+        {
+          "field": "Allw03",
+          "oldValue": "3510.00",
+          "newValue": 4095
+        },
+        {
+          "field": "Allw11",
+          "oldValue": "0.00",
+          "newValue": 1371.28
+        },
+        {
+          "field": "Allw12",
+          "oldValue": "0.00",
+          "newValue": 1371.28
+        },
+        {
+          "field": "Allw14",
+          "oldValue": "0.00",
+          "newValue": 2468.31
+        },
+        {
+          "field": "Allw16",
+          "oldValue": "0.00",
+          "newValue": 685.64
+        },
+        {
+          "field": "Allw17",
+          "oldValue": "301.82",
+          "newValue": 342.82
+        },
+        {
+          "field": "Allw19",
+          "oldValue": "603.65",
+          "newValue": 0
+        },
+        {
+          "field": "TotAllw",
+          "oldValue": "5225.48",
+          "newValue": 11144.33
+        },
+        {
+          "field": "TotalIncome",
+          "oldValue": "11262.04",
+          "newValue": 18000.75
+        },
+        {
+          "field": "Taxable",
+          "oldValue": "10460.21",
+          "newValue": 17657.93
+        },
+        {
+          "field": "Tax",
+          "oldValue": "2778.06",
+          "newValue": 4937.38
+        },
+        {
+          "field": "NassitEmp",
+          "oldValue": "301.82",
+          "newValue": 342.82
+        },
+        {
+          "field": "NassitInst",
+          "oldValue": "603.65",
+          "newValue": 685.64
+        },
+        {
+          "field": "GratEmp",
+          "oldValue": "603.65",
+          "newValue": 685.64
+        },
+        {
+          "field": "GratInst",
+          "oldValue": "1509.14",
+          "newValue": 1371.28
+        },
+        {
+          "field": "UnionDues",
+          "oldValue": "5.00",
+          "newValue": 0
+        },
+        {
+          "field": "TotalDeduction",
+          "oldValue": 3688.55,
+          "newValue": 5965.84
+        },
+        {
+          "field": "NetIncome",
+          "oldValue": "7573.51",
+          "newValue": 12034.91
+        },
+        {
+          "field": "Operator",
+          "oldValue": "user",
+          "newValue": "WAEC April 2026 Salary Review"
+        },
+        {
+          "field": "Approved",
+          "oldValue": -1,
+          "newValue": 0
+        }
+      ],
+      "salaryCalculation": {
+        "Salary": 6856.42,
+        "TotAllw": 11144.33,
+        "TotalIncome": 18000.75,
+        "Taxable": 17657.93,
+        "Tax": 4937.38,
+        "NassitEmp": 342.82,
+        "NassitInst": 685.64,
+        "GratEmp": 685.64,
+        "TotalDeduction": 5965.84,
+        "NetIncome": 12034.91
+      },
+      "excelReference": {
+        "TotalIncome": 18000.76,
+        "Taxable": 17657.94,
+        "Tax": 4787.38,
+        "NetIncome": 12184.92
+      },
+      "remainingExcelVarianceAfterCanonicalTax": {
+        "TotalIncome": -0.01,
+        "Taxable": -0.01,
+        "Tax": 150,
+        "NetIncome": -150.01
+      },
+      "approvalState": "SUBMITTED_TO_MANAGER"
+    },
+    {
+      "pf": "0684",
+      "name": "Chernor Sankoh",
+      "designation": "Ag.Head  Of Audit/AR II",
+      "scale": "6.01",
+      "gradeNotch": {
+        "grade": "0600",
+        "notch": 1
+      },
+      "jobTitle": {
+        "oldCode": "0601",
+        "oldName": null,
+        "action": "No job-title code changed automatically; designation text requires WAEC/code mapping confirmation unless already matched."
+      },
+      "staffChanges": [
+        {
+          "field": "Notch",
+          "oldValue": 0,
+          "newValue": 1
+        }
+      ],
+      "entitlementChanges": [
+        {
+          "field": "Allw10",
+          "oldValue": 0,
+          "newValue": -1
+        },
+        {
+          "field": "Allw11",
+          "oldValue": 0,
+          "newValue": -1
+        },
+        {
+          "field": "Allw12",
+          "oldValue": 0,
+          "newValue": -1
+        },
+        {
+          "field": "Allw14",
+          "oldValue": 0,
+          "newValue": -1
+        },
+        {
+          "field": "Allw16",
+          "oldValue": 0,
+          "newValue": -1
+        },
+        {
+          "field": "Allw19",
+          "oldValue": -1,
+          "newValue": 0
+        }
+      ],
+      "salaryChanges": [
+        {
+          "field": "PDate",
+          "oldValue": "2024-03-13 00:00:00.000",
+          "newValue": "2026-04-01"
+        },
+        {
+          "field": "Allw03",
+          "oldValue": "3510.00",
+          "newValue": 4095
+        },
+        {
+          "field": "Allw10",
+          "oldValue": "0.00",
+          "newValue": 360
+        },
+        {
+          "field": "Allw11",
+          "oldValue": "0.00",
+          "newValue": 1383.64
+        },
+        {
+          "field": "Allw12",
+          "oldValue": "0.00",
+          "newValue": 1383.64
+        },
+        {
+          "field": "Allw14",
+          "oldValue": "0.00",
+          "newValue": 2490.55
+        },
+        {
+          "field": "Allw16",
+          "oldValue": "0.00",
+          "newValue": 691.82
+        },
+        {
+          "field": "Allw17",
+          "oldValue": "277.25",
+          "newValue": 345.91
+        },
+        {
+          "field": "Allw19",
+          "oldValue": "554.51",
+          "newValue": 0
+        },
+        {
+          "field": "TotAllw",
+          "oldValue": "4791.77",
+          "newValue": 11200.56
+        },
+        {
+          "field": "TotalIncome",
+          "oldValue": "10336.97",
+          "newValue": 18118.75
+        },
+        {
+          "field": "Taxable",
+          "oldValue": "9559.71",
+          "newValue": 17772.84
+        },
+        {
+          "field": "Tax",
+          "oldValue": "2507.91",
+          "newValue": 4971.85
+        },
+        {
+          "field": "NassitEmp",
+          "oldValue": "277.25",
+          "newValue": 345.91
+        },
+        {
+          "field": "NassitInst",
+          "oldValue": "554.51",
+          "newValue": 691.82
+        },
+        {
+          "field": "GratEmp",
+          "oldValue": "554.51",
+          "newValue": 691.82
+        },
+        {
+          "field": "GratInst",
+          "oldValue": "1386.29",
+          "newValue": 1383.64
+        },
+        {
+          "field": "UnionDues",
+          "oldValue": "2.00",
+          "newValue": 0
+        },
+        {
+          "field": "TotalDeduction",
+          "oldValue": 3341.6939999999986,
+          "newValue": 6009.58
+        },
+        {
+          "field": "NetIncome",
+          "oldValue": "6995.30",
+          "newValue": 12109.17
+        },
+        {
+          "field": "Operator",
+          "oldValue": "user",
+          "newValue": "WAEC April 2026 Salary Review"
+        },
+        {
+          "field": "Approved",
+          "oldValue": -1,
+          "newValue": 0
+        }
+      ],
+      "salaryCalculation": {
+        "Salary": 6918.19,
+        "TotAllw": 11200.56,
+        "TotalIncome": 18118.75,
+        "Taxable": 17772.84,
+        "Tax": 4971.85,
+        "NassitEmp": 345.91,
+        "NassitInst": 691.82,
+        "GratEmp": 691.82,
+        "TotalDeduction": 6009.58,
+        "NetIncome": 12109.17
+      },
+      "excelReference": {
+        "TotalIncome": 18118.74,
+        "Taxable": 17772.83,
+        "Tax": 4821.85,
+        "NetIncome": 12259.16
+      },
+      "remainingExcelVarianceAfterCanonicalTax": {
+        "TotalIncome": 0.01,
+        "Taxable": 0.01,
+        "Tax": 150,
+        "NetIncome": -149.99
+      },
+      "approvalState": "SUBMITTED_TO_MANAGER"
+    },
+    {
+      "pf": "0587",
+      "name": "Basiru A. Waheed Sawyer",
+      "designation": "SAO",
+      "scale": "10.039999999999999",
+      "gradeNotch": {
+        "grade": "1000",
+        "notch": 4
+      },
+      "jobTitle": {
+        "oldCode": "1002",
+        "oldName": null,
+        "action": "No job-title code changed automatically; designation text requires WAEC/code mapping confirmation unless already matched."
+      },
+      "staffChanges": [
+        {
+          "field": "GradeCode",
+          "oldValue": "1400",
+          "newValue": "1000"
+        },
+        {
+          "field": "Notch",
+          "oldValue": 3,
+          "newValue": 4
+        }
+      ],
+      "entitlementChanges": [
+        {
+          "field": "Allw03",
+          "oldValue": -1,
+          "newValue": 0
+        },
+        {
+          "field": "Allw10",
+          "oldValue": 0,
+          "newValue": -1
+        },
+        {
+          "field": "Allw14",
+          "oldValue": 0,
+          "newValue": -1
+        },
+        {
+          "field": "Allw17",
+          "oldValue": -1,
+          "newValue": 0
+        }
+      ],
+      "salaryChanges": [
+        {
+          "field": "PDate",
+          "oldValue": "2024-03-13 00:00:00.000",
+          "newValue": "2026-04-01"
+        },
+        {
+          "field": "Allw03",
+          "oldValue": "3510.00",
+          "newValue": 0
+        },
+        {
+          "field": "Allw06",
+          "oldValue": "450.00",
+          "newValue": 300
+        },
+        {
+          "field": "Allw10",
+          "oldValue": "0.00",
+          "newValue": 191.29
+        },
+        {
+          "field": "Allw14",
+          "oldValue": "0.00",
+          "newValue": 4095
+        },
+        {
+          "field": "Allw17",
+          "oldValue": "169.33",
+          "newValue": 0
+        },
+        {
+          "field": "TotAllw",
+          "oldValue": "4129.33",
+          "newValue": 4586.29
+        },
+        {
+          "field": "TotalIncome",
+          "oldValue": "7516.03",
+          "newValue": 8412.04
+        },
+        {
+          "field": "Taxable",
+          "oldValue": "6846.69",
+          "newValue": 8220.75
+        },
+        {
+          "field": "Tax",
+          "oldValue": "1694.00",
+          "newValue": 2106.23
+        },
+        {
+          "field": "NassitEmp",
+          "oldValue": "169.33",
+          "newValue": 191.29
+        },
+        {
+          "field": "NassitInst",
+          "oldValue": "338.66",
+          "newValue": 382.58
+        },
+        {
+          "field": "GratEmp",
+          "oldValue": "338.66",
+          "newValue": 382.58
+        },
+        {
+          "field": "GratInst",
+          "oldValue": "846.67",
+          "newValue": 765.15
+        },
+        {
+          "field": "UnionDues",
+          "oldValue": "2.00",
+          "newValue": 0
+        },
+        {
+          "field": "TotalDeduction",
+          "oldValue": 2204.0131249999986,
+          "newValue": 2680.1
+        },
+        {
+          "field": "NetIncome",
+          "oldValue": "5312.04",
+          "newValue": 5731.94
+        },
+        {
+          "field": "Operator",
+          "oldValue": "user",
+          "newValue": "WAEC April 2026 Salary Review"
+        },
+        {
+          "field": "Approved",
+          "oldValue": -1,
+          "newValue": 0
+        }
+      ],
+      "salaryCalculation": {
+        "Salary": 3825.75,
+        "TotAllw": 4586.29,
+        "TotalIncome": 8412.04,
+        "Taxable": 8220.75,
+        "Tax": 2106.23,
+        "NassitEmp": 191.29,
+        "NassitInst": 382.58,
+        "GratEmp": 382.58,
+        "TotalDeduction": 2680.1,
+        "NetIncome": 5731.94
+      },
+      "excelReference": {
+        "TotalIncome": 8412.04,
+        "Taxable": 8220.74,
+        "Tax": 1956.22,
+        "NetIncome": 5881.95
+      },
+      "remainingExcelVarianceAfterCanonicalTax": {
+        "TotalIncome": 0,
+        "Taxable": 0.01,
+        "Tax": 150.01,
+        "NetIncome": -150.01
+      },
+      "approvalState": "SUBMITTED_TO_MANAGER"
+    }
+  ],
+  "totals": {
+    "Salary": 50840.69,
+    "TotAllw": 77508.2,
+    "TotalIncome": 128348.89,
+    "Taxable": 125806.85,
+    "Tax": 35582.06,
+    "NassitEmp": 2542.04,
+    "NassitInst": 5084.07,
+    "GratEmp": 5084.07,
+    "TotalDeduction": 43208.17,
+    "NetIncome": 85140.72
+  },
+  "unresolved": [],
+  "counts": {
+    "employees": 6,
+    "staffChangeEmployees": 6,
+    "salaryChangeEmployees": 6,
+    "entitlementChangeEmployees": 6,
+    "approvedChanges": 0,
+    "pendingApprovals": 6
+  }
+}

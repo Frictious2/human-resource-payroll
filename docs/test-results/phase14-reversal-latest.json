@@ -1,6 +1,6 @@
 {
   "status": "PASS",
-  "completedAt": "2026-08-29T00:07:37.316Z",
+  "completedAt": "2026-10-08T21:15:03.273Z",
   "selfContained": true,
   "safetyGuard": "ALLOW_DESTRUCTIVE_TESTS=true or NODE_ENV=test",
   "testEnvironment": {
@@ -34,19 +34,19 @@
     "cleanupMarker": "phase15a_"
   },
   "payroll": {
-    "workflowBatchId": 156,
+    "workflowBatchId": 170,
     "generationNo": 1,
     "rowCount": 2,
     "checksum": "877b3b013f11bd4c10b6f4413114491e48bcad8acc53d4b29176609804ee4b49",
-    "postingBatchId": 52,
+    "postingBatchId": 61,
     "finalStatus": "REVERSED"
   },
   "reversal": {
-    "requestId": 25,
-    "reversalBatchId": 31,
+    "requestId": 29,
+    "reversalBatchId": 36,
     "finalStatus": "REVERSED",
     "actionCount": 10,
-    "notificationCount": 13,
+    "notificationCount": 12,
     "auditCount": 10
   },
   "reconciliation": {

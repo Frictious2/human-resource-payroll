@@ -104,11 +104,18 @@ async function resolveEntityHeadScope(req, res, next) {
         );
 
         if (!rows.length) {
-            return forbiddenResponse(
-                req,
-                res,
-                'This Entity Head account is not linked to an active organization head staff record.'
-            );
+            req.entityScope = {
+                companyId,
+                staffPfNo: req.user.pfno || req.user.id || null,
+                staffName: req.user.fullName || req.user.name || 'Entity Head',
+                deptCode: null,
+                deptName: 'Organization-wide view',
+                assignedDeptCode: null,
+                assignedDeptName: null,
+                scopeLabel: 'Organization-wide view'
+            };
+            res.locals.entityScope = req.entityScope;
+            return next();
         }
 
         const scope = rows[0];

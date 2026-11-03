@@ -1,0 +1,79 @@
+{
+  "generatedAt": "2026-10-09T13:40:00.000Z",
+  "classification": "READY_FOR_STAGING",
+  "productionReady": false,
+  "database": {
+    "name": "personnel_master",
+    "mariadbVersion": "11.4.9-MariaDB",
+    "innodbSupport": "YES",
+    "criticalTablesAccessible": true
+  },
+  "security": {
+    "csrf": "PASS",
+    "securityHeaders": "PASS",
+    "loginRateLimiting": "PASS",
+    "persistentSessions": "PASS",
+    "productionEnvironmentValidation": "PASS",
+    "dependencyAudit": {
+      "status": "FAIL",
+      "critical": 1,
+      "high": 4,
+      "moderate": 3,
+      "low": 0
+    }
+  },
+  "waecPayroll": {
+    "augustBatch161": {
+      "status": "PROCESSED",
+      "modernGlPosted": false,
+      "unchangedByAudit": true,
+      "correctionWorkflowReady": "SAFE_WITH_CONDITIONS"
+    },
+    "approvedSalarySetup": {
+      "staff": 6,
+      "basicSalary": 50840.69,
+      "allowances": 77508.20,
+      "grossIncome": 128348.89,
+      "taxableIncome": 125806.85,
+      "paye": 35582.06,
+      "employeeNassit": 2542.04,
+      "employeeProvidentFund": 5084.07,
+      "totalDeductions": 43208.17,
+      "netIncome": 85140.72
+    }
+  },
+  "tests": [
+    { "name": "node --check selected files", "status": "PASS" },
+    { "name": "runProductionReadinessChecks", "status": "PASS" },
+    { "name": "testCsrfProtection", "status": "PASS" },
+    { "name": "testLoginRateLimiting", "status": "PASS" },
+    { "name": "testPersistentSessionStore", "status": "PASS" },
+    { "name": "testFinanceManagerOversight", "status": "PASS" },
+    { "name": "auditSierraLeonePayeCalculation", "status": "PASS_AFTER_CORRECTIONS" },
+    { "name": "auditPayrollItemTaxability", "status": "PASS" },
+    { "name": "verifyWaecProvidentFundDeduction", "status": "PASS_WITH_CORRECTIONS" },
+    { "name": "testYearlyPaymentWorkflow", "status": "PASS" },
+    { "name": "testPayrollLiabilityReports", "status": "FAIL_FIXTURE_PFNO_MISSING" },
+    { "name": "npm audit --omit=dev", "status": "FAIL_PRODUCTION_VULNERABILITIES" }
+  ],
+  "counts": {
+    "testsPassed": 10,
+    "testsFailed": 2,
+    "criticalBlockers": 1,
+    "highPriorityIssues": 4,
+    "mediumIssues": 6,
+    "lowIssues": 1
+  },
+  "activeRoles": [
+    "Admin",
+    "Data Entry Officer",
+    "Finance Officer",
+    "Finance Manager",
+    "Manager",
+    "Auditor",
+    "Entity Head / HNO"
+  ],
+  "staffSelfService": "DEFERRED_OUT_OF_SCOPE",
+  "hostingRecommendation": "Linux VPS or dedicated server",
+  "finalRecommendation": "Upload to controlled staging after dependency remediation or documented staging-only risk acceptance. Do not proceed to production until dependencies, production configuration, role setup, backup restore, target-server UAT, and August payroll authorization are complete."
+}
