@@ -1,0 +1,21 @@
+{
+  "runId": "1ee48c6d-1c0d-4dae-9f58-33cca2f1e548",
+  "startedAt": "2026-11-09T21:06:46.185Z",
+  "companyId": 1,
+  "entries": [
+    {
+      "table": "tblstaff",
+      "field": "PhotoPath",
+      "status": "PASS",
+      "sha256": "d571b5c0407d54bced4cceb4347cc707c875ec3c0903c15167fa389c30e1cd42"
+    }
+  ],
+  "status": "PASS",
+  "sourceFilesChanged": false,
+  "copyFilesRemoved": true,
+  "confidentialManifest": "private\\staging-file-rehearsal\\1ee48c6d-1c0d-4dae-9f58-33cca2f1e548\\migration-manifest.json",
+  "inventoryFiles": 6,
+  "references": 1,
+  "databaseReferencesUnchanged": true,
+  "completedAt": "2026-11-09T21:06:51.302Z"
+}

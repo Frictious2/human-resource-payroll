@@ -81,7 +81,7 @@ function getAuditMetadata(overrides = {}) {
             (req && (req.originalUrl || `${req.baseUrl || ''}${req.path || ''}`)) ||
             overrides.table ||
             'System',
-        companyId: overrides.companyId || 1
+        companyId: overrides.companyId ?? 1
     };
 }
 

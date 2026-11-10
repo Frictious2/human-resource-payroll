@@ -1,3 +1,4 @@
+require('./requireDisposableDatabase')();
 const pool = require('../config/db');
 const yearlyPaymentService = require('../services/yearlyPaymentService');
 

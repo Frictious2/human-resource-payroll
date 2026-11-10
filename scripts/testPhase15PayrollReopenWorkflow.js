@@ -1,3 +1,4 @@
+require('./requireDisposableDatabase')();
 const pool = require('../config/db');
 const ProcessEmolumentsService = require('../services/processEmolumentsService');
 const payrollWorkflowService = require('../services/payrollWorkflowService');

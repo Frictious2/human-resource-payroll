@@ -1,10 +1,8 @@
-const bcrypt = require('bcrypt');
 const pool = require('../config/db');
 const authService = require('./authService');
 const auditTrailService = require('./auditTrailService');
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const BCRYPT_ROUNDS = 10;
 
 function mapRoleToPartialsBase(role) {
     switch (role) {
@@ -248,7 +246,7 @@ async function updateProfile({ sessionUser, fullName, email }) {
 }
 
 async function updatePassword({ sessionUser, currentPassword, newPassword, confirmPassword }) {
-    const profile = await getProfileBySessionUser(sessionUser);
+    await getProfileBySessionUser(sessionUser);
     const currentValue = String(currentPassword || '');
     const newValue = String(newPassword || '');
     const confirmValue = String(confirmPassword || '');
@@ -269,65 +267,11 @@ async function updatePassword({ sessionUser, currentPassword, newPassword, confi
         throw buildValidationError('New password and confirmation do not match.', 'confirmPassword');
     }
 
-    const [rows] = profile.source === 'developer'
-        ? await pool.execute(
-            `SELECT password AS storedPassword
-             FROM developer
-             WHERE ID = ?
-             LIMIT 1`,
-            [profile.id]
-        )
-        : await pool.execute(
-            `SELECT Pword AS storedPassword, CompanyID
-             FROM tblpassword
-             WHERE PFNo = ?
-             LIMIT 1`,
-            [profile.id]
-        );
-
-    const record = rows[0];
-    if (!record) {
-        throw buildValidationError('Your profile record could not be found.');
-    }
-
-    const passwordMatches = await authService.verifyPassword({
-        storedPassword: record.storedPassword,
-        password: currentValue,
-        onLegacyUpgrade: async (hash) => {
-            if (profile.source === 'developer') {
-                await pool.execute('UPDATE developer SET password = ? WHERE ID = ?', [hash, profile.id]);
-            } else {
-                await pool.execute('UPDATE tblpassword SET Pword = ? WHERE PFNo = ?', [hash, profile.id]);
-            }
-        }
-    });
-
-    if (!passwordMatches) {
-        throw buildValidationError('Current password is incorrect.', 'currentPassword');
-    }
-
-    const hashedPassword = await bcrypt.hash(newValue, BCRYPT_ROUNDS);
-
-    if (profile.source === 'developer') {
-        await pool.execute('UPDATE developer SET password = ? WHERE ID = ?', [hashedPassword, profile.id]);
-        await auditTrailService.logUpdate({
-            table: 'developer',
-            formName: 'developer/profile/password',
-            recordId: profile.id,
-            previousRow: { password: '[MASKED]' },
-            nextRow: { password: '[MASKED]' },
-            changedFields: ['password']
-        });
-    } else {
-        await pool.execute('UPDATE tblpassword SET Pword = ? WHERE PFNo = ?', [hashedPassword, profile.id]);
-        await auditTrailService.logUpdate({
-            table: 'tblpassword',
-            formName: '/profile/password',
-            recordId: profile.id,
-            previousRow: { Pword: '[MASKED]', CompanyID: profile.companyId },
-            nextRow: { Pword: '[MASKED]', CompanyID: profile.companyId },
-            changedFields: ['Pword']
-        });
+    try {
+        await require('./accountSecurityService').changeOwnPassword(sessionUser, currentValue, newValue);
+    } catch (error) {
+        if (error.expose) throw buildValidationError(error.message);
+        throw error;
     }
 
     return {

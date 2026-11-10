@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 require('dotenv').config({ override: true });
+require('./requireDisposableDatabase')();
 
 const assert = require('assert');
 const crypto = require('crypto');
@@ -49,23 +50,19 @@ function parseSessionIdFromCookie(cookieHeader, cookieName = process.env.SESSION
     return unsignedValue.slice(0, dotIndex);
 }
 
-async function createTemporaryDeveloperAccount({ username, email, password, fullName }) {
+async function createTemporaryPortalAccount({ username, email, password, fullName }) {
     const passwordHash = await bcrypt.hash(password, 10);
     await pool.execute(
-        `INSERT INTO developer (username, email, password, FullName)
-         VALUES (?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           username = VALUES(username),
-           password = VALUES(password),
-           FullName = VALUES(FullName)`,
-        [username, email, passwordHash, fullName]
+        `INSERT INTO tblpassword (DateCreated, Username, Email, Pword, FullName, Level, CompanyID)
+         VALUES (NOW(), ?, ?, ?, ?, 'Finance Manager', ?)`,
+        [username, email, passwordHash, fullName, TEST_COMPANY_ID]
     );
 }
 
-async function deleteTemporaryDeveloperAccount(email) {
+async function deleteTemporaryPortalAccount(email) {
     await pool.execute(
-        'DELETE FROM developer WHERE email = ?',
-        [email]
+        'DELETE FROM tblpassword WHERE Email = ? AND CompanyID = ?',
+        [email, TEST_COMPANY_ID]
     );
 }
 
@@ -86,6 +83,7 @@ function startServer(envOverrides = {}) {
             cwd: require('path').join(__dirname, '..'),
             env: {
                 ...process.env,
+                INSTALLATION_COMPANY_ID: String(TEST_COMPANY_ID),
                 PORT: String(TEST_PORT),
                 NODE_ENV: envOverrides.NODE_ENV || 'development',
                 SESSION_SECRET: envOverrides.SESSION_SECRET || process.env.SESSION_SECRET || 'phase16a-session-secret',
@@ -203,12 +201,12 @@ async function runDirectStoreChecks(store) {
 
 async function runAuthenticatedRestartTest() {
     const uniqueSuffix = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-    const username = `phase16a_dev_${uniqueSuffix}`;
-    const email = `phase16a_dev_${uniqueSuffix}@hrpayroll.local`;
+    const username = `qa_session_${crypto.randomBytes(6).toString('hex')}`;
+    const email = `qa_session_${uniqueSuffix}@example.test`;
     const password = 'Phase16A!123';
-    const fullName = 'Phase 16A Developer';
+    const fullName = 'Synthetic Session Finance Manager';
 
-    await createTemporaryDeveloperAccount({ username, email, password, fullName });
+    await createTemporaryPortalAccount({ username, email, password, fullName });
 
     let child;
     try {
@@ -243,7 +241,7 @@ async function runAuthenticatedRestartTest() {
             }
         });
         assert.strictEqual(protectedResponse.status, 302, 'Authenticated dashboard request should redirect to the role dashboard.');
-        assert.strictEqual(protectedResponse.headers.get('location'), '/developer/dashboard', 'Developer session should resolve to the developer dashboard.');
+        assert.strictEqual(protectedResponse.headers.get('location'), '/finance-manager/dashboard', 'Company-scoped session should resolve to its dashboard.');
 
         await stopServer(child);
         child = await startServer();
@@ -255,14 +253,14 @@ async function runAuthenticatedRestartTest() {
             }
         });
         assert.strictEqual(postRestartResponse.status, 302, 'Session should survive a Node restart.');
-        assert.strictEqual(postRestartResponse.headers.get('location'), '/developer/dashboard', 'Restarted session should still resolve to the developer dashboard.');
+        assert.strictEqual(postRestartResponse.headers.get('location'), '/finance-manager/dashboard', 'Restarted session should still resolve to its dashboard.');
 
-        const developerPage = await request('/developer/dashboard', {
+        const portalPage = await request('/finance-manager/dashboard', {
             headers: {
                 Cookie: cookieHeader
             }
         });
-        const logoutToken = extractCsrfToken(await developerPage.text());
+        const logoutToken = extractCsrfToken(await portalPage.text());
         const logoutResponse = await request('/logout', {
             method: 'POST',
             headers: {
@@ -277,7 +275,7 @@ async function runAuthenticatedRestartTest() {
         assert.strictEqual(await countSessionRows(sessionId), 0, 'Logout should remove the persisted session row.');
     } finally {
         await stopServer(child).catch(() => {});
-        await deleteTemporaryDeveloperAccount(email).catch(() => {});
+        await deleteTemporaryPortalAccount(email).catch(() => {});
     }
 }
 

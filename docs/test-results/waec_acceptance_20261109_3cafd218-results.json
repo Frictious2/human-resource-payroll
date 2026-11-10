@@ -1,0 +1,23 @@
+{
+  "startedAt": "2026-11-09T21:16:18.146Z",
+  "database": "waec_acceptance_20261109_3cafd218",
+  "mode": "EMPLOYEE_DIAGNOSTIC",
+  "syntheticOnly": true,
+  "liveDatabase": "personnel_master",
+  "tests": [
+    {
+      "script": "scripts/testDisposableEmployeeSetup.js",
+      "status": "FAIL",
+      "exitCode": 1,
+      "failureTail": "<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Page not found</title>\n  <link rel=\"stylesheet\" href=\n\n404 !== 302\n <html lang=\"en\">\n<head>\n"
+    }
+  ],
+  "status": "BLOCKED",
+  "liveAccessDenied": true,
+  "schemaOnlyTables": 148,
+  "sanitizedWorkspace": "private\\acceptance-work\\waec_acceptance_20261109_3cafd218",
+  "liveProtectedRecordsUnchanged": true,
+  "disposableDatabaseRemoved": true,
+  "restrictedDatabaseUsersRemoved": true,
+  "completedAt": "2026-11-09T21:17:41.048Z"
+}

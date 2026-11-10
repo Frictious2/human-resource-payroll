@@ -1,0 +1,28 @@
+{
+  "startedAt": "2026-11-09T21:40:15.436Z",
+  "database": "waec_acceptance_20261109_03b1af90",
+  "mode": "STAFF_ISOLATION_DIAGNOSTIC",
+  "syntheticOnly": true,
+  "liveDatabase": "personnel_master",
+  "tests": [
+    {
+      "script": "scripts/testDisposableEmployeeSetup.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testDisposableStaffCompanyIsolation.js",
+      "status": "FAIL",
+      "exitCode": 1,
+      "failureTail": "{\"check\":\"cross-company staff save\",\"httpStatus\":302,\"companyARecordUnchanged\":false}\nCompany B must not save Company A staff\n"
+    }
+  ],
+  "status": "BLOCKED",
+  "liveAccessDenied": true,
+  "schemaOnlyTables": 148,
+  "sanitizedWorkspace": "private\\acceptance-work\\waec_acceptance_20261109_03b1af90",
+  "liveProtectedRecordsUnchanged": true,
+  "disposableDatabaseRemoved": true,
+  "restrictedDatabaseUsersRemoved": true,
+  "completedAt": "2026-11-09T21:42:00.533Z"
+}

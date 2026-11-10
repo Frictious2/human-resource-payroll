@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+require('./requireDisposableDatabase')();
 const pool = require('../config/db');
 const payrollWorkflowService = require('../services/payrollWorkflowService');
 const managerPayrollWorkflowService = require('../services/managerPayrollWorkflowService');

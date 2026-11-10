@@ -211,7 +211,7 @@ async function resolvePayrollCompanyScope(executor, { companyId, pMonth, pYear, 
     }
 
     return {
-        companyWhereClause: '(p.CompanyID = ? OR p.CompanyID IS NULL)',
+        companyWhereClause: '(p.CompanyID = ?)',
         companyParams: [companyId],
         companyMatchMode: 'legacy-null-fallback',
         payrollTypeVariants: variants
@@ -790,7 +790,7 @@ async function getWorkflowBatchDetail(companyId, batchId, connection = null) {
         `
             SELECT Com_Name
             FROM tblcominfo
-            WHERE (CompanyID = ? OR CompanyID IS NULL)
+            WHERE (CompanyID = ?)
             LIMIT 1
         `,
         [Number(batch.CompanyID) || 1]

@@ -1,0 +1,28 @@
+{
+  "startedAt": "2026-11-09T21:18:47.472Z",
+  "database": "waec_acceptance_20261109_c33e278a",
+  "mode": "EMPLOYEE_DIAGNOSTIC",
+  "syntheticOnly": true,
+  "liveDatabase": "personnel_master",
+  "tests": [
+    {
+      "script": "scripts/testDisposableEmployeeSetup.js",
+      "status": "FAIL",
+      "exitCode": 1,
+      "failureTail": "TEST_FAILED No valid salary data found for the selected payroll period.     at ProcessEmolumentsService.processEmoluments (C:\\Users\\David M. Gegbai\\Documents\\trae_projects\\Human Resource Payroll\\private\\acceptance-work\\waec_acceptance_20261109_c33e278a\\services\\processEmolumentsService.js:1349:31)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n"
+    },
+    {
+      "script": "scripts/testCsrfProtection.js",
+      "status": "PASS",
+      "exitCode": 0
+    }
+  ],
+  "status": "BLOCKED",
+  "liveAccessDenied": true,
+  "schemaOnlyTables": 148,
+  "sanitizedWorkspace": "private\\acceptance-work\\waec_acceptance_20261109_c33e278a",
+  "liveProtectedRecordsUnchanged": true,
+  "disposableDatabaseRemoved": true,
+  "restrictedDatabaseUsersRemoved": true,
+  "completedAt": "2026-11-09T21:20:32.285Z"
+}

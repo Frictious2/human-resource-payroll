@@ -15,7 +15,7 @@ const {
 const payrollGlPostingService = require('../services/payrollGlPostingService');
 const { validateProductionEnvironment } = require('../services/environmentValidationService');
 
-const AUDIT_DATE = '2026-08-27';
+const AUDIT_DATE = new Date().toISOString().slice(0, 10);
 const INCLUDE_SANDBOX = process.argv.includes('--sandbox');
 
 const KEY_TABLES = [
@@ -236,6 +236,7 @@ async function main() {
         const safeProductionFixture = validateProductionEnvironment({
             NODE_ENV: 'production',
             SESSION_SECRET: 'production-readiness-fixture-only-32-characters-minimum',
+            RESET_TOKEN_SECRET: 'independent-reset-token-fixture-only-32-characters-minimum',
             DB_HOST: 'db.internal',
             DB_NAME: 'personnel_master',
             DB_USER: 'hrpayroll',
@@ -286,6 +287,13 @@ async function main() {
                     && securitySource.includes('LOGIN_RATE_LIMIT_MAX'),
                 productionSessionSecretValidation: safeProductionFixture.valid
                     && missingSecretFixture.errors.some((message) => message.includes('SESSION_SECRET')),
+                productionResetSecretValidation: safeProductionFixture.valid
+                    && missingSecretFixture.errors.some((message) => message.includes('RESET_TOKEN_SECRET')),
+                privilegedStartupSeedingDisabled: !serverSource.includes('ensureSeedDeveloper('),
+                privateUploadGateConfigured: serverSource.includes('createPrivateFileHandler'),
+                gracefulShutdownConfigured: serverSource.includes('createShutdownHandler'),
+                sessionCleanupConfigured: typeof sessionStore.clearExpiredSessions === 'function'
+                    && Boolean(sessionStore.cleanupTimer),
                 productionCookieConfiguration: {
                     httpOnly: true,
                     secureInProduction: true,

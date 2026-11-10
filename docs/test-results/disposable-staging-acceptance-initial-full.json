@@ -1,0 +1,96 @@
+{
+  "startedAt": "2026-11-09T21:07:33.992Z",
+  "database": "waec_acceptance_20261109_801812e5",
+  "syntheticOnly": true,
+  "liveDatabase": "personnel_master",
+  "tests": [
+    {
+      "script": "scripts/testDisposableEmployeeSetup.js",
+      "status": "FAIL",
+      "exitCode": 1,
+      "failureTail": "ERR_ASSERTION\n"
+    },
+    {
+      "script": "scripts/testFinalSecurityHardening.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testSecurityHttpIsolated.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testSecurityPayrollRegression.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testCsrfProtection.js",
+      "status": "FAIL",
+      "exitCode": 1,
+      "failureTail": "[security] {\"timestamp\":\"2026-11-09T21:09:39.854Z\",\"event\":\"INVALID_CSRF\",\"method\":\"POST\",\"path\":\"/admin/api/parameters/departments\",\"ip\":\"127.0.0.1\",\"role\":\"admin\",\"userId\":\"99801\",\"companyId\":2,\"outcome\":\"blocked\",\"reason\":\"invalid-or-missing-token\"}\n[security] {\"timestamp\":\"2026-11-09T21:09:39.877Z\",\"event\":\"INVALID_CSRF\",\"method\":\"POST\",\"path\":\"/notifications/read-all\",\"ip\":\"127.0.0.1\",\"role\":\"admin\",\"userId\":\"99801\",\"companyId\":2,\"outcome\":\"blocked\",\"reason\":\"invalid-or-missing-token\"}\nCSRF verification failed.\nAssertionError [ERR_ASSERTION]: admin authorized mutation with valid CSRF failed.\n\n403 !== 302\n\n    at main (C:\\Users\\David M. Gegbai\\Documents\\trae_projects\\Human Resource Payroll\\private\\acceptance-work\\waec_acceptance_20261109_801812e5\\scripts\\testCsrfProtection.js:68:20)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n"
+    },
+    {
+      "script": "scripts/testLoginRateLimiting.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testPersistentSessionStore.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testPhase14PayrollReversalWorkflow.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testPhase15PayrollReopenWorkflow.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testYearlyPaymentWorkflow.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testPayrollWorkflowFoundation.js",
+      "status": "FAIL",
+      "exitCode": 1,
+      "failureTail": "Payroll workflow foundation verification failed.\nError: No payroll batch rows were found for workflow verification.\n    at getCandidatePayrollBatch (C:\\Users\\David M. Gegbai\\Documents\\trae_projects\\Human Resource Payroll\\private\\acceptance-work\\waec_acceptance_20261109_801812e5\\scripts\\testPayrollWorkflowFoundation.js:49:15)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async run (C:\\Users\\David M. Gegbai\\Documents\\trae_projects\\Human Resource Payroll\\private\\acceptance-work\\waec_acceptance_20261109_801812e5\\scripts\\testPayrollWorkflowFoundation.js:225:29)\n"
+    },
+    {
+      "script": "scripts/testPhase11RecordWorkflows.js",
+      "status": "FAIL",
+      "exitCode": 1,
+      "failureTail": "Testing transfer workflow...\nError: Transfer draft workflow item was not created\n    at assert (C:\\Users\\David M. Gegbai\\Documents\\trae_projects\\Human Resource Payroll\\private\\acceptance-work\\waec_acceptance_20261109_801812e5\\scripts\\testPhase11RecordWorkflows.js:37:15)\n    at testTransfer (C:\\Users\\David M. Gegbai\\Documents\\trae_projects\\Human Resource Payroll\\private\\acceptance-work\\waec_acceptance_20261109_801812e5\\scripts\\testPhase11RecordWorkflows.js:304:5)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async main (C:\\Users\\David M. Gegbai\\Documents\\trae_projects\\Human Resource Payroll\\private\\acceptance-work\\waec_acceptance_20261109_801812e5\\scripts\\testPhase11RecordWorkflows.js:667:9)\n"
+    },
+    {
+      "script": "scripts/testPayrollLiabilityReports.js",
+      "status": "FAIL",
+      "exitCode": 1,
+      "failureTail": "Error: Payroll Liability test requires at least one company-scoped staff record with PAYE payroll rows.\n    at resolveTestPfNo (C:\\Users\\David M. Gegbai\\Documents\\trae_projects\\Human Resource Payroll\\private\\acceptance-work\\waec_acceptance_20261109_801812e5\\scripts\\testPayrollLiabilityReports.js:96:23)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async main (C:\\Users\\David M. Gegbai\\Documents\\trae_projects\\Human Resource Payroll\\private\\acceptance-work\\waec_acceptance_20261109_801812e5\\scripts\\testPayrollLiabilityReports.js:106:18) {\n  statusCode: 404\n}\n"
+    },
+    {
+      "script": "scripts/auditPayrollItemTaxability.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/auditSierraLeonePayeCalculation.js",
+      "status": "PASS",
+      "exitCode": 0
+    }
+  ],
+  "status": "BLOCKED",
+  "liveAccessDenied": true,
+  "schemaOnlyTables": 148,
+  "sanitizedWorkspace": "private\\acceptance-work\\waec_acceptance_20261109_801812e5",
+  "liveProtectedRecordsUnchanged": true,
+  "disposableDatabaseRemoved": true,
+  "restrictedDatabaseUsersRemoved": true,
+  "completedAt": "2026-11-09T21:10:58.948Z"
+}

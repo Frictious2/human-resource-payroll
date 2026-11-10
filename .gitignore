@@ -1,3 +1,12 @@
 node_modules
 .env
+.env.*
+!.env.production.example
+!.env.staging.example
+deploy/*.zip
+deploy/*.tmp
+private/
+*.sql.gz
+*.dump
+*.log
 personnel_master

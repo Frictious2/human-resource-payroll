@@ -1,10 +1,7 @@
 // Top imports
 const pool = require('../config/db');
-const bcrypt = require('bcrypt');
-const SALT_ROUNDS = 10;
 const mailer = require('../config/mailer');
-const jwt = require('jsonwebtoken');
-const RESET_SECRET = process.env.RESET_TOKEN_SECRET || process.env.JWT_SECRET || 'reset_secret';
+const accountSecurity = require('../services/accountSecurityService');
 
 function getViewUser(req, fallbackName = 'Developer') {
   return (req.session && req.session.user) || { name: fallbackName };
@@ -58,14 +55,10 @@ const createDeveloper = async (req, res) => {
     });
   }
   try {
-    const hashed = password ? await bcrypt.hash(password, SALT_ROUNDS) : null;
-    await pool.query(
-      'INSERT INTO developer (FullName, username, email, password, createdBy) VALUES (?,?,?,?,?)',
-      [FullName, username, email, hashed, createdBy || null]
-    );
+    await accountSecurity.manageDeveloper(req, 'create');
     res.redirect('/developer/developers');
   } catch (err) {
-    console.error(err);
+    console.error('Developer account creation failed:', err.code || 'ACCOUNT_FAILED');
     res.status(500).render('developer/developers-new', {
       user: getViewUser(req, 'Developer'),
       error: 'Failed to create developer.',
@@ -78,7 +71,7 @@ const editPage = async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM developer WHERE ID = ?', [req.params.id]);
     if (!rows.length) return res.status(404).send('Developer not found');
-    res.render('developer/developers-edit', { user: getViewUser(req, 'Developer'), dev: rows[0], error: null });
+    res.render('developer/developers-edit', { user: getViewUser(req, 'Developer'), dev: { ...rows[0], password: '' }, error: null });
   } catch (err) {
     console.error(err);
     res.status(500).send('Failed to load developer');
@@ -89,24 +82,13 @@ const editPage = async (req, res) => {
 const updateDeveloper = async (req, res) => {
   const { FullName, username, email, password, createdBy } = req.body;
   try {
-    if (password && password.trim().length > 0) {
-      const hashed = await bcrypt.hash(password, SALT_ROUNDS);
-      await pool.query(
-        'UPDATE developer SET FullName=?, username=?, email=?, password=?, createdBy=? WHERE ID=?',
-        [FullName, username, email, hashed, createdBy || null, req.params.id]
-      );
-    } else {
-      await pool.query(
-        'UPDATE developer SET FullName=?, username=?, email=?, createdBy=? WHERE ID=?',
-        [FullName, username, email, createdBy || null, req.params.id]
-      );
-    }
+    await accountSecurity.manageDeveloper(req, 'update');
     res.redirect('/developer/developers');
   } catch (err) {
-    console.error(err);
+    console.error('Developer account update failed:', err.code || 'ACCOUNT_FAILED');
     res.status(500).render('developer/developers-edit', {
       user: getViewUser(req, 'Developer'),
-      dev: { ID: req.params.id, FullName, username, email, password, createdBy },
+      dev: { ID: req.params.id, FullName, username, email, createdBy },
       error: 'Failed to update developer.',
     });
   }
@@ -115,10 +97,10 @@ const updateDeveloper = async (req, res) => {
 // Delete developer
 const deleteDeveloper = async (req, res) => {
   try {
-    await pool.query('DELETE FROM developer WHERE ID = ?', [req.params.id]);
+    await accountSecurity.manageDeveloper(req, 'delete');
     res.json({ ok: true });
   } catch (err) {
-    console.error(err);
+    console.error('Developer account deletion failed:', err.code || 'ACCOUNT_FAILED');
     res.status(500).json({ error: 'Failed to delete developer' });
   }
 };
@@ -246,16 +228,11 @@ async function createAdmin(req, res) {
   try {
     const { Username, Email, FullName, CompanyID } = req.body;
 
-    const [result] = await pool.query(
-      `INSERT INTO tblpassword (DateCreated, Level, Username, FullName, Pword, Email, CompanyID)
-       VALUES (NOW(), 'Admin', ?, ?, NULL, ?, ?)`,
-      [Username, FullName, Email, CompanyID || null]
-    );
-
-    const pfno = result.insertId;
-    const token = jwt.sign({ pfno }, RESET_SECRET, { expiresIn: '30m' });
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const link = `${baseUrl}/developer/admins/${pfno}/set-password?token=${encodeURIComponent(token)}`;
+    const pfno = await accountSecurity.createAccount(req, 'Admin', { Username, FullName, Email }, CompanyID);
+    const token = await accountSecurity.issueSetupToken(pfno, Number(CompanyID));
+    await accountSecurity.recordInvitation(req, pfno, Number(CompanyID));
+    const baseUrl = (process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+    const link = `${baseUrl}/admin/admins/set-password?token=${encodeURIComponent(token)}`;
 
     if (Email) {
       const subject = 'Set up your HR Payroll admin password';
@@ -268,19 +245,20 @@ async function createAdmin(req, res) {
       `;
       try {
         await mailer.sendMail({
-          from: process.env.SMTP_USER || 'info@hrpayroll.davisasmedia.com',
+          from: process.env.SMTP_FROM || process.env.SMTP_USER,
           to: Email,
           subject,
           html
-        });
+        }, { required: true });
       } catch (mailErr) {
-        console.error('Admin password email failed:', mailErr.message);
+        console.error('Admin password email failed:', mailErr.code || 'MAIL_FAILED');
+        return res.status(503).send('Account created, but setup email could not be sent. Configure SMTP and resend the invitation.');
       }
     }
 
     res.redirect('/developer/admins');
   } catch (err) {
-    console.error(err);
+    console.error('Admin account creation failed:', err.code || 'ACCOUNT_FAILED');
     res.status(500).send('Failed to create admin');
   }
 }
@@ -289,8 +267,9 @@ async function setAdminPasswordPage(req, res) {
   const { pfno } = req.params;
   const { token } = req.query;
   try {
-    jwt.verify(token, RESET_SECRET);
-    res.render('developer/admins-set-password', { title: 'Set Password', pfno, token, user: getViewUser(req, 'Developer') });
+    const account = await accountSecurity.verifySetupToken(token);
+    if (String(account.PFNo) !== String(pfno)) return res.status(400).send('Invalid account link.');
+    res.redirect('/admin/admins/set-password?token=' + encodeURIComponent(token));
   } catch {
     res.status(400).send('Invalid or expired link');
   }
@@ -302,12 +281,9 @@ async function setAdminPasswordUpdate(req, res) {
   const { password } = req.body;
 
   try {
-    jwt.verify(token, RESET_SECRET);
-    const hash = await bcrypt.hash(password, SALT_ROUNDS);
-    await pool.query(`UPDATE tblpassword SET Pword = ? WHERE PFNo = ?`, [hash, pfno]);
-    res.redirect('/developer/admins');
+    await accountSecurity.setPassword(token || req.body.token, password, pfno);
+    res.redirect('/login');
   } catch (err) {
-    console.error(err);
     res.status(400).send('Failed to set password (link invalid or expired)');
   }
 }
@@ -315,7 +291,8 @@ async function setAdminPasswordUpdate(req, res) {
 async function deleteAdmin(req, res) {
   const { pfno } = req.params;
   try {
-    await pool.query(`DELETE FROM tblpassword WHERE PFNo = ?`, [pfno]);
+    const deleted = await accountSecurity.deleteAccount(req, 'Admin', pfno);
+    if (!deleted) return res.status(404).json({ ok: false });
     res.json({ ok: true });
   } catch (err) {
     console.error(err);

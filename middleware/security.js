@@ -169,6 +169,7 @@ function createLoginRateLimiter() {
 }
 
 module.exports = {
+    initializeSessionCsrfToken: generateToken,
     createCsrfProtectionMiddleware,
     createCsrfViewMiddleware,
     createLoginRateLimiter,

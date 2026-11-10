@@ -59,6 +59,10 @@ function requireRoles(...allowedRoles) {
             return handleForbidden(req, res);
         }
 
+        if (req.user.role !== 'developer' && (!Number.isSafeInteger(Number(req.user.companyId)) || Number(req.user.companyId) < 1)) {
+            return handleForbidden(req, res, 'A valid company scope is required.');
+        }
+
         return next();
     };
 }

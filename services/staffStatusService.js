@@ -1,3 +1,4 @@
+const { getInstallationCompanyId } = require('./installationCompanyService');
 const STAFF_STATUS_MODES = Object.freeze({
     ACTIVE: 'active',
     FORMER: 'former',
@@ -32,7 +33,9 @@ function getActiveStaffFilter(alias = '') {
     // Live personnel_master status codes currently map 01=CURRENT, 03=PROBATION, 04=PART-TIME.
     // Former staff are stored as 02 and final redundant staff are marked with Redundant = 1.
     // Pending redundancy proposals use Redundant = 2 and must remain visible until final approval.
-    return `COALESCE(${redundant}, 0) IN (0, 2) AND (${empStatus} IS NULL OR CAST(${empStatus} AS CHAR) IN (${ACTIVE_EMP_STATUS_CODES.map((code) => `'${code}'`).join(', ')}))`;
+    const installation = require('./requestContext').getRequestContext()?.req?.installationCompanyId;
+    const scope = installation ? ` AND ${getColumnRef(alias, 'CompanyID')} = ${getInstallationCompanyId()}` : '';
+    return `COALESCE(${redundant}, 0) IN (0, 2) AND (${empStatus} IS NULL OR CAST(${empStatus} AS CHAR) IN (${ACTIVE_EMP_STATUS_CODES.map((code) => `'${code}'`).join(', ')}))${scope}`;
 }
 
 function getFormerStaffFilter(alias = '') {
@@ -106,7 +109,8 @@ function buildStaffQuery({
     orderBy = 'SName'
 } = {}) {
     const fromClause = alias ? `tblstaff ${alias}` : 'tblstaff';
-    const query = applyStaffStatusFilter(`SELECT ${fields} FROM ${fromClause}`, mode, alias);
+    const statusQuery = applyStaffStatusFilter(`SELECT ${fields} FROM ${fromClause}`, mode, alias);
+    const query = `${statusQuery}${/\bWHERE\b/i.test(statusQuery) ? ' AND' : ' WHERE'} ${getColumnRef(alias, 'CompanyID')} = ${getInstallationCompanyId()}`;
     return orderBy ? `${query} ORDER BY ${orderBy}` : query;
 }
 

@@ -1,0 +1,9 @@
+{
+  "reference": "1594acaf-6768-488c-8808-7a59f79fb049",
+  "attemptedAt": "2026-11-09T20:52:47.308Z",
+  "recipientHash": "30c72fbd39d76b2dfcd8817d451825b08d192702723af6e19887db438961f8d3",
+  "status": "SMTP_ACCEPTED",
+  "receiptConfirmed": true,
+  "receiptConfirmation": "Approved recipient confirmed receipt in Inbox in chat",
+  "messageId": "<a3161773-0931-6578-86ae-2ee748ba49e0@hrpayroll.davisasmedia.com>"
+}

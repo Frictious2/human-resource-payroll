@@ -1,170 +1,112 @@
 # WAEC Staging Deployment Checklist
 
-Date: 2026-10-09
+Security code remediation is complete for the tested scope; the original checkboxes below remain deployment acceptance tasks, not current defect counts. Consult `WAEC-STAGING-SECURITY-VERIFICATION.md`. Mailbox rotation and controlled Linux/disposable-DB acceptance remain gates; no deployment is authorized by passing local tests.
 
-Status: `READY FOR STAGING DEPLOYMENT`
+9 November 2026. Current external-deployment gate: **BLOCKED**.
 
-This checklist is for controlled staging deployment only. It does not authorize production go-live.
+This is an acceptance plan, not a record of deployed tests passing. See the preparation guide for executed local checks and blockers STG-01 through STG-10. No production readiness is claimed.
 
-## 1. Server Preparation
+## Release and authorization
 
-- [ ] Provision Linux VPS, recommended Ubuntu 22.04 LTS or 24.04 LTS.
-- [ ] Allocate at least 2 vCPU, 4 GB RAM and 60 GB SSD.
-- [ ] Create a non-root application user.
-- [ ] Configure firewall to allow SSH, HTTP and HTTPS only as required.
-- [ ] Install Node.js LTS.
-- [ ] Install MariaDB.
-- [ ] Install Nginx.
-- [ ] Configure system timezone.
+- [ ] WAEC names staging owner, operator, Finance Manager holder and authorized approvers.
+- [ ] Confirm the existing Company 1 Finance Manager account belongs to the approved holder; do not create a default or duplicate.
+- [ ] Resolve two High dependency findings; classify/patch three Moderate findings, rerun audit and relevant regressions.
+- [ ] Disable production default Developer seeding and credential logging; inspect privileged accounts securely.
+- [ ] Enforce reset-token secret, password/identity/reuse controls and company-scoped provisioning administration; test missing-company denial.
+- [ ] Protect confidential upload delivery; exclude real employee attachments and payroll exports.
+- [ ] Rotate the formerly populated example credential and inspect source history/artifacts for secrets.
+- [ ] Add/test provisioning audit events without fabricating history; record activation/password-policy limitations.
+- [ ] Freeze approved commit/release hash, clean Linux dependency install and inspected allowlist archive/checksum.
 
-## 2. Database Preparation
+## Server and database
 
-- [ ] Create staging database, preferably `personnel_master_staging`.
-- [ ] Create dedicated database user.
-- [ ] Grant only required application privileges.
-- [ ] Import protected staging data.
-- [ ] Apply migration scripts in documented order.
-- [ ] Verify key tables exist:
-  - `tblstaff`
-  - `tblentitle`
-  - `tblsalary`
-  - `tblpayroll`
-  - `tblgltrans`
-  - `tblpassword`
-  - `sessions`
-  - payroll workflow helper tables
-  - yearly payment helper tables
-- [ ] Verify all staging tables use supported storage engines.
-- [ ] Run read-only data checks.
+- [ ] Linux VPS and patched tested Node/MariaDB versions recorded; staging domain confirmed.
+- [ ] Firewall, SSH recovery, non-root service, Nginx HTTPS/redirect and certificate renewal verified.
+- [ ] Node and DB ports inaccessible from the internet; proxy forwarding headers replace client values; exact trust proxy count verified.
+- [ ] Dedicated staging DB/user; no connection to live `personnel_master`; protected/anonymized source approved.
+- [ ] Verified backup and scratch restore before migration; selective migration order and duplicate-generation preflights reviewed.
+- [ ] Verify engines, session columns/indexes, helper tables and company/generation unique keys; no implicit runtime migration dependencies.
+- [ ] Test CRUD-only application privileges; migrations run separately, no routine app root/DDL permissions.
+- [ ] Root `.env` populated securely, mode 0600; strong separate session/reset secrets and HTTPS base URL.
+- [ ] SMTP file-only behavior verified on target; explicit account-email/workflow-email decision.
+- [ ] Persistent upload path, ownership, private media delivery, timezone, log rotation and backup paths verified.
+- [ ] Service start/status/restart and reboot recovery verified; graceful drain/maintenance behavior recorded.
 
-## 3. Application Deployment
+## Isolated staging test rules
 
-- [ ] Upload application source or pull from the approved release branch.
-- [ ] Do not upload `.env` from development.
-- [ ] Do not upload real database dumps into the web root.
-- [ ] Do not upload local logs or temporary files.
-- [ ] Ensure `public/uploads` and child upload directories are persistent and writable by the Node process.
-- [ ] Run `npm ci --omit=dev`.
-- [ ] Run `npm audit --omit=dev`.
-- [ ] Confirm zero critical and zero high production vulnerabilities.
+Create a separate synthetic test company with uniquely marked staff/accounts/periods after authorization. Provision independent participants through approved workflows; never use real WAEC staff or batch 161 for mutations. Record fixture ownership, before-state, cleanup and test IDs. Tests that can modify financial rows or issue runtime DDL must target only the isolated staging DB, not the local/live database.
 
-## 4. Environment Configuration
+## Authentication and role acceptance
 
-- [ ] Create server-side `.env` with staging values only.
-- [ ] Set `NODE_ENV=production`.
-- [ ] Set `APP_BASE_URL` to the HTTPS staging URL.
-- [ ] Set production-style `SESSION_SECRET` using a strong random value.
-- [ ] Set database host, port, name, user and password.
-- [ ] Set `TRUST_PROXY_HOPS` to match the proxy topology.
-- [ ] Decide SMTP enabled or disabled.
-- [ ] Configure SMTP only if credentials are available.
-- [ ] Configure log location and backup location.
-- [ ] Confirm real secrets are not committed or printed.
+| Test | Expected | Result / evidence |
+| --- | --- | --- |
+| Admin login/logout | Correct dashboard, authorized administration only | Pending |
+| Data Entry login/logout | Correct dashboard and permitted submissions | Pending |
+| Finance Officer login/logout | Financial processing permissions as designed | Pending |
+| Finance Manager login/logout | Read-only oversight dashboard, no approval action queue | Pending identity confirmation |
+| Manager login/logout | Manager review/actions only | Pending |
+| Auditor login/logout | Auditor review/actions only | Pending |
+| Entity Head/HNO login/logout | Final-approval role, no Finance execution | Pending |
+| Setup email | Real approved recipient receives link; correct HTTPS URL; safe failure/resend | Pending |
+| Session fixation/logout | ID regenerated at login; old ID invalid; logout destroys session | Pending |
+| Session expiry/restart | Expired ID rejected; persistent sessions survive intended restart | Pending |
+| Parallel workers/outage | Same DB/secret; outage safe, restoration recovers without leaking data | Pending |
+| Rate limit and CSRF | Valid forms work; invalid/missing CSRF 403; controlled failed login limit 429 | Pending |
 
-## 5. Reverse Proxy and HTTPS
+Staff Self-Service: **DEFERRED / OUT OF SCOPE**.
 
-- [ ] Configure Nginx virtual host for staging domain.
-- [ ] Proxy requests to the Node.js application port.
-- [ ] Forward `Host`, `X-Forwarded-For`, and `X-Forwarded-Proto`.
-- [ ] Install TLS certificate.
-- [ ] Redirect HTTP to HTTPS.
-- [ ] Verify no redirect loop.
-- [ ] Verify HSTS appears only over HTTPS production-mode responses.
+## Employee and workflow acceptance
 
-## 6. Process Management
+- [ ] Synthetic employee create/edit, grade/notch/job/department changes reviewed before approval.
+- [ ] Entitlement eligibility, manual Transport/COLA and salary setup survive authorized approval/recalculation.
+- [ ] All required approval pages show proposed values, actor, timestamps and correct company; audits roll back on forced failure in isolated fixtures.
+- [ ] Manager/Auditor/HNO separation holds; Finance Manager has no processing/approval/post/reversal/reopen rights.
+- [ ] Monthly payroll figures independently reconcile PAYE, employee/employer NASSIT, PROV-EMP once, deductions and net.
+- [ ] Rent/Inducement/Leave annual workflows preserve existing formulas, including first-year Rent rule.
+- [ ] Controlled isolated reversal/reopen fixtures preserve original history and effective-generation reports.
+- [ ] Existing relevant payroll, report, session, CSRF and authorization suites run only against approved isolated fixtures; record actual command, timestamp, exit and cleanup.
+- [ ] Direct forbidden mutations use a valid CSRF token so authorization is tested independently, not merely CSRF rejection.
 
-- [ ] Configure PM2 or systemd service.
-- [ ] Ensure app starts after reboot.
-- [ ] Configure graceful restart procedure.
-- [ ] Configure log rotation.
-- [ ] Confirm app refuses startup with unsafe production environment.
-- [ ] Confirm app starts with valid staging production-mode environment.
+## Company isolation
 
-## 7. Finance Manager Provisioning
+- [ ] Explicit Company A and Company B fixtures exist; no conditional skip accepted as proof.
+- [ ] Payroll/yearly detail ID manipulation returns established denied/not-found response without disclosure.
+- [ ] GL/reversal/reopen IDs and PFNo statement manipulation are denied across companies.
+- [ ] Query/body CompanyID cannot override session company; missing company fails closed.
+- [ ] Account creation/resend/list/delete obey approved company-scope policy.
 
-- [ ] WAEC identifies real Finance Manager account holder.
-- [ ] Confirm full name, official email and username.
-- [ ] Admin signs into staging.
-- [ ] Admin creates Finance Manager via `/admin/finance-managers/new`.
-- [ ] Account is scoped to `CompanyID = 1`.
-- [ ] Password setup link is delivered or resent after SMTP is configured.
-- [ ] Finance Manager sets password.
-- [ ] Finance Manager login redirects to `/finance-manager/dashboard`.
-- [ ] Verify Finance Manager can view oversight pages.
-- [ ] Verify Finance Manager cannot process, approve, post, reverse, reopen, edit or delete operational records.
+## Reports and browser acceptance
 
-## 8. Staging Acceptance Tests
+- [ ] Payslip: authoritative payroll amounts, PROV-EMP deduction, net, correct period/company.
+- [ ] Journal and GL: balanced totals, generation identity, Finance Manager read-only display.
+- [ ] PAYE/EOS: local NRA logo and centered tax-department header; all pages print/PDF.
+- [ ] NASSIT: separate company contribution header, correct employer/employee contributions.
+- [ ] Staff PAYE, NASSIT and Gratuity statements: company/PFNo scope and effective generations.
+- [ ] Bio Data and End of Service: private authorized data, intact page structure.
+- [ ] Preview opens new tab; Previous/Next and Page X/Y work; print/PDF includes all pages, no viewer controls.
+- [ ] Excel downloads open with numeric values and expected row counts; retain synthetic-only evidence.
+- [ ] Desktop/tablet/mobile usability and CSP browser console checked on actual HTTPS staging.
+- [ ] HTTP tests alone are not accepted as visual/PDF evidence.
 
-- [ ] Admin login and logout.
-- [ ] Data Entry login and logout.
-- [ ] Finance Officer login and logout.
-- [ ] Finance Manager login and logout after provisioning.
-- [ ] Manager login and logout.
-- [ ] Auditor login and logout.
-- [ ] Entity Head/HNO login and logout.
-- [ ] Employee registration using isolated staging record.
-- [ ] Entitlement setup using isolated staging record.
-- [ ] Salary setup using isolated staging record.
-- [ ] Manager approval pages render correctly.
-- [ ] Payroll calculation test uses isolated staging period only.
-- [ ] Payroll reports open and remain CompanyID-scoped.
-- [ ] PDF exports generate on Linux server.
-- [ ] Excel exports download.
-- [ ] CSRF-protected forms submit normally with valid tokens.
-- [ ] Missing CSRF token returns safe 403.
-- [ ] Login rate limiter is active.
-- [ ] Session persists through normal navigation.
-- [ ] Logout destroys session.
-- [ ] Cross-role route attempts are blocked.
-- [ ] Cross-company access attempts are blocked.
+## Operations and recovery
 
-## 9. Reports to Check
+- [ ] Daily encrypted DB/uploads backup, retention and off-server replication configured and monitored.
+- [ ] Restore to a scratch database demonstrated; recovery owner/RPO/RTO approved.
+- [ ] Session cleanup timer implemented/tested; no expired sessions authenticate before cleanup.
+- [ ] Logs exclude passwords, tokens, session payloads and payroll exports; retention bounded.
+- [ ] Deployment rollback and schema compatibility rehearsed; no automatic restore over newer transactions.
+- [ ] No remaining Critical/High application findings; client signs staging acceptance on deployed URL.
 
-- [ ] Payslip.
-- [ ] Journal.
-- [ ] General Ledger.
-- [ ] Payroll Liabilities PAYE.
-- [ ] Payroll Liabilities EOS Benefit.
-- [ ] Payroll Liabilities NASSIT.
-- [ ] Staff PAYE Statement.
-- [ ] NASSIT Statement.
-- [ ] Gratuity Statement.
-- [ ] Bio Data.
-- [ ] End of Service.
+## Financial safety and final gate
 
-## 10. Backup and Recovery
+- [ ] No change to local/live `tblstaff`, `tblentitle`, `tblsalary`, `tblpayroll`, `tblgltrans` from deployment preparation.
+- [ ] August 2026 batch 161 and its legacy GL summary remain untouched: no approve/cancel/reopen/reprocess/reverse/post.
+- [ ] No historical audit event fabricated; named approvers act through authenticated workflows only.
 
-- [ ] Configure daily staging database backup.
-- [ ] Store at least one backup off-server.
-- [ ] Verify backup file is readable.
-- [ ] Restore backup to an isolated temporary database.
-- [ ] Document restore command.
-- [ ] Document rollback decision process.
-- [ ] Do not restore over active production/live database.
+FINANCE MANAGER PROVISIONING: AWAITING AUTHORIZATION
 
-## 11. WAEC August 2026 Payroll Safety
+STAGING DEPLOYMENT PACKAGE: BLOCKED
 
-- [ ] Do not modify August batch 161 during staging setup.
-- [ ] Do not post August batch 161 to GL.
-- [ ] Do not cancel, reopen, reverse or regenerate August payroll without explicit WAEC authorization.
-- [ ] Keep the legacy unapproved August GL summary row intact until WAEC authorizes the accounting treatment.
-- [ ] If correction rehearsal is authorized, use isolated staging data or a formally approved staging copy.
+OVERALL: BLOCKED
 
-## 12. Final Staging Gate
-
-Staging is acceptable only when:
-
-- [ ] All seven active roles can log in.
-- [ ] Finance Manager account is provisioned and read-only controls are verified.
-- [ ] Critical reports render and export.
-- [ ] Security controls remain active.
-- [ ] Backup restore has been demonstrated.
-- [ ] No Critical or High staging defects remain.
-- [ ] WAEC approves moving from staging testing toward production planning.
-
-## Final Status
-
-`OVERALL: READY FOR STAGING DEPLOYMENT`
-
-`READY FOR PRODUCTION: NO`
-
+After the identified blockers are corrected and verified, authorize deployment to restricted staging; only completion of this checklist can establish staging acceptance. Production requires a separate go-live decision.

@@ -110,48 +110,19 @@ const comingSoon = (title, group) => {
 };
 
 const pool = require('../config/db');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
 const mailer = require('../config/mailer');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const lookupTableService = require('../services/lookupTableService');
 const controllerAuditHelper = require('../services/controllerAuditHelper');
 const brandingService = require('../services/brandingService');
-const RESET_SECRET = process.env.RESET_TOKEN_SECRET || process.env.JWT_SECRET || 'reset_secret';
+const accountSecurity = require('../services/accountSecurityService');
 
-// Configure Multer for logo uploads
-const logoUploadDirectory = path.join(process.cwd(), 'public', 'uploads');
-fs.mkdirSync(logoUploadDirectory, { recursive: true });
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, logoUploadDirectory);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-    }
-});
-
-const upload = multer({ 
-    storage: storage,
-    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
-    fileFilter: (req, file, cb) => {
-        const filetypes = /jpeg|jpg|png|gif/;
-        const mimetype = filetypes.test(file.mimetype);
-        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-        if (mimetype && extname) {
-            return cb(null, true);
-        }
-        cb(new Error('Error: File upload only supports images!'));
-    }
-});
+const upload = require('../services/privateFileService').createImageUpload('logos', 2 * 1024 * 1024);
 
 async function getCompanyInfo(req, res) {
     try {
-        const [rows] = await pool.query('SELECT * FROM tblcominfo LIMIT 1');
+        const companyId = accountSecurity.actorScope(req).companyId;
+        const [rows] = await pool.query('SELECT * FROM tblcominfo WHERE CompanyID = ?', [companyId]);
+        if (!rows.length) return res.status(404).send('Company not found.');
         const company = rows[0] || {};
         company.LogoPath = brandingService.normalizeLogoPath(company.LogoPath || company.Logopath);
         if (!company.Logopath && company.LogoPath) {
@@ -176,13 +147,12 @@ async function updateCompanyInfo(req, res) {
             AccNo, Phone, Bank, PayingBank, Email, Manager
         } = req.body;
 
-        const LogoPath = brandingService.normalizeLogoPath(req.file ? `/uploads/${req.file.filename}` : req.body.currentLogo);
-
-        // Check if company record exists
-        const [rows] = await pool.query('SELECT CompanyID FROM tblcominfo LIMIT 1');
+        const companyId = accountSecurity.actorScope(req).companyId;
+        const [rows] = await pool.query('SELECT CompanyID, LogoPath FROM tblcominfo WHERE CompanyID = ?', [companyId]);
+        if (!rows.length) return res.status(404).send('Company not found.');
+        const LogoPath = brandingService.normalizeLogoPath(req.file ? `/uploads/logos/${req.file.filename}` : rows[0].LogoPath);
         
         if (rows.length > 0) {
-            const companyId = rows[0].CompanyID;
             await controllerAuditHelper.auditUpdate({
                 table: 'tblcominfo',
                 formName: 'admin/company-info',
@@ -199,23 +169,6 @@ async function updateCompanyInfo(req, res) {
                     );
                 }
             });
-        } else {
-            await controllerAuditHelper.auditCreate({
-                table: 'tblcominfo',
-                formName: 'admin/company-info',
-                recordId: 1,
-                fetchQuery: 'SELECT * FROM tblcominfo ORDER BY CompanyID DESC LIMIT 1',
-                fetchParams: [],
-                applyChange: async () => {
-                    await pool.query(
-                        `INSERT INTO tblcominfo (
-                            Com_Name, TinNo, Address, Town, City, Country, 
-                            AccNo, Phone, Bank, PayingBank, Email, Manager, LogoPath, DateCreated
-                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-                        [Com_Name, TinNo, Address, Town, City, Country, AccNo, Phone, Bank, PayingBank, Email, Manager, LogoPath]
-                    );
-                }
-            });
         }
 
         res.redirect('/admin/company-info?success=Company info updated successfully');
@@ -227,7 +180,7 @@ async function updateCompanyInfo(req, res) {
 
 
 async function adminsListPage(req, res) {
-    const rows = await getPortalUsersByLevel('Admin');
+    const rows = await getPortalUsersByLevel('Admin', accountSecurity.actorScope(req).companyId);
     res.render('admin/admins', {
         user: getViewUser(req, 'Admin'),
         rows,
@@ -238,7 +191,7 @@ async function adminsListPage(req, res) {
 
 async function adminsListJson(req, res) {
     try {
-        const rows = await getPortalUsersByLevel('Admin');
+        const rows = await getPortalUsersByLevel('Admin', accountSecurity.actorScope(req).companyId);
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -255,16 +208,16 @@ async function adminsNewPage(req, res) {
     });
 }
 
-async function getPortalUsersByLevel(level) {
+async function getPortalUsersByLevel(level, companyId) {
     const [rows] = await pool.execute(
         `
             SELECT p.PFNo, p.Username, p.FullName, p.Email, p.CompanyID, p.DateCreated, c.Com_Name
             FROM tblpassword p
             LEFT JOIN tblcominfo c ON p.CompanyID = c.CompanyID
-            WHERE p.Level = ?
+            WHERE p.Level = ? AND p.CompanyID = ?
             ORDER BY p.PFNo DESC
         `,
-        [level]
+        [level, companyId]
     );
 
     return rows;
@@ -358,23 +311,25 @@ async function ensurePortalAccountIdentityAvailable({ username, email }) {
     }
 }
 
-function buildAccountSetupLink(req, pfno, email) {
-    const token = jwt.sign({ pfno, email }, RESET_SECRET, { expiresIn: '30m' });
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+async function buildAccountSetupLink(req, pfno, email) {
+    const companyId = accountSecurity.actorScope(req).companyId;
+    const token = await accountSecurity.issueSetupToken(pfno, companyId);
+    await accountSecurity.recordInvitation(req, pfno, companyId);
+    const baseUrl = (process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
     return `${baseUrl}/admin/admins/set-password?token=${encodeURIComponent(token)}`;
 }
 
 async function sendAccountSetupEmail({ to, subject, html }) {
     if (!to) {
-        return false;
+        throw new Error('An email address is required for account setup.');
     }
 
     await mailer.sendMail({
-        from: process.env.SMTP_USER || 'info@hrpayroll.davisasmedia.com',
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
         to,
         subject,
         html
-    });
+    }, { required: true });
 
     return true;
 }
@@ -387,14 +342,9 @@ async function createPortalUser(req, res, { level, redirectPath, accountLabel })
         const companyId = getSessionCompanyId(req);
         await ensurePortalAccountIdentityAvailable({ username: Username, email: Email });
 
-        const [result] = await pool.execute(
-            `INSERT INTO tblpassword (DateCreated, Level, Username, FullName, Pword, Email, CompanyID)
-             VALUES (NOW(), ?, ?, ?, NULL, ?, ?)`,
-            [level, Username, FullName, Email, companyId]
-        );
-        const pfno = result.insertId;
+        const pfno = await accountSecurity.createAccount(req, level, { Username, Email, FullName, CompanyID: req.body.CompanyID });
 
-        const link = buildAccountSetupLink(req, pfno, Email);
+        const link = await buildAccountSetupLink(req, pfno, Email);
 
         const subject = `Set up your HR Payroll ${accountLabel} password`;
         const html = `
@@ -410,12 +360,13 @@ async function createPortalUser(req, res, { level, redirectPath, accountLabel })
             await sendAccountSetupEmail({ to: Email, subject, html });
             return res.redirect(`${redirectPath}?success=${encodeURIComponent(`${accountLabel} account created successfully.`)}`);
         } catch (mailError) {
-            console.error(`Failed to send ${accountLabel} setup email:`, mailError);
+            console.error(`Failed to send ${accountLabel} setup email:`, mailError.code || 'MAIL_FAILED');
             return res.redirect(`${redirectPath}?warning=${encodeURIComponent(`${accountLabel} account was created, but the password email could not be sent.`)}`);
         }
     } catch (err) {
-        console.error(err);
-        res.redirect(`${redirectPath}/new?error=${encodeURIComponent(err.message || `Error creating ${accountLabel}`)}`);
+        console.error('Account creation failed:', err.code || 'ACCOUNT_CREATE_FAILED');
+        if (err.status === 403) return res.status(403).send('Not authorized.');
+        res.redirect(`${redirectPath}/new?error=${encodeURIComponent('Unable to create account. Check the required fields and account identity, or contact the administrator.')}`);
     }
 }
 
@@ -430,7 +381,7 @@ async function createAdmin(req, res) {
 async function setPasswordPage(req, res) {
     const { token } = req.query;
     try {
-        jwt.verify(token, RESET_SECRET);
+        await accountSecurity.verifySetupToken(token);
         res.render('admin/admins-set-password', { token, user: getViewUser(req, 'Admin') });
     } catch (err) {
         res.status(400).send('Invalid or expired link.');
@@ -440,57 +391,29 @@ async function setPasswordPage(req, res) {
 async function setPasswordSubmit(req, res) {
     const { token, password } = req.body;
     try {
-        const payload = jwt.verify(token, RESET_SECRET);
-        const hash = await bcrypt.hash(password, 10);
-        await pool.execute(`UPDATE tblpassword SET Pword = ? WHERE PFNo = ?`, [hash, payload.pfno]);
-        res.redirect('/admin/admins');
+        await accountSecurity.setPassword(token, password);
+        res.redirect('/login');
     } catch (err) {
-        console.error(err);
-        res.status(400).send('Failed to set password. Link may be invalid or expired.');
+        require('../services/securityEventService').logSecurityEvent('ACCOUNT_SETUP_FAILED', req, { outcome: 'blocked', reason: 'invalid-link-or-password' });
+        res.status(400).send('Use a strong password (12+ characters, upper/lower case, number and symbol). The link may be invalid, expired or already used.');
     }
 }
 
 async function resendLink(req, res) {
-    const { pfno } = req.params;
-    try {
-        const [[admin]] = await pool.execute(`SELECT Email, Username, FullName FROM tblpassword WHERE PFNo = ?`, [pfno]);
-        if (!admin) return res.status(404).json({ ok: false, message: 'Admin not found' });
-        const token = jwt.sign({ pfno, email: admin.Email }, RESET_SECRET, { expiresIn: '30m' });
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-        const link = `${baseUrl}/admin/admins/set-password?token=${encodeURIComponent(token)}`;
-        const subject = `Set up your HR Payroll admin password`;
-        const html = `
-            <p>Dear ${admin.FullName || admin.Username},</p>
-            <p>Please click the link below to set your password. The link expires in 30 minutes:</p>
-            <p><a href="${link}" target="_blank" rel="noopener">Set Password</a></p>
-            <p>Regards,<br/>HR Payroll Team</p>
-        `;
-        await mailer.sendMail({
-            from: process.env.SMTP_USER || 'info@hrpayroll.davisasmedia.com',
-            to: admin.Email,
-            subject,
-            html
-        });
-        res.json({ ok: true });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ ok: false, error: 'Failed to resend link' });
-    }
+    return resendAdminLink(req, res);
 }
 
 async function resendPortalLinkForLevel(req, res, { level, accountLabel }) {
     const { pfno } = req.params;
     try {
         const [[account]] = await pool.execute(
-            `SELECT Email, Username, FullName FROM tblpassword WHERE PFNo = ? AND Level = ?`,
-            [pfno, level]
+            `SELECT Email, Username, FullName FROM tblpassword WHERE PFNo = ? AND Level = ? AND CompanyID = ?`,
+            [pfno, level, getSessionCompanyId(req)]
         );
         if (!account) {
             return res.status(404).json({ ok: false, message: `${accountLabel} account not found` });
         }
-        const token = jwt.sign({ pfno, email: account.Email }, RESET_SECRET, { expiresIn: '30m' });
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-        const link = `${baseUrl}/admin/admins/set-password?token=${encodeURIComponent(token)}`;
+        const link = await buildAccountSetupLink(req, pfno, account.Email);
         const subject = `Set up your HR Payroll ${accountLabel} password`;
         const html = `
             <p>Dear ${account.FullName || account.Username},</p>
@@ -498,27 +421,23 @@ async function resendPortalLinkForLevel(req, res, { level, accountLabel }) {
             <p><a href="${link}" target="_blank" rel="noopener">Set Password</a></p>
             <p>Regards,<br/>HR Payroll Team</p>
         `;
-        await mailer.sendMail({
-            from: process.env.SMTP_USER || 'info@hrpayroll.davisasmedia.com',
+        await sendAccountSetupEmail({
             to: account.Email,
             subject,
             html
         });
         res.json({ ok: true });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ ok: false, error: `Failed to resend ${accountLabel} link` });
+        console.error('Account setup email failed:', err.code || 'MAIL_FAILED');
+        res.status(503).json({ ok: false, error: 'Setup email could not be sent. Check SMTP configuration and the recipient address, then retry.' });
     }
 }
 
 async function deletePortalUserForLevel(req, res, { level, accountLabel }) {
     const { pfno } = req.params;
     try {
-        const [result] = await pool.execute(
-            `DELETE FROM tblpassword WHERE PFNo = ? AND Level = ?`,
-            [pfno, level]
-        );
-        if (!result.affectedRows) {
+        const affectedRows = await accountSecurity.deleteAccount(req, level, pfno);
+        if (!affectedRows) {
             return res.status(404).json({ ok: false, error: `${accountLabel} account not found` });
         }
         res.json({ ok: true });
@@ -576,7 +495,7 @@ async function createManager(req, res) {
 }
 
 async function managersListPage(req, res) {
-    const rows = await getPortalUsersByLevel('Manager');
+    const rows = await getPortalUsersByLevel('Manager', accountSecurity.actorScope(req).companyId);
     res.render('admin/managers', {
         user: getViewUser(req, 'Admin'),
         rows,
@@ -587,7 +506,7 @@ async function managersListPage(req, res) {
 
 async function managersListJson(req, res) {
     try {
-        const rows = await getPortalUsersByLevel('Manager');
+        const rows = await getPortalUsersByLevel('Manager', accountSecurity.actorScope(req).companyId);
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -596,7 +515,7 @@ async function managersListJson(req, res) {
 }
 
 async function dataEntryListPage(req, res) {
-    const rows = await getPortalUsersByLevel('Data Entry');
+    const rows = await getPortalUsersByLevel('Data Entry', accountSecurity.actorScope(req).companyId);
     res.render('admin/data-entry-officers', {
         user: getViewUser(req, 'Admin'),
         rows,
@@ -606,7 +525,7 @@ async function dataEntryListPage(req, res) {
 }
 
 async function financeOfficersListPage(req, res) {
-    const rows = await getPortalUsersByLevel('Finance Officer');
+    const rows = await getPortalUsersByLevel('Finance Officer', accountSecurity.actorScope(req).companyId);
     res.render('admin/finance-officers', {
         user: getViewUser(req, 'Admin'),
         rows,
@@ -617,7 +536,7 @@ async function financeOfficersListPage(req, res) {
 
 async function financeOfficersListJson(req, res) {
     try {
-        const rows = await getPortalUsersByLevel('Finance Officer');
+        const rows = await getPortalUsersByLevel('Finance Officer', accountSecurity.actorScope(req).companyId);
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -626,7 +545,7 @@ async function financeOfficersListJson(req, res) {
 }
 
 async function financeManagersListPage(req, res) {
-    const rows = await getPortalUsersByLevel('Finance Manager');
+    const rows = await getPortalUsersByLevel('Finance Manager', accountSecurity.actorScope(req).companyId);
     res.render('admin/finance-managers', {
         user: getViewUser(req, 'Admin'),
         rows,
@@ -637,7 +556,7 @@ async function financeManagersListPage(req, res) {
 
 async function financeManagersListJson(req, res) {
     try {
-        const rows = await getPortalUsersByLevel('Finance Manager');
+        const rows = await getPortalUsersByLevel('Finance Manager', accountSecurity.actorScope(req).companyId);
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -647,7 +566,7 @@ async function financeManagersListJson(req, res) {
 
 async function dataEntryListJson(req, res) {
     try {
-        const rows = await getPortalUsersByLevel('Data Entry');
+        const rows = await getPortalUsersByLevel('Data Entry', accountSecurity.actorScope(req).companyId);
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -701,7 +620,7 @@ async function createFinanceManager(req, res) {
 }
 
 async function auditorsListPage(req, res) {
-    const rows = await getPortalUsersByLevel('Auditor');
+    const rows = await getPortalUsersByLevel('Auditor', accountSecurity.actorScope(req).companyId);
     res.render('admin/auditors', {
         user: getViewUser(req, 'Admin'),
         rows,
@@ -712,7 +631,7 @@ async function auditorsListPage(req, res) {
 
 async function auditorsListJson(req, res) {
     try {
-        const rows = await getPortalUsersByLevel('Auditor');
+        const rows = await getPortalUsersByLevel('Auditor', accountSecurity.actorScope(req).companyId);
         res.json({ data: rows });
     } catch (err) {
         console.error(err);
@@ -874,16 +793,8 @@ async function createEntityHead(req, res) {
             return res.status(400).send('An Entity Head account already exists for this staff PFNo or email.');
         }
 
-        const [result] = await pool.execute(
-            `
-                INSERT INTO tblpassword (DateCreated, Level, Username, FullName, Pword, Email, CompanyID)
-                VALUES (NOW(), ?, ?, ?, NULL, ?, ?)
-            `,
-            ['Entity Head', username, fullName, email, companyId]
-        );
-
-        const pfno = result.insertId;
-        const link = buildAccountSetupLink(req, pfno, email);
+        const pfno = await accountSecurity.createAccount(req, 'Entity Head', { Username: username, FullName: fullName, Email: email }, companyId);
+        const link = await buildAccountSetupLink(req, pfno, email);
 
         try {
             await sendAccountSetupEmail({
@@ -899,7 +810,7 @@ async function createEntityHead(req, res) {
             });
             res.redirect('/admin/entity-heads?success=' + encodeURIComponent('Entity Head account created successfully.'));
         } catch (mailError) {
-            console.error('Failed to send Entity Head setup email:', mailError);
+            console.error('Failed to send Entity Head setup email:', mailError.code || 'MAIL_FAILED');
             res.redirect('/admin/entity-heads?warning=' + encodeURIComponent('Entity Head account was created, but the password email could not be sent.'));
         }
     } catch (err) {
@@ -2286,7 +2197,7 @@ const sponsorsPage = async (req, res) => {
 
 const getSponsors = async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM tblCourseSponsor ORDER BY SCode');
+        const [rows] = await pool.query('SELECT * FROM tblcoursesponsor ORDER BY SCode');
         res.json(rows);
     } catch (error) {
         console.error('Error fetching sponsors:', error);
@@ -2539,9 +2450,9 @@ const getStaffFileData = async (req, res) => {
         jt.JobTitle AS JobTitleName,
         g.Medical AS MedicalLimit,
         g.WDays AS LeaveDays
-      FROM tblStaff s
-      LEFT JOIN tblJobTitle jt ON s.JobTitle = jt.Code
-      LEFT JOIN tblGrade g ON s.GradeCode = g.GradeCode AND s.JobTitle = g.JobTitle
+      FROM tblstaff s
+      LEFT JOIN tbljobtitle jt ON s.JobTitle = jt.Code
+      LEFT JOIN tblgrade g ON s.GradeCode = g.GradeCode AND s.JobTitle = g.JobTitle
       WHERE s.PFNo = ?
     `;
 
@@ -2557,7 +2468,7 @@ const getStaffFileData = async (req, res) => {
     // "subtracting the values from LDay and BalDay"
     const leaveQuery = `
       SELECT LDays, BalDays
-      FROM tblLeaveHistory
+      FROM tblleavehistory
       WHERE PFNo = ?
       ORDER BY LYear DESC, EntryDate DESC
       LIMIT 1
@@ -2572,7 +2483,7 @@ const getStaffFileData = async (req, res) => {
     // 3. Salary History
     const salaryQuery = `
       SELECT PDate, Annual
-      FROM tblSalary
+      FROM tblsalary
       WHERE PFNo = ?
       ORDER BY PDate DESC
     `;
@@ -2581,8 +2492,8 @@ const getStaffFileData = async (req, res) => {
     // 4. Grade History
     const gradeQuery = `
       SELECT p.PDate, jt.JobTitle
-      FROM tblPromotions p
-      LEFT JOIN tblJobTitle jt ON p.JobTitle = jt.Code
+      FROM tblpromotions p
+      LEFT JOIN tbljobtitle jt ON p.JobTitle = jt.Code
       WHERE p.PFNO = ?
       ORDER BY p.PDate DESC
     `;
@@ -2591,7 +2502,7 @@ const getStaffFileData = async (req, res) => {
     // 5. Discipline / Queries
     const queryQuery = `
       SELECT QDate, QDetails, QType
-      FROM tblQuery
+      FROM tblquery
       WHERE PFNO = ?
       ORDER BY QDate DESC
     `;
@@ -2600,7 +2511,7 @@ const getStaffFileData = async (req, res) => {
     // 6. Transfer History
     const transferQuery = `
       SELECT t.TDate, d1.Dept AS PrevDeptName, d2.Dept AS NewDeptName
-      FROM tblTransfer t
+      FROM tbltransfer t
       LEFT JOIN tbldept d1 ON t.PrevDept = d1.Code
       LEFT JOIN tbldept d2 ON t.TDept = d2.Code
       WHERE t.PFNO = ?
@@ -2611,7 +2522,7 @@ const getStaffFileData = async (req, res) => {
     // 7. Training / Course History
     const courseQuery = `
       SELECT StartDate, Course, OrganisedBy, Duration, Country
-      FROM tblCourse
+      FROM tblcourse
       WHERE PFNo = ?
       ORDER BY StartDate DESC
     `;

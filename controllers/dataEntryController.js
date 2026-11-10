@@ -17,6 +17,7 @@ const workQueueService = require('../services/workQueueService');
 const payrollSetupAutoCalculationService = require('../services/payrollSetupAutoCalculationService');
 const payeTaxService = require('../services/payeTaxService');
 const { getWorkspaceContext } = require('../utils/workspaceContext');
+const { getInstallationCompanyId, assertInstallationUser, assertCompanyInput } = require('../services/installationCompanyService');
 
 function roundCurrency(value) {
     return Math.round((Number(value) || 0) * 100) / 100;
@@ -264,12 +265,12 @@ function buildSalaryScale({ gradeCode, maxNotch, startLevel, endLevel, scaleNotc
     };
 }
 
-async function getLatestGradeScale(gradeCode) {
+async function getLatestGradeScale(gradeCode, executor = pool, companyId = getInstallationCompanyId()) {
     if (!gradeCode) {
         return null;
     }
 
-    const [rows] = await pool.query(
+    const [rows] = await executor.query(
         `
             SELECT
                 g.GradeCode,
@@ -281,22 +282,25 @@ async function getLatestGradeScale(gradeCode) {
             FROM tblgrade g
             LEFT JOIN tblallowance a
                 ON a.Grade = g.GradeCode
+                AND a.CompanyID = g.CompanyID
                 AND a.ScaleDate = (
                     SELECT MAX(a2.ScaleDate)
                     FROM tblallowance a2
                     WHERE a2.Grade = g.GradeCode
+                      AND a2.CompanyID = g.CompanyID
                 )
             WHERE g.GradeCode = ?
+              AND g.CompanyID = ?
             LIMIT 1
         `,
-        [gradeCode]
+        [gradeCode, companyId]
     );
 
     return rows[0] || null;
 }
 
-async function calculateStaffCompensation(gradeCode, notch) {
-    const scale = await getLatestGradeScale(gradeCode);
+async function calculateStaffCompensation(gradeCode, notch, executor = pool, companyId = getInstallationCompanyId()) {
+    const scale = await getLatestGradeScale(gradeCode, executor, companyId);
     if (!scale) {
         return buildSalaryScale({
             gradeCode,
@@ -771,7 +775,7 @@ const dataEntryController = {
                 LEFT JOIN tblgrade g ON s.CGrade = g.GradeCode
                 LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code
                 WHERE s.PFNo = ?
-                  AND (s.CompanyID = ? OR s.CompanyID IS NULL)
+                  AND (s.CompanyID = ?)
                   AND ${staffStatusService.getActiveStaffFilter('s')}
                 LIMIT 1
             `, [pfno, companyId]);
@@ -837,7 +841,7 @@ const dataEntryController = {
                     SELECT PFNo, CDept AS Dept, CGrade AS GradeCode, JobTitle AS JobTitleCode
                     FROM tblstaff
                     WHERE PFNo = ?
-                      AND (CompanyID = ? OR CompanyID IS NULL)
+                      AND (CompanyID = ?)
                     LIMIT 1
                 `,
                 [pfno, companyId]
@@ -905,7 +909,7 @@ const dataEntryController = {
                 `
                     SELECT Code, Taxable
                     FROM tblpayrollitems
-                    WHERE CompanyID = ? OR CompanyID IS NULL
+                    WHERE CompanyID = ?
                     ORDER BY CASE WHEN CompanyID = ? THEN 0 ELSE 1 END, Code
                 `,
                 [companyId, companyId]
@@ -948,7 +952,7 @@ const dataEntryController = {
                     SELECT PFNo, Dept, PType
                     FROM tblsalary
                     WHERE PFNo = ?
-                      AND (CompanyID = ? OR CompanyID IS NULL)
+                      AND (CompanyID = ?)
                     ORDER BY PDate DESC
                     LIMIT 1
                 `,
@@ -967,7 +971,7 @@ const dataEntryController = {
                         WHERE PFNo = ?
                           AND Dept = ?
                           AND PType = ?
-                          AND (CompanyID = ? OR CompanyID IS NULL)
+                          AND (CompanyID = ?)
                     `,
                     [...values, existing.PFNo, existing.Dept, existing.PType, companyId]
                 );
@@ -1210,7 +1214,7 @@ const dataEntryController = {
             const [colsRows] = await pool.query(`
                 SELECT COLUMN_NAME, IS_NULLABLE, COLUMN_DEFAULT, DATA_TYPE, EXTRA 
                 FROM information_schema.COLUMNS 
-                WHERE TABLE_NAME = 'tblbonusawards'
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tblbonusawards'
             `);
             const colSet = new Set(colsRows.map(r => r.COLUMN_NAME));
 
@@ -1242,8 +1246,8 @@ const dataEntryController = {
             let whereParams = [];
             if (id && (colSet.has('RefNo') || colSet.has('Id') || colSet.has('BonusID'))) {
                 const keyCol = colSet.has('RefNo') ? 'RefNo' : (colSet.has('Id') ? 'Id' : 'BonusID');
-                whereClause = `WHERE ${keyCol} = ?`;
-                whereParams = [id];
+                whereClause = `WHERE ${keyCol} = ? AND CompanyID = ?`;
+                whereParams = [id, getInstallationCompanyId()];
                 const [existing] = await pool.query(`SELECT * FROM tblbonusawards ${whereClause}`, whereParams);
                 if (existing.length > 0) {
                     const setClause = fields.map(f => `${f} = ?`).join(', ');
@@ -1253,6 +1257,7 @@ const dataEntryController = {
                     );
                     return res.json({ success: true, message: 'Bonus award updated' });
                 }
+                return res.status(404).json({ error: 'Record not found.' });
             }
 
             // Otherwise insert new; generate reference if column exists
@@ -1264,7 +1269,7 @@ const dataEntryController = {
             }
             if (colSet.has('CompanyID')) {
                 extraCols.push('CompanyID');
-                extraVals.push(1);
+                extraVals.push(getInstallationCompanyId());
             }
             // Provide safe defaults for common non-null flags
             const defaultFlags = ['Paid', 'Posted', 'Linked', 'FullPay', 'HalfPay', 'WithoutPay'];
@@ -1305,7 +1310,7 @@ const dataEntryController = {
             res.json({ success: true, message: 'Bonus award saved' });
         } catch (error) {
             console.error('Post Bonus Award Error:', error);
-            res.status(500).json({ error: 'Server Error: ' + (error.sqlMessage || error.message || 'Unknown') });
+            res.status(500).json({ error: 'Unable to save bonus setup.' });
         }
     },
 
@@ -1317,8 +1322,8 @@ const dataEntryController = {
             const candidates = ['RefNo', 'Id', 'BonusID'];
             for (const key of candidates) {
                 const [rows] = await pool.query(
-                    `SELECT * FROM tblbonusawards WHERE ${key} = ? LIMIT 1`,
-                    [id]
+                    `SELECT * FROM tblbonusawards WHERE ${key} = ? AND CompanyID = ? LIMIT 1`,
+                    [id, getInstallationCompanyId()]
                 );
                 if (rows.length > 0) {
                     return res.json(rows[0]);
@@ -1624,10 +1629,10 @@ const dataEntryController = {
             const query = `
                 SELECT PFNo, SName, DATE_FORMAT(DOB, '%Y-%m-%d') as Birthdate 
                 FROM tblstaff 
-                WHERE MONTH(DOB) = ? 
+                WHERE MONTH(DOB) = ? AND CompanyID = ?
                 ORDER BY DAY(DOB)
             `;
-            const [rows] = await pool.query(query, [month]);
+            const [rows] = await pool.query(query, [month, getInstallationCompanyId()]);
             res.json(rows);
         } catch (error) {
             console.error(error);
@@ -1693,12 +1698,12 @@ const dataEntryController = {
                 LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code
                 LEFT JOIN (
                     SELECT PFNO, PrevDept FROM tbltransfer t1
-                    WHERE TDate = (SELECT MAX(TDate) FROM tbltransfer t2 WHERE t2.PFNO = t1.PFNO)
+                    WHERE t1.CompanyID = ${getInstallationCompanyId()} AND TDate = (SELECT MAX(TDate) FROM tbltransfer t2 WHERE t2.PFNO = t1.PFNO AND t2.CompanyID = t1.CompanyID)
                 ) t ON s.PFNo = t.PFNO
-                WHERE 1=1
+                WHERE s.CompanyID = ?
             `;
 
-            const params = [];
+            const params = [getInstallationCompanyId()];
 
             if (fServedFrom) {
                 query += ' AND TIMESTAMPDIFF(YEAR, s.DOE, CURDATE()) >= ?';
@@ -2326,10 +2331,10 @@ const dataEntryController = {
             const company = comRows[0] || { Com_Name: 'Company Name', Address: 'Address', LogoPath: null };
 
             // Fetch Bonus Rules
-            const [bonusRules] = await pool.query('SELECT * FROM tblbonusawards WHERE BonusYear = ?', [year]);
+            const [bonusRules] = await pool.query('SELECT * FROM tblbonusawards WHERE BonusYear = ? AND CompanyID = ?', [year, getInstallationCompanyId()]);
 
             // Determine latest payroll period for salary base
-            const [periodRows] = await pool.query('SELECT MAX(PYear) as y, MAX(PMonth) as m FROM tblpayroll');
+            const [periodRows] = await pool.query('SELECT MAX(PYear) as y, MAX(PMonth) as m FROM tblpayroll WHERE CompanyID = ?', [getInstallationCompanyId()]);
             const latestYear = periodRows[0]?.y || new Date().getFullYear();
             const latestMonth = periodRows[0]?.m || (new Date().getMonth() + 1);
 
@@ -2339,12 +2344,12 @@ const dataEntryController = {
                        d.Dept AS DeptName, j.JobTitle AS JobTitleName,
                        COALESCE(p.Salary, 0) as BasicPay
                 FROM tblstaff s
-                LEFT JOIN tblpayroll p ON s.PFNo = p.PFNo AND p.PYear = ? AND p.PMonth = ?
+                LEFT JOIN tblpayroll p ON s.PFNo = p.PFNo AND p.CompanyID = s.CompanyID AND p.PYear = ? AND p.PMonth = ?
                 LEFT JOIN tbldept d ON s.CDept = d.Code
                 LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code
-                WHERE s.EmpStatus = '1'
+                WHERE s.EmpStatus = '1' AND s.CompanyID = ?
             `;
-            const staffParams = [latestYear, latestMonth];
+            const staffParams = [latestYear, latestMonth, getInstallationCompanyId()];
             
             if (scope === 'staff' && pfno) {
                 staffQuery += ' AND s.PFNo = ?';
@@ -2467,7 +2472,7 @@ const dataEntryController = {
             const companyId = req.user?.companyId || req.user?.company_id || req.session?.companyId || req.session?.CompanyID || 1;
 
             const [comRows] = await pool.query(
-                'SELECT Com_Name, Address, LogoPath FROM tblcominfo WHERE (CompanyID = ? OR CompanyID IS NULL) ORDER BY CompanyID DESC LIMIT 1',
+                'SELECT Com_Name, Address, LogoPath FROM tblcominfo WHERE (CompanyID = ?) ORDER BY CompanyID DESC LIMIT 1',
                 [companyId]
             );
             const company = comRows[0] || { Com_Name: '', Address: '', LogoPath: null };
@@ -2645,47 +2650,48 @@ const dataEntryController = {
             const [sex] = await pool.query('SELECT * FROM tblsex');
             const [mstatus] = await pool.query('SELECT * FROM tblmstatus');
             const [nations] = await pool.query('SELECT * FROM tblnation');
-            const [depts] = await pool.query('SELECT * FROM tbldept');
-            const [jobTitles] = await pool.query('SELECT * FROM tbljobtitle');
+            const [depts] = await pool.query('SELECT * FROM tbldept WHERE CompanyID = ?', [getInstallationCompanyId()]);
+            const [jobTitles] = await pool.query('SELECT * FROM tbljobtitle WHERE CompanyID = ?', [getInstallationCompanyId()]);
             const [grades] = await pool.query(`
                 SELECT
                     g.*,
                     (
                         SELECT a.StartLevel
                         FROM tblallowance a
-                        WHERE a.Grade = g.GradeCode
+                        WHERE a.Grade = g.GradeCode AND a.CompanyID = g.CompanyID
                         ORDER BY a.ScaleDate DESC
                         LIMIT 1
                     ) AS StartLevel,
                     (
                         SELECT a.EndLevel
                         FROM tblallowance a
-                        WHERE a.Grade = g.GradeCode
+                        WHERE a.Grade = g.GradeCode AND a.CompanyID = g.CompanyID
                         ORDER BY a.ScaleDate DESC
                         LIMIT 1
                     ) AS EndLevel,
                     (
                         SELECT a.Notches
                         FROM tblallowance a
-                        WHERE a.Grade = g.GradeCode
+                        WHERE a.Grade = g.GradeCode AND a.CompanyID = g.CompanyID
                         ORDER BY a.ScaleDate DESC
                         LIMIT 1
                     ) AS ScaleNotches,
                     (
                         SELECT a.Increment
                         FROM tblallowance a
-                        WHERE a.Grade = g.GradeCode
+                        WHERE a.Grade = g.GradeCode AND a.CompanyID = g.CompanyID
                         ORDER BY a.ScaleDate DESC
                         LIMIT 1
                     ) AS ScaleIncrement
                 FROM tblgrade g
-            `);
+                WHERE g.CompanyID = ?
+            `, [getInstallationCompanyId()]);
             const [empTypes] = await pool.query('SELECT * FROM tblemptype');
             const [relations] = await pool.query('SELECT * FROM tblrelation');
             const [empStatuses] = await pool.query('SELECT * FROM tblempstatus');
             const [levels] = await pool.query('SELECT LCode, Level FROM tbllevel ORDER BY Level');
             const [qualifTypes] = await pool.query('SELECT Code, QType FROM tblqualiftype ORDER BY QType');
-            const [params1] = await pool.query('SELECT RetireAge FROM tblparams1 LIMIT 1');
+            const [params1] = await pool.query('SELECT RetireAge FROM tblparams1 WHERE CompanyID = ? LIMIT 1', [getInstallationCompanyId()]);
             const [vehicles] = await pool.query('SELECT VType FROM tblvehicle ORDER BY VType');
 
             res.render('data_entry/staff/new_edit', {
@@ -2715,8 +2721,8 @@ const dataEntryController = {
         try {
             const { pfno } = req.params;
             const [rows] = await pool.query(
-                'SELECT DATE_FORMAT(MAX(StartDate), "%Y-%m-%d") as LastLeave FROM tblleave WHERE PFNO = ?',
-                [pfno]
+                'SELECT DATE_FORMAT(MAX(StartDate), "%Y-%m-%d") as LastLeave FROM tblleave WHERE PFNO = ? AND CompanyID = ?',
+                [pfno, getInstallationCompanyId()]
             );
             const lastLeave = rows[0] ? rows[0].LastLeave : null;
             res.json({ lastLeave });
@@ -2733,9 +2739,9 @@ const dataEntryController = {
                 SELECT q.Code, q.QName, qt.QType
                 FROM tblqualif q
                 LEFT JOIN tblqualiftype qt ON q.Code = qt.Code
-                WHERE q.PFNo = ?
+                WHERE q.PFNo = ? AND q.CompanyID = ?
             `;
-            const [rows] = await pool.query(query, [pfno]);
+            const [rows] = await pool.query(query, [pfno, getInstallationCompanyId()]);
             res.json(rows);
         } catch (error) {
             console.error(error);
@@ -2756,15 +2762,15 @@ const dataEntryController = {
                     d.Dept AS CDeptName,
                     j.JobTitle AS JobTitleName
                 FROM tblstaff s
-                LEFT JOIN tbldept d ON s.CDept = d.Code
-                LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code
-                WHERE s.PFNo LIKE ? OR s.SName LIKE ?
+                LEFT JOIN tbldept d ON s.CDept = d.Code AND d.CompanyID = s.CompanyID
+                LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code AND j.CompanyID = s.CompanyID
+                WHERE s.CompanyID = ? AND (s.PFNo LIKE ? OR s.SName LIKE ?)
                 ORDER BY
                     CASE WHEN s.PFNo = ? THEN 0 ELSE 1 END,
                     s.SName,
                     s.PFNo
                 LIMIT 25
-            `, [`%${q}%`, `%${q}%`, q]);
+            `, [getInstallationCompanyId(), `%${q}%`, `%${q}%`, q]);
             res.json(rows);
         } catch (err) {
             console.error(err);
@@ -2773,7 +2779,11 @@ const dataEntryController = {
     },
 
     postStaffNewEdit: async (req, res) => {
+        let connection;
         try {
+            const companyId = assertInstallationUser(req.user);
+            if (req.user.role !== 'data-entry') throw Object.assign(new Error('Not authorized.'), { status: 403 });
+            assertCompanyInput(req.body);
             const {
                 sname, dob, sex, mstatus, nation, address, city, phone, email,
                 pfno, doe, dateConfirmed, jobTitle, cGrade, gradeEmployed, dept, empType, empStatus,
@@ -2784,6 +2794,13 @@ const dataEntryController = {
                 qualifCode, qualifName
             } = req.body;
 
+            if (typeof pfno !== 'string' || !/^[a-zA-Z0-9_-]{1,50}$/.test(pfno)) {
+                throw Object.assign(new Error('Invalid employee identifier.'), { status: 400 });
+            }
+            connection = await require('../config/db').getConnection();
+            const pool = connection;
+            await connection.beginTransaction();
+
             const operator = (req.session && req.session.user && req.session.user.name) ? req.session.user.name : 'Data Entry Officer';
             const now = new Date();
             const photoPath = req.file ? '/uploads/staff_photos/' + req.file.filename : null;
@@ -2793,15 +2810,17 @@ const dataEntryController = {
             const vehicleVal = vehicle || 'NO';
 
             // Check if staff exists
-            const [existing] = await pool.query('SELECT PFNo FROM tblstaff WHERE PFNo = ?', [pfno]);
-            const previousStaffRow = existing.length > 0
-                ? await controllerAuditHelper.fetchSingleRow?.('SELECT * FROM tblstaff WHERE PFNo = ?', [pfno])
-                : null;
+            const [owners] = await pool.query('SELECT CompanyID FROM tblstaff WHERE PFNo = ? FOR UPDATE', [pfno]);
+            if (owners.some(row => Number(row.CompanyID) !== companyId)) {
+                throw Object.assign(new Error('Record not found.'), { status: 404 });
+            }
+            const [existing] = await pool.query('SELECT * FROM tblstaff WHERE PFNo = ? AND CompanyID = ? FOR UPDATE', [pfno, companyId]);
+            const previousStaffRow = existing[0] || null;
 
-            const compensation = await calculateStaffCompensation(cGrade, notch);
+            const compensation = await calculateStaffCompensation(cGrade, notch, pool, companyId);
             const maxNotch = compensation.maxNotch;
             if ((parseInt(notch, 10) || 0) > maxNotch) {
-                return res.status(400).json({ error: `Notch cannot exceed ${maxNotch} for this grade` });
+                throw Object.assign(new Error(`Notch cannot exceed ${maxNotch} for this grade`), { status: 400 });
             }
 
             const calculatedSalary = compensation.monthlySalary;
@@ -2830,11 +2849,11 @@ const dataEntryController = {
                     operator, now, now
                 ];
 
-                const [masterPayroll] = await pool.query('SELECT * FROM tblpayroll WHERE PFNo = ? AND PYear = 0 AND PMonth = 0', [pfno]);
+                const [masterPayroll] = await pool.query('SELECT * FROM tblpayroll WHERE PFNo = ? AND CompanyID = ? AND PYear = 0 AND PMonth = 0', [pfno, companyId]);
                 if (masterPayroll.length > 0) {
                     await pool.query(
-                        'UPDATE tblpayroll SET Salary = ?, Grade = ?, Dept = ?, JobTitle = ?, AccountNo = ?, Level = ?, EmpType = ? WHERE PFNo = ? AND PYear = 0 AND PMonth = 0',
-                        [calculatedSalary, cGrade, dept, jobTitle, accountNo, level, empType, pfno]
+                        'UPDATE tblpayroll SET Salary = ?, Grade = ?, Dept = ?, JobTitle = ?, AccountNo = ?, Level = ?, EmpType = ? WHERE PFNo = ? AND CompanyID = ? AND PYear = 0 AND PMonth = 0',
+                        [calculatedSalary, cGrade, dept, jobTitle, accountNo, level, empType, pfno, companyId]
                     );
                 } else {
                     await pool.query(`INSERT INTO tblpayroll (
@@ -2847,19 +2866,19 @@ const dataEntryController = {
                         now, now, pfno, dept, cGrade, jobTitle,
                         '1', '1', accountNo, level, empType,
                         '01', 1, calculatedSalary,
-                        0, 0, '1', 0, 1, 1,
+                        0, 0, '1', 0, 1, companyId,
                         1, 0, 0
                     ]);
                 }
 
                 const [latestSalaryRows] = await pool.query(
-                    'SELECT PDate FROM tblsalary WHERE PFNo = ? ORDER BY PDate DESC LIMIT 1',
-                    [pfno]
+                    'SELECT PDate FROM tblsalary WHERE PFNo = ? AND CompanyID = ? ORDER BY PDate DESC LIMIT 1',
+                    [pfno, companyId]
                 );
                 if (latestSalaryRows.length > 0) {
                     await pool.query(
-                        'UPDATE tblsalary SET Grade = ?, Dept = ?, JobTitle = ?, AccountNo = ?, Level = ?, EmpType = ?, Annual = ?, Salary = ? WHERE PFNo = ? AND PDate = ?',
-                        [cGrade, dept, jobTitle, accountNo, level, empType, calculatedAnnualSalary, calculatedSalary, pfno, latestSalaryRows[0].PDate]
+                        'UPDATE tblsalary SET Grade = ?, Dept = ?, JobTitle = ?, AccountNo = ?, Level = ?, EmpType = ?, Annual = ?, Salary = ? WHERE PFNo = ? AND PDate = ? AND CompanyID = ?',
+                        [cGrade, dept, jobTitle, accountNo, level, empType, calculatedAnnualSalary, calculatedSalary, pfno, latestSalaryRows[0].PDate, companyId]
                     );
                 }
 
@@ -2868,8 +2887,8 @@ const dataEntryController = {
                     params.push(photoPath);
                 }
 
-                updateQuery += ` WHERE PFNo = ?`;
-                params.push(pfno);
+                updateQuery += ` WHERE PFNo = ? AND CompanyID = ?`;
+                params.push(pfno, companyId);
 
                 await pool.query(updateQuery, params);
             } else {
@@ -2893,7 +2912,7 @@ const dataEntryController = {
                         ?, ?, ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?,
                         0, 0, 0,
-                        0, ?, ?, ?, 1
+                        0, ?, ?, ?, ?
                     )
                 `;
                 await pool.query(insertQuery, [
@@ -2903,7 +2922,7 @@ const dataEntryController = {
                     accountNo, nassitNo, nassitR,
                     cGradeDate || null, cDeptDate || null, dEmp, notch, level, unionMem, acad, photoPath,
                     hodVal, hodStartDate || null, hodEndDate || null, vehicleVal, vehicleStartDate || null, vehicleEndDate || null, contractExp || null,
-                    operator, now, now
+                    operator, now, now, companyId
                 ]);
 
                 // Create master payroll record for new staff
@@ -2911,12 +2930,12 @@ const dataEntryController = {
                     PDate, SalDate, PFNo, Dept, Grade, JobTitle, 
                     PayThrough, Bank, AccountNo, Level, EmpType, 
                     PayCurrency, ExchRate, Salary, 
-                    PMonth, PYear, PType, Paid, Approved, CompanyID
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+                    PMonth, PYear, PType, Paid, Approved, CompanyID, FullPay, HalfPay, WithoutPay
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
                     now, now, pfno, dept, cGrade, jobTitle, 
                     '1', '1', accountNo, level, empType, 
                     '01', 1, calculatedSalary || 0, 
-                    0, 0, '1', 0, 1, 1
+                    0, 0, '1', 0, 1, companyId, 1, 0, 0
                 ]);
 
                 await pool.query(
@@ -2928,14 +2947,14 @@ const dataEntryController = {
                     [
                         now, pfno, dept, cGrade, jobTitle, accountNo, level, empType,
                         '01', 1, calculatedAnnualSalary || 0, calculatedSalary || 0, operator, now, now,
-                        '01', 0, 0, 0, 0, 0, 0, 0, 1
+                        '01', 0, 0, 0, 0, 0, 0, 0, companyId
                     ]
                 );
             }
 
             // Handle Qualifications
             if (acad === 'Y') {
-                await pool.query('DELETE FROM tblqualif WHERE PFNo = ?', [pfno]);
+                await pool.query('DELETE FROM tblqualif WHERE PFNo = ? AND CompanyID = ?', [pfno, companyId]);
 
                 if (qualifCode && qualifName) {
                     const codes = Array.isArray(qualifCode) ? qualifCode : [qualifCode];
@@ -2943,40 +2962,41 @@ const dataEntryController = {
 
                     for (let i = 0; i < codes.length; i++) {
                         if (codes[i] && names[i]) {
-                            await pool.query('INSERT INTO tblqualif (PFNo, Code, QName, CompanyID) VALUES (?, ?, ?, 1)', [pfno, codes[i], names[i]]);
+                            await pool.query('INSERT INTO tblqualif (PFNo, Code, QName, CompanyID) VALUES (?, ?, ?, ?)', [pfno, codes[i], names[i], companyId]);
                         }
                     }
                 }
             }
 
-            const [updatedStaffRows] = await pool.query('SELECT * FROM tblstaff WHERE PFNo = ?', [pfno]);
+            const [updatedStaffRows] = await pool.query('SELECT * FROM tblstaff WHERE PFNo = ? AND CompanyID = ?', [pfno, companyId]);
             const updatedStaffRow = updatedStaffRows[0] || null;
 
             if (previousStaffRow && updatedStaffRow) {
                 const changedFields = controllerAuditHelper.getChangedFields(previousStaffRow, updatedStaffRow);
                 if (changedFields.length > 0) {
-                    await auditTrailService.logUpdate({
-                        table: 'tblstaff',
+                    for (const fieldName of changedFields) await auditTrailService.writeAuditEntryWithExecutor(connection, {
+                        action: 'Edit', companyId, userName: req.user.name || req.user.username,
                         formName: 'data-entry/staff/new-edit',
                         recordId: pfno,
-                        previousRow: previousStaffRow,
-                        nextRow: updatedStaffRow,
-                        changedFields
+                        fieldName, oldValue: previousStaffRow[fieldName], newValue: updatedStaffRow[fieldName]
                     });
                 }
             } else if (updatedStaffRow) {
-                await auditTrailService.logCreate({
-                    table: 'tblstaff',
+                await auditTrailService.writeAuditEntryWithExecutor(connection, {
+                    action: 'New', companyId, userName: req.user.name || req.user.username,
                     formName: 'data-entry/staff/new-edit',
                     recordId: pfno,
-                    row: updatedStaffRow
+                    fieldName: 'StaffRecord', newValue: 'Pending Manager approval'
                 });
             }
 
+            await connection.commit();
             res.redirect('/data-entry/staff/new-edit?success=Record saved successfully and sent for approval');
         } catch (err) {
-            console.error(err);
-            res.status(err.statusCode || 500).send(err.message || 'Server Error');
+            if (connection) await connection.rollback();
+            res.status(err.status || err.statusCode || 500).send(err.status ? err.message : 'Unable to save staff record.');
+        } finally {
+            connection?.release();
         }
     },
 
@@ -3014,7 +3034,7 @@ const dataEntryController = {
             const { pfno } = req.params;
             
             // Check staff existence
-            const [staffRows] = await pool.query('SELECT SName FROM tblstaff WHERE PFNo = ?', [pfno]);
+            const [staffRows] = await pool.query('SELECT SName FROM tblstaff WHERE PFNo = ? AND CompanyID = ?', [pfno, getCompanyId(req)]);
             if (staffRows.length === 0) {
                 return res.status(404).json({ error: 'Staff not found' });
             }
@@ -3031,13 +3051,13 @@ const dataEntryController = {
                     d.PhoneNo
                 FROM tbldependant d
                 LEFT JOIN tblrelation r ON d.RCode = r.RCode
-                WHERE d.PFNo = ? AND (d.Closed = 0 OR d.Closed IS NULL)
+                WHERE d.PFNo = ? AND d.CompanyID = ? AND (d.Closed = 0 OR d.Closed IS NULL)
                 ORDER BY d.DepNo
             `;
-            const [dependants] = await pool.query(query, [pfno]);
+            const [dependants] = await pool.query(query, [pfno, getCompanyId(req)]);
 
             // Get max dependants limit
-            const [paramsRows] = await pool.query('SELECT Max_Dependants FROM tblparams1 LIMIT 1');
+            const [paramsRows] = await pool.query('SELECT Max_Dependants FROM tblparams1 WHERE CompanyID = ? LIMIT 1', [getCompanyId(req)]);
             const maxDependants = paramsRows[0] ? paramsRows[0].Max_Dependants : 0;
 
             res.json({
@@ -3152,10 +3172,11 @@ const dataEntryController = {
                     bg.Duration, bg.Monthly, bg.Bank, b.Bank as BankName,
                     bg.ExpiryDate, bg.Approved, bg.Clearance, bg.ClearanceDate, bg.ReceivedBy
                 FROM tblbankguarantee bg
-                LEFT JOIN tblstaff s ON bg.PFNO = s.PFNo
+                LEFT JOIN tblstaff s ON bg.PFNO = s.PFNo AND s.CompanyID = bg.CompanyID
                 LEFT JOIN tblbanks b ON bg.Bank = b.Code
+                WHERE bg.CompanyID = ?
                 ORDER BY bg.LoanDate DESC
-            `);
+            `, [getInstallationCompanyId()]);
 
             // 2. Fetch Staff for Dropdown
             const [staff] = await pool.query(staffStatusService.getActiveStaffQuery());
@@ -3418,9 +3439,10 @@ const dataEntryController = {
                     b.Years,
                     b.Paid
                 FROM tbleosbudget b
-                LEFT JOIN tblgrade g ON b.Grade = g.GradeCode
+                LEFT JOIN tblgrade g ON b.Grade = g.GradeCode AND g.CompanyID = b.CompanyID
+                WHERE b.CompanyID = ?
                 ORDER BY b.PFNo
-            `);
+            `, [getInstallationCompanyId()]);
             res.json({ rows });
         } catch (error) {
             console.error(error);
@@ -3431,13 +3453,14 @@ const dataEntryController = {
     addDependant: async (req, res) => {
         try {
             const { pfno, dependant, rcode, dob, phone } = req.body;
+            const companyId = getCompanyId(req);
 
             // Get max dependants limit
-            const [paramsRows] = await pool.query('SELECT Max_Dependants FROM tblparams1 LIMIT 1');
+            const [paramsRows] = await pool.query('SELECT Max_Dependants FROM tblparams1 WHERE CompanyID = ? LIMIT 1', [companyId]);
             const maxDependants = paramsRows[0] ? paramsRows[0].Max_Dependants : 0;
 
             // Check current count
-            const [countRows] = await pool.query('SELECT COUNT(*) as count FROM tbldependant WHERE PFNo = ? AND (Closed = 0 OR Closed IS NULL)', [pfno]);
+            const [countRows] = await pool.query('SELECT COUNT(*) as count FROM tbldependant WHERE PFNo = ? AND CompanyID = ? AND (Closed = 0 OR Closed IS NULL)', [pfno, companyId]);
             const currentCount = countRows[0].count;
 
             if (currentCount >= maxDependants) {
@@ -3445,7 +3468,7 @@ const dataEntryController = {
             }
 
             // Find next DepNo
-            const [maxDepRow] = await pool.query('SELECT MAX(CAST(DepNo AS UNSIGNED)) as maxDep FROM tbldependant WHERE PFNo = ?', [pfno]);
+            const [maxDepRow] = await pool.query('SELECT MAX(CAST(DepNo AS UNSIGNED)) as maxDep FROM tbldependant WHERE PFNo = ? AND CompanyID = ?', [pfno, companyId]);
             let nextDepNo = (maxDepRow[0].maxDep || 0) + 1;
             
             if (nextDepNo > 9) {
@@ -3456,14 +3479,14 @@ const dataEntryController = {
                 table: 'tbldependant',
                 formName: 'data-entry/staff/dependants',
                 recordId: `${pfno}${nextDepNo}`,
-                fetchQuery: 'SELECT * FROM tbldependant WHERE PFNo = ? AND DepNo = ?',
-                fetchParams: [pfno, nextDepNo],
+                fetchQuery: 'SELECT * FROM tbldependant WHERE PFNo = ? AND DepNo = ? AND CompanyID = ?',
+                fetchParams: [pfno, nextDepNo, companyId],
                 applyChange: async () => {
                     const query = `
                         INSERT INTO tbldependant (PFNo, DepNo, Dependant, RCode, DOB, PhoneNo, Closed, Approved, CompanyID)
-                        VALUES (?, ?, ?, ?, ?, ?, 0, 0, 1)
+                        VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?)
                     `;
-                    await pool.query(query, [pfno, nextDepNo, dependant, rcode, dob, phone]);
+                    await pool.query(query, [pfno, nextDepNo, dependant, rcode, dob, phone, companyId]);
                 }
             });
 
@@ -3477,20 +3500,23 @@ const dataEntryController = {
     editDependant: async (req, res) => {
         try {
             const { pfno, depNo, dependant, rcode, dob, phone } = req.body;
+            const companyId = getCompanyId(req);
+            const [owned] = await pool.query('SELECT DepNo FROM tbldependant WHERE PFNo = ? AND DepNo = ? AND CompanyID = ?', [pfno, depNo, companyId]);
+            if (!owned.length) return res.status(404).json({ error: 'Record not found.' });
 
             await controllerAuditHelper.auditUpdate({
                 table: 'tbldependant',
                 formName: 'data-entry/staff/dependants',
                 recordId: `${pfno}${depNo}`,
-                fetchQuery: 'SELECT * FROM tbldependant WHERE PFNo = ? AND DepNo = ?',
-                fetchParams: [pfno, depNo],
+                fetchQuery: 'SELECT * FROM tbldependant WHERE PFNo = ? AND DepNo = ? AND CompanyID = ?',
+                fetchParams: [pfno, depNo, companyId],
                 applyChange: async () => {
                     const query = `
                         UPDATE tbldependant 
                         SET Dependant = ?, RCode = ?, DOB = ?, PhoneNo = ?
-                        WHERE PFNo = ? AND DepNo = ?
+                        WHERE PFNo = ? AND DepNo = ? AND CompanyID = ?
                     `;
-                    await pool.query(query, [dependant, rcode, dob, phone, pfno, depNo]);
+                    await pool.query(query, [dependant, rcode, dob, phone, pfno, depNo, companyId]);
                 }
             });
 
@@ -3505,7 +3531,7 @@ const dataEntryController = {
     checkOver18Dependants: async (req, res) => {
         try {
             // 1. Get Params (ChildAge limit, HOD, DeptName)
-            const [params] = await pool.query('SELECT ChildAge, HOD, DeptName FROM tblparams1 LIMIT 1');
+            const [params] = await pool.query('SELECT ChildAge, HOD, DeptName FROM tblparams1 WHERE CompanyID = ? LIMIT 1', [getCompanyId(req)]);
             if (params.length === 0) {
                  return res.json({ error: 'Parameters not configured (tblparams1)' });
             }
@@ -3522,12 +3548,12 @@ const dataEntryController = {
             const query = `
                 SELECT d.PFNo, d.DepNo, d.Dependant, d.RCode, d.DOB, s.SName, s.Email
                 FROM tbldependant d
-                JOIN tblstaff s ON d.PFNo = s.PFNo
-                WHERE d.Closed = 0 
+                JOIN tblstaff s ON d.PFNo = s.PFNo AND s.CompanyID = d.CompanyID
+                WHERE d.Closed = 0 AND d.CompanyID = ?
                 AND d.RCode IN ('03', '04')
                 AND TIMESTAMPDIFF(YEAR, d.DOB, CURDATE()) > ?
             `;
-            const [dependants] = await pool.query(query, [ageLimit]);
+            const [dependants] = await pool.query(query, [getCompanyId(req), ageLimit]);
 
             if (dependants.length === 0) {
                 return res.json({ success: true, message: 'No over-age dependants found.', count: 0 });
@@ -3575,9 +3601,9 @@ const dataEntryController = {
                     
                     try {
                          await transporter.sendMail(mailOptions);
-                         console.log(`Email sent to ${dep.Email} for ${dep.Dependant}`);
+                         console.log('Dependant notification sent.');
                     } catch (err) {
-                        console.error(`Failed to send email to ${dep.Email}:`, err);
+                        console.error('Dependant notification delivery failed.');
                     }
                 }
 
@@ -3585,8 +3611,8 @@ const dataEntryController = {
                 // Update Closed=1, DateClosed=NOW, Reason='09' (OFF AGE)
                 // Also set TimeKeyedIn/DateKeyedIn if needed, but user only specified DateClosed and Closed and Reason.
                 await pool.query(
-                    'UPDATE tbldependant SET Closed = 1, DateClosed = ?, Reason = ? WHERE PFNo = ? AND DepNo = ?',
-                    [now, '09', dep.PFNo, dep.DepNo]
+                    'UPDATE tbldependant SET Closed = 1, DateClosed = ?, Reason = ? WHERE PFNo = ? AND DepNo = ? AND CompanyID = ?',
+                    [now, '09', dep.PFNo, dep.DepNo, getCompanyId(req)]
                 );
                 processedCount++;
             }
@@ -5260,7 +5286,7 @@ const dataEntryController = {
                         AND p.PType = '01'
                 `, [sqlDate, sqlDate]);
 
-                // 4. Update tblLoan (Insert history)
+                // 4. Update tblloan (Insert history)
                 await conn.query(`
                     INSERT INTO tblloan (PFNo, LTypeCode, LTrans, Amount, EntryDate, TransNo, Approved, Expired, Reschedule, Repaid)
                     SELECT 
@@ -5269,7 +5295,7 @@ const dataEntryController = {
                     WHERE lr.DeductionDate = ?
                 `, [sqlDate, sqlDate]);
 
-                // 5. Update tblSalary LoanCounter
+                // 5. Update tblsalary LoanCounter
                 await conn.query(`
                     UPDATE tblsalary s
                     INNER JOIN tblloan l ON s.PFNo = l.PFNo
@@ -5277,7 +5303,7 @@ const dataEntryController = {
                     WHERE s.LoanCounter > 0 AND l.LTrans NOT IN ('03', '04')
                 `);
 
-                // 6. Update tblLoan Balances
+                // 6. Update tblloan Balances
                 await conn.query(`
                     UPDATE tblloan 
                     SET 
@@ -5323,7 +5349,7 @@ const dataEntryController = {
                     SELECT DISTINCT SalDate FROM tblpayroll WHERE SalDate = ?
                 `, [sqlDate]);
 
-                // 11. Update tblSalary NetIncome
+                // 11. Update tblsalary NetIncome
                 await conn.query(`
                     UPDATE tblsalary s
                     INNER JOIN tblloan l ON s.PFNo = l.PFNo
@@ -5402,7 +5428,7 @@ const dataEntryController = {
                     WHERE yp.PType = '02' AND yp.PMonth = ? AND yp.PYear = ? AND yp.Approved = 1 AND s.EmpStatus <> '04'
                 `, [sqlDate, operatorFull, pMonth, pYear]);
 
-                // Update tblYearlyPayments
+                // Update tblyearlypayments
                 await conn.query(`
                     UPDATE tblyearlypayments 
                     SET Paid = 1 
@@ -5426,7 +5452,7 @@ const dataEntryController = {
                     WHERE yp.PType = '04' AND yp.PMonth = ? AND yp.PYear = ? AND yp.Approved = 1 AND s.EmpStatus <> '04'
                 `, [sqlDate, operatorFull, pMonth, pYear]);
 
-                // Update tblYearlyPayments
+                // Update tblyearlypayments
                 await conn.query(`
                     UPDATE tblyearlypayments 
                     SET Paid = 1 
@@ -5468,7 +5494,7 @@ const dataEntryController = {
                     WHERE yp.PType = '05' AND yp.PMonth = ? AND yp.PYear = ? AND yp.Approved = 1 AND s.EmpStatus <> '04'
                 `, [sqlDate, operatorFull, pMonth, pYear]);
 
-                // Update tblYearlyPayments
+                // Update tblyearlypayments
                 await conn.query(`
                     UPDATE tblyearlypayments 
                     SET Paid = 1 
@@ -5492,7 +5518,7 @@ const dataEntryController = {
                     WHERE yp.PType = '15' AND yp.PMonth = ? AND yp.PYear = ? AND yp.Approved = 1 AND s.EmpStatus <> '04'
                 `, [sqlDate, operatorFull, pMonth, pYear]);
 
-                // Update tblYearlyPayments
+                // Update tblyearlypayments
                 await conn.query(`
                     UPDATE tblyearlypayments 
                     SET Paid = 1 
@@ -5522,7 +5548,7 @@ const dataEntryController = {
                     WHERE e.Paid = 0 AND (s.EmpStatus = '01' OR s.EmpStatus = '03')
                 `, [pMonth, pYear, sqlDate, sqlDate, operatorFull, sqlDate]);
 
-                // Update tblEOS and tblPayroll
+                // Update tbleos and tblPayroll
                 await conn.query('UPDATE tbleos SET Paid = 1, DatePaid = ? WHERE Paid = 0', [sqlDate]);
                 await conn.query('UPDATE tblpayroll SET Paid = 1 WHERE PType = "08" AND Paid = 0 AND PMonth = ? AND PYear = ?', [pMonth, pYear]);
 
@@ -5546,7 +5572,7 @@ const dataEntryController = {
                 // --- Code 13: Leave Allowance ---
                 // Source: tblYearlyPayments
                 
-                // 1. Insert into tblPayroll
+                // 1. Insert into tblpayroll
                 await conn.query(`
                     INSERT INTO tblpayroll (
                         PDate, SalDate, PFNo, Grade, AccountNo, JobTitle, Salary, TotalIncome, Taxable, Tax, PMonth, PYear, PType, Operator, Paid, NetIncome, Approved, PayThrough, PayingBBAN, Allw13, Allw02, Allw05, Allw15, Allw04, Bank, Dept, PayingBank, EmpType, PayCurrency, ApprovedBy, DateApproved, TimeApproved
@@ -5561,7 +5587,7 @@ const dataEntryController = {
                     WHERE yp.PType = '13' AND yp.PMonth = ? AND yp.PYear = ? AND yp.Approved = 1 AND s.EmpStatus <> '04'
                 `, [sqlDate, operatorFull, pMonth, pYear]);
 
-                // 2. Update tblYearlyPayments
+                // 2. Update tblyearlypayments
                 await conn.query(`
                     UPDATE tblyearlypayments 
                     SET Paid = 1 
@@ -5574,7 +5600,7 @@ const dataEntryController = {
                     WHERE EntryDate = ? AND TCode = '01' AND PMonth = ? AND PYear = ?
                 `, [sqlDate, pMonth, pYear]);
 
-                // 4. Insert into tblLeaveAllowance (TCode 01)
+                // 4. Insert into tblleaveallowance (TCode 01)
                 await conn.query(`
                     INSERT INTO tblleaveallowance (EntryDate, PFNo, SName, L_Allowance, TCode, PMonth, PYear)
                     SELECT ?, s.PFNo, CONCAT(s.SName, ' ', s.FName, ' ', s.MName), yp.TotalIncome, '01', ?, ?
@@ -5583,7 +5609,7 @@ const dataEntryController = {
                     WHERE s.EmpStatus <> '04' AND yp.PType = '13' AND yp.PMonth = ? AND yp.PYear = ?
                 `, [sqlDate, pMonth, pYear, pMonth, pYear]);
 
-                // 5. Insert into tblLeaveAllowance (TCode 03 - Tax/Payment)
+                // 5. Insert into tblleaveallowance (TCode 03 - Tax/Payment)
                 await conn.query(`
                     INSERT INTO tblleaveallowance (EntryDate, PFNo, SName, Payment, TCode, PMonth, PYear, TransNo, TimeKeyed, KeyedInBy)
                     SELECT ?, s.PFNo, CONCAT(s.SName, ' ', s.FName, ' ', s.MName), l.Tax, '03', ?, ?, l.LCount, CURTIME(), ?
@@ -5594,21 +5620,21 @@ const dataEntryController = {
                     GROUP BY s.PFNo, l.LCount, l.Tax, s.SName, s.FName, s.MName
                 `, [sqlDate, pMonth, pYear, operatorFull]);
 
-                // 6. Update tblLeaveAllowance (Paid)
+                // 6. Update tblleaveallowance (Paid)
                 await conn.query(`
                     UPDATE tblleaveallowance 
                     SET Paid = 1, DatePaid = ? 
                     WHERE Initiated = 'Yes'
                 `, [sqlDate]);
 
-                // 7. Update tblPayroll (Operator, DateKeyed, Reset Approved)
+                // 7. Update tblpayroll (Operator, DateKeyed, Reset Approved)
                 await conn.query(`
                     UPDATE tblpayroll 
                     SET Operator = ?, DateKeyed = ?, TimeKeyed = CURTIME(), Approved = 0
                     WHERE PType = '13' AND PMonth = ? AND PYear = ?
                 `, [operatorFull, sqlDate, pMonth, pYear]);
 
-                // 8. Update tblLeave (EntryPassed)
+                // 8. Update tblleave (EntryPassed)
                 await conn.query(`
                     UPDATE tblleave l
                     INNER JOIN tblpayroll p ON l.PFNo = p.PFNo
@@ -5621,7 +5647,7 @@ const dataEntryController = {
             } else if (payCode === '07') {
                 // --- Code 07: Backlog ---
                 // Source: tblSalary vs tblSalaryHistory difference
-                // Logic: Calculate differences, apply progressive tax, insert into tblPayroll
+                // Logic: Calculate differences, apply progressive tax, insert into tblpayroll
 
                 // 1. Get Company/effective-date scoped Tax Rates
                 const taxRates = await payeTaxService.getEffectiveTaxConfig({
@@ -5701,7 +5727,7 @@ const dataEntryController = {
                     ]);
                 }
 
-                // 4. Update tblIncrement
+                // 4. Update tblincrement
                 await conn.query(`
                     UPDATE tblincrement 
                     SET EPassed = 1
@@ -5916,7 +5942,7 @@ const dataEntryController = {
             });
 
             const [leaveRows] = await pool.query(
-                'SELECT ID FROM tblleave WHERE LCount = ? AND (CompanyID = ? OR CompanyID IS NULL) LIMIT 1',
+                'SELECT ID FROM tblleave WHERE LCount = ? AND (CompanyID = ?) LIMIT 1',
                 [nextCount, getCompanyId(req)]
             );
             const leaveId = leaveRows[0]?.ID || nextCount;
@@ -6391,7 +6417,7 @@ const dataEntryController = {
                         m.PicturePath
                     FROM tblmedical m
                     LEFT JOIN tblstaff s ON m.PFNo = s.PFNo
-                    LEFT JOIN tblMCode mc ON m.MCode = mc.TCode
+                    LEFT JOIN tblmcode mc ON m.MCode = mc.TCode
                     WHERE 1=1
                 `;
                 const params = [];

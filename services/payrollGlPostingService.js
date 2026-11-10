@@ -223,7 +223,7 @@ async function getPayTypeRows(companyId) {
         `
             SELECT CompanyID, TRIM(Code) AS Code, TRIM(PayType) AS PayType
             FROM tblpaytype
-            WHERE CompanyID = ? OR CompanyID IS NULL
+            WHERE CompanyID = ?
             ORDER BY COALESCE(CompanyID, ?), Code
         `,
         [companyId, companyId]

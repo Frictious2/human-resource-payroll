@@ -307,7 +307,7 @@ async function fetchSalarySourceRows(connection, {
     payingBank
 }) {
     const conditions = [
-        '(s.CompanyID = ? OR s.CompanyID IS NULL)',
+        '(s.CompanyID = ?)',
         '(s.DOE IS NULL OR DATE(s.DOE) <= ?)',
         staffStatusService.getPayrollEligibilityClause({ staffAlias: 's', payrollDateExpression: "STR_TO_DATE(?, '%Y-%m-%d')" })
     ];
@@ -802,8 +802,8 @@ async function applyLoanDeductions(connection, { companyId, payrollMonth, payrol
                 FROM tblloan l
                 INNER JOIN tblstaff s
                     ON s.PFNo = l.PFNo
-                WHERE (l.CompanyID = ? OR l.CompanyID IS NULL)
-                  AND (s.CompanyID = ? OR s.CompanyID IS NULL)
+                WHERE (l.CompanyID = ?)
+                  AND (s.CompanyID = ?)
                   AND COALESCE(l.Approved, 0) IN (-1, 1)
                   AND COALESCE(l.Expired, 0) = 0
                   AND COALESCE(l.Repaid, 0) = 0
@@ -867,8 +867,8 @@ async function applyMedicalDeductions(connection, { companyId, payrollMonth, pay
                    AND rw.Module = 'medical'
                    AND rw.SourceTable = 'tblmedical'
                    AND rw.RecordReference = CAST(m.TransNo AS CHAR)
-                WHERE (m.CompanyID = ? OR m.CompanyID IS NULL)
-                  AND (s.CompanyID = ? OR s.CompanyID IS NULL)
+                WHERE (m.CompanyID = ?)
+                  AND (s.CompanyID = ?)
                   AND (rw.id IS NULL OR rw.Status = 'FINAL_APPROVED')
                   AND YEAR(m.EntryDate) = ?
                   AND MONTH(m.EntryDate) = ?
@@ -915,8 +915,8 @@ async function applySurchargeDeductions(connection, { companyId, payrollMonth, p
                 FROM tblsurcharge s
                 INNER JOIN tblstaff st
                     ON st.PFNo = s.PFNo
-                WHERE (s.CompanyID = ? OR s.CompanyID IS NULL)
-                  AND (st.CompanyID = ? OR st.CompanyID IS NULL)
+                WHERE (s.CompanyID = ?)
+                  AND (st.CompanyID = ?)
                   AND COALESCE(s.Approved, 0) IN (-1, 1)
                   AND COALESCE(s.Expired, 0) = 0
                   AND (s.StarDate IS NULL OR DATE(s.StarDate) <= ?)
@@ -1275,8 +1275,8 @@ class ProcessEmolumentsService {
             });
             const incrementContext = incrementPayrollService.buildIncrementContext(incrementRows);
             const appliedIncrementRows = new Set();
-            // Activity 01 is a posting step from tblSalary into tblPayroll. We read
-            // the base source values from tblSalary, then layer approved legacy
+            // Activity 01 is a posting step from tblsalary into tblpayroll. We read
+            // the base source values from tblsalary, then layer approved legacy
             // increment rows in memory before writing the adjusted payroll row.
             const fullPayCount = await insertFullPaySalaryRows(connection, {
                 payrollDate: sqlDate,

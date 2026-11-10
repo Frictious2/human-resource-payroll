@@ -149,19 +149,21 @@ async function getLatestSalarySnapshot(pfNo, companyId) {
                 COALESCE(st.AccountNo, s.AccountNo) AS AccountNo
             FROM tblsalary s
             INNER JOIN (
-                SELECT PFNo, MAX(PDate) AS latest_pdate
+                SELECT PFNo, CompanyID, MAX(PDate) AS latest_pdate
                 FROM tblsalary
-                GROUP BY PFNo
+                WHERE CompanyID = ?
+                GROUP BY PFNo, CompanyID
             ) latest
                 ON latest.PFNo = s.PFNo
+               AND latest.CompanyID = s.CompanyID
                AND latest.latest_pdate = s.PDate
             INNER JOIN tblstaff st
-                ON st.PFNo = s.PFNo
+                ON st.PFNo = s.PFNo AND st.CompanyID = s.CompanyID
             WHERE s.PFNo = ?
-              AND (COALESCE(st.CompanyID, s.CompanyID, ?) = ? OR st.CompanyID IS NULL OR s.CompanyID IS NULL)
+              AND s.CompanyID = ?
             LIMIT 1
         `,
-        [pfNo, companyId, companyId]
+        [companyId, pfNo, companyId]
     );
 
     return rows[0] || null;
@@ -453,7 +455,7 @@ async function saveYearlyPayment({
 }
 
 function buildSalaryReviewFilters(filters = {}) {
-    const conditions = ['(sr.CompanyID = ? OR sr.CompanyID IS NULL)'];
+    const conditions = ['(sr.CompanyID = ?)'];
     const params = [Number(filters.companyId) || 1];
 
     if (filters.revCode) {
@@ -569,7 +571,7 @@ async function saveSalaryReview({
             `
                 SELECT RevCode
                 FROM tblsalreview
-                WHERE (CompanyID = ? OR CompanyID IS NULL)
+                WHERE (CompanyID = ?)
                   AND DATE(RevDate) = ?
                   AND RevCode = ?
                   AND SGrade = ?
@@ -587,7 +589,7 @@ async function saveSalaryReview({
                     SET Percentage = ?,
                         Operator = ?,
                         Datekeyed = NOW()
-                    WHERE (CompanyID = ? OR CompanyID IS NULL)
+                    WHERE (CompanyID = ?)
                       AND DATE(RevDate) = ?
                       AND RevCode = ?
                       AND SGrade = ?
@@ -667,7 +669,7 @@ async function decideSalaryReview({
             SET Approved = ?,
                 ApprovedBy = ?,
                 DateApproved = NOW()
-            WHERE (CompanyID = ? OR CompanyID IS NULL)
+            WHERE (CompanyID = ?)
               AND DATE(RevDate) = ?
               AND RevCode = ?
               AND SGrade = ?
@@ -701,7 +703,7 @@ async function getApprovedSalaryReviewRule(queryable, {
                 ON sg.GradeCode = sr.SGrade
             LEFT JOIN tblgrade eg
                 ON eg.GradeCode = sr.EGrade
-            WHERE (sr.CompanyID = ? OR sr.CompanyID IS NULL)
+            WHERE (sr.CompanyID = ?)
               AND DATE(sr.RevDate) = ?
               AND sr.RevCode = ?
               AND sr.SGrade = ?
@@ -770,7 +772,7 @@ async function getSalaryReviewPreviewRowsForRule(queryable, { companyId, rule })
                 ON d.Code = st.CDept
             LEFT JOIN tblgrade g
                 ON g.GradeCode = st.CGrade
-            WHERE (st.CompanyID = ? OR st.CompanyID IS NULL)
+            WHERE (st.CompanyID = ?)
               AND ${staffStatusService.getActiveStaffFilter('st')}
               AND st.CGrade >= ?
               AND st.CGrade <= ?
@@ -854,7 +856,7 @@ async function commitSalaryReviewRun({
             `
                 SELECT PFNo
                 FROM tblincrement
-                WHERE (CompanyID = ? OR CompanyID IS NULL)
+                WHERE (CompanyID = ?)
                   AND Type = '04'
                   AND DATE(IncDate) = ?
                   AND Category = ?
@@ -960,7 +962,7 @@ async function getRunSalaryReviewData({ companyId, filters = {} }) {
                     ON sg.GradeCode = sr.SGrade
                 LEFT JOIN tblgrade eg
                     ON eg.GradeCode = sr.EGrade
-                WHERE (sr.CompanyID = ? OR sr.CompanyID IS NULL)
+                WHERE (sr.CompanyID = ?)
                   AND COALESCE(sr.Approved, 0) IN (-1, 1)
                   ${selectedReviewDate ? 'AND DATE(sr.RevDate) = ?' : ''}
                   ${selectedRevCode ? 'AND sr.RevCode = ?' : ''}
@@ -1015,7 +1017,7 @@ async function getEndOfServiceApprovalData({ companyId, filters = {} }) {
     const statusFilter = normalizeOptionalText(filters.status) || 'pending';
     const pfNo = normalizeOptionalText(filters.pfNo);
 
-    const conditions = ['(e.CompanyID = ? OR e.CompanyID IS NULL)'];
+    const conditions = ['(e.CompanyID = ?)'];
     const params = [resolvedCompanyId];
 
     if (pfNo) {
@@ -1073,7 +1075,7 @@ async function decideEndOfService({
                 ApprovedBy = ?,
                 DateApproved = NOW(),
                 TimeApproved = NOW()
-            WHERE (CompanyID = ? OR CompanyID IS NULL)
+            WHERE (CompanyID = ?)
               AND PFNo = ?
               AND COALESCE(DateKeyed, '1900-01-01') = COALESCE(?, COALESCE(DateKeyed, '1900-01-01'))
               AND COALESCE(Approved, 0) = 0

@@ -26,6 +26,9 @@ function validateUrl(name, value, { requireHttps = false } = {}) {
 
 function validateProductionEnvironment(env = process.env) {
     const errors = [];
+    if (!env.INSTALLATION_COMPANY_ID) errors.push('INSTALLATION_COMPANY_ID is required in production.');
+    try { require('./installationCompanyService').getInstallationCompanyId(env); }
+    catch (error) { errors.push(error.message); }
     const secret = String(env.SESSION_SECRET || '').trim();
 
     if (!secret) {
@@ -45,6 +48,11 @@ function validateProductionEnvironment(env = process.env) {
         ['DB_USER', 'DBUSER'],
         ['DB_PASSWORD', 'DBPASS']
     ];
+    const resetSecret = String(env.RESET_TOKEN_SECRET || env.JWT_SECRET || '').trim();
+    if (resetSecret.length < 32 || UNSAFE_SESSION_SECRETS.has(resetSecret.toLowerCase())
+        || /replace-with|your-secret|reset_secret/i.test(resetSecret)) {
+        errors.push('RESET_TOKEN_SECRET must be an independent strong random value of at least 32 characters.');
+    }
     for (const [preferredName, legacyName] of databaseVariables) {
         if (!String(env[preferredName] || env[legacyName] || '').trim()) {
             errors.push(`${preferredName} (or legacy ${legacyName}) is required.`);
@@ -74,10 +82,11 @@ function validateProductionEnvironment(env = process.env) {
         }
     }
 
-    if (String(env.EMAIL_NOTIFICATIONS_ENABLED || '').trim().toLowerCase() === 'true') {
+    if (String(env.EMAIL_NOTIFICATIONS_ENABLED || '').trim().toLowerCase() === 'true'
+        || String(env.ACCOUNT_EMAIL_ENABLED || '').trim().toLowerCase() === 'true') {
         for (const name of ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS']) {
             if (!String(env[name] || '').trim()) {
-                errors.push(`${name} is required when email notifications are enabled.`);
+                errors.push(`${name} is required when workflow or account email is enabled.`);
             }
         }
     }

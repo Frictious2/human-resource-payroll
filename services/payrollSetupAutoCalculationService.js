@@ -108,7 +108,7 @@ async function getPayrollItems(executor, companyId) {
         `
             SELECT *
             FROM tblpayrollitems
-            WHERE CompanyID = ? OR CompanyID IS NULL
+            WHERE CompanyID = ?
             ORDER BY CASE WHEN CompanyID = ? THEN 0 ELSE 1 END, Code
         `,
         [Number(companyId) || 1, Number(companyId) || 1]
@@ -168,7 +168,7 @@ async function fetchStaff(executor, companyId, pfNo) {
                 CompanyID
             FROM tblstaff
             WHERE PFNo = ?
-              AND (CompanyID = ? OR CompanyID IS NULL)
+              AND (CompanyID = ?)
             LIMIT 1
         `,
         [pfNo, Number(companyId) || 1]
@@ -184,7 +184,7 @@ async function fetchLatestSalary(executor, companyId, pfNo) {
             SELECT *
             FROM tblsalary
             WHERE PFNo = ?
-              AND (CompanyID = ? OR CompanyID IS NULL)
+              AND (CompanyID = ?)
             ORDER BY PDate DESC
             LIMIT 1
         `,
@@ -321,7 +321,7 @@ async function upsertAutoCalculatedSalarySetup({
                 WHERE PFNo = ?
                   AND Dept = ?
                   AND PType = ?
-                  AND (CompanyID = ? OR CompanyID IS NULL)
+                  AND (CompanyID = ?)
             `,
             [
                 ...values,

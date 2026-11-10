@@ -1,4 +1,5 @@
 const mysql = require('mysql2/promise');
+require('./requireDisposableDatabase')();
 const bcrypt = require('bcrypt');
 
 const BASE_URL = process.env.PHASE11_BASE_URL || 'http://localhost:3001';
@@ -254,10 +255,15 @@ async function findWorkflowItem(connection, module, referenceLike) {
 }
 
 async function submitWorkflow(session, workflowItemId, module) {
-    const response = await session.form(`/data-entry/workflow/items/${workflowItemId}/submit`, { module });
-    assert([302, 303].includes(response.status), `Submit workflow failed for ${module}: ${response.status}`);
-    assert(!/error=/i.test(response.location || ''), `Submit workflow returned an error for ${module}: ${response.location}`);
-    return response;
+    // Current Save actions submit automatically; assert the actual state and action,
+    // rather than submitting a second time or accepting either legacy/new status.
+    const connection=await mysql.createConnection(DB_CONFIG);
+    try{
+        const [[item]]=await connection.query('SELECT Status,CompanyID,Module FROM record_workflow_items WHERE id=?',[workflowItemId]);
+        assert(item?.Status==='SUBMITTED_TO_MANAGER'&&item.CompanyID===COMPANY_ID&&item.Module===module,'Save must submit the correct company/module to Manager');
+        const [[history]]=await connection.query("SELECT COUNT(*) AS total FROM record_workflow_actions WHERE WorkflowItemID=? AND Action='SUBMIT_TO_MANAGER' AND CompanyID=?",[workflowItemId,COMPANY_ID]);
+        assert(Number(history.total)>0,'Automatic submission must write action history');
+    }finally{await connection.end();}
 }
 
 async function managerReturn(session, workflowItemId, comments = '') {
@@ -301,7 +307,7 @@ async function testTransfer(connection, sessions, lookups) {
     assert(save.status === 200, 'Transfer save route did not return 200');
 
     const item = await findWorkflowItem(connection, 'transfer', `${encodeURIComponent(pfno)}%`);
-    assert(item && item.Status === 'DRAFT', 'Transfer draft workflow item was not created');
+    assert(item && item.Status === 'SUBMITTED_TO_MANAGER', 'Transfer save must automatically submit to Manager');
 
     await submitWorkflow(sessions.dataEntry, item.id, 'transfer');
     const [afterSubmitStaff] = await connection.query('SELECT CDept FROM tblstaff WHERE PFNo = ?', [pfno]);
@@ -323,7 +329,7 @@ async function testTransfer(connection, sessions, lookups) {
     assert(resave.status === 200, 'Transfer re-save after Manager return did not return 200');
 
     const refreshedItem = await findWorkflowItem(connection, 'transfer', `${encodeURIComponent(pfno)}%`);
-    assert(refreshedItem && refreshedItem.Status === 'DRAFT', 'Transfer was not reset to DRAFT after correction save');
+    assert(refreshedItem && refreshedItem.Status === 'SUBMITTED_TO_MANAGER', 'Transfer correction save must resubmit to Manager');
 
     await submitWorkflow(sessions.dataEntry, refreshedItem.id, 'transfer');
     await managerEndorse(sessions.manager, refreshedItem.id, 'Looks good');
@@ -352,7 +358,7 @@ async function testPromotion(connection, sessions, lookups) {
     assert([302, 303].includes(save.status), 'Promotion save route did not redirect successfully');
 
     const item = await findWorkflowItem(connection, 'promotion', `${encodeURIComponent(pfno)}%`);
-    assert(item && item.Status === 'DRAFT', 'Promotion draft workflow item was not created');
+    assert(item && item.Status === 'SUBMITTED_TO_MANAGER', 'Promotion save must automatically submit to Manager');
     await submitWorkflow(sessions.dataEntry, item.id, 'promotion');
     await managerEndorse(sessions.manager, item.id, 'Forwarded');
 
@@ -398,7 +404,7 @@ async function testActing(connection, sessions, lookups) {
     assert(Number(salaryBeforeSubmit[0].Allw14 || 0) === 0, 'Acting changed Allw14 at draft stage');
 
     const item = await findWorkflowItem(connection, 'acting', `${encodeURIComponent(pfno)}%`);
-    assert(item && item.Status === 'DRAFT', 'Acting draft workflow item was not created');
+    assert(item && item.Status === 'SUBMITTED_TO_MANAGER', 'Acting save must automatically submit to Manager');
     await submitWorkflow(sessions.dataEntry, item.id, 'acting');
 
     const editBlocked = await sessions.dataEntry.form('/data-entry/payroll/acting-allowance', {
@@ -456,7 +462,7 @@ async function testLeave(connection, sessions, lookups) {
     assert(save.status === 200, 'Leave save route did not return 200');
 
     const item = await findWorkflowItem(connection, 'leave', '%');
-    assert(item && item.Status === 'DRAFT', 'Leave draft workflow item was not created');
+    assert(item && item.Status === 'SUBMITTED_TO_MANAGER', 'Leave save must automatically submit to Manager');
     await submitWorkflow(sessions.dataEntry, item.id, 'leave');
     await managerEndorse(sessions.manager, item.id, 'Forwarded');
     await entityApprove(sessions.entityHead, item.id, 'Approved');
@@ -487,7 +493,9 @@ async function testTraining(connection, sessions) {
     assert(save.status === 200, 'Training save route did not return 200');
 
     const item = await findWorkflowItem(connection, 'training', `${encodeURIComponent(pfno)}%`);
-    assert(item && item.Status === 'DRAFT', 'Training draft workflow item was not created');
+    assert(item && item.Status === 'SUBMITTED_TO_MANAGER', 'Training save must automatically submit to Manager');
+    const returned=await managerReturn(sessions.manager,item.id,'Synthetic training correction required');
+    assert([302,303].includes(returned.status)&&!/error=/.test(returned.location),'Manager must return training before it can be edited');
 
     const updateDraft = await sessions.dataEntry.form('/data-entry/api/staff/training', {
         pfno,
@@ -553,7 +561,7 @@ async function testStaffExit(connection, sessions) {
     assert([302, 303].includes(save.status), 'Staff exit save route did not redirect');
 
     const item = await findWorkflowItem(connection, 'staff-exit', `${encodeURIComponent(pfno)}%`);
-    assert(item && item.Status === 'DRAFT', 'Staff exit draft workflow item was not created');
+    assert(item && item.Status === 'SUBMITTED_TO_MANAGER', 'Staff exit save must automatically submit to Manager');
 
     const [beforeRows] = await connection.query('SELECT EmpStatus FROM tblstaff WHERE PFNo = ?', [pfno]);
     await submitWorkflow(sessions.dataEntry, item.id, 'staff-exit');
@@ -576,7 +584,7 @@ async function testRedundancy(connection, sessions) {
     assert([302, 303].includes(save.status), 'Redundancy save route did not redirect');
 
     const item = await findWorkflowItem(connection, 'redundancy', `${encodeURIComponent(pfno)}%`);
-    assert(item && item.Status === 'DRAFT', 'Redundancy draft workflow item was not created');
+    assert(item && item.Status === 'SUBMITTED_TO_MANAGER', 'Redundancy save must automatically submit to Manager');
 
     const [beforeSubmit] = await connection.query('SELECT Redundant FROM tblstaff WHERE PFNo = ?', [pfno]);
     assert(Number(beforeSubmit[0].Redundant) === 2, 'Redundancy proposal flag was not stored as pending state');

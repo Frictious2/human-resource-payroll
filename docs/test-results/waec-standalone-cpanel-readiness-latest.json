@@ -1,0 +1,88 @@
+{
+  "date": "2026-11-09",
+  "installation": { "mode": "standalone", "companyId": 1, "database": "personnel_master", "schemaConverted": false },
+  "classification": {
+    "standaloneSecurity": "PASS",
+    "staffSaveVulnerability": "FIXED",
+    "cpanelWhmCompatibility": "READY FOR TARGET-SERVER TESTING",
+    "stagingDeployment": "BLOCKED",
+    "productionDeployment": "NOT READY"
+  },
+  "hosting": {
+    "ownerConfirmedInterface": "Setup Node.js App (CloudLinux)",
+    "ownerConfirmedNodeMajor": 22,
+    "targetAccessed": false,
+    "actualPassengerTested": false,
+    "deployed": false,
+    "requiresDocker": false,
+    "requiresSeparateVps": false,
+    "startupFile": "app.js"
+  },
+  "regressions": {
+    "fullRun": "docs/test-results/waec_acceptance_20261109_0e186fe1-results.json",
+    "suitesPassed": 18,
+    "suitesFailed": 0,
+    "staffSave": "PASS",
+    "staffSaveRollbackOnAuditFailure": "PASS",
+    "foreignLoginAndStaleSessionRejection": "PASS",
+    "parallelPostLoginCsrf": "PASS",
+    "scopedStaffLists": "PASS",
+    "foreignChildEditAndApprovalDenied": "PASS",
+    "ownChildEditAndManagerReview": "PASS",
+    "multipartCompanyForgeryWithAndWithoutFile": "PASS",
+    "sessionRestartAndLogout": "PASS",
+    "financeManager": "PASS",
+    "paye": "PASS",
+    "payrollItemTaxability": "PASS",
+    "payrollLiabilities": "PASS",
+    "payrollFoundationReversalReopenYearly": "PASS",
+    "privateFileSecurity": "PASS",
+    "javascriptSyntaxFiles": 56,
+    "ejsTemplatesCompiled": 276
+  },
+  "dependencyAudit": { "command": "npm audit --omit=dev --json", "critical": 0, "high": 0, "moderate": 0, "low": 0 },
+  "dataSafety": {
+    "syntheticFixturesOnly": true,
+    "schemaDefinitionsCopied": 148,
+    "liveRowsCopied": false,
+    "liveDatabaseAccessDeniedForTestIdentity": true,
+    "liveProtectedTableFingerprintsUnchanged": true,
+    "batch161Changed": false,
+    "legacyGlChanged": false,
+    "liveAccountsOrPasswordsChanged": false,
+    "otherCompanyRowsDeletedOrReassigned": false,
+    "disposableDatabaseRemoved": true,
+    "disposableRestrictedUsersRemoved": true,
+    "acceptanceDatabasesRemaining": 0,
+    "acceptanceUserHostEntriesRemaining": 0,
+    "realPrivateFileMigrationPerformed": false
+  },
+  "resolvedFindings": [
+    {
+      "id": "STANDALONE-CHILD-SCOPE",
+      "severity": "HIGH",
+      "status": "FIXED",
+      "area": "legacy HR child-record ownership",
+      "finding": "Dependant handlers formerly keyed child rows by PF/DepNo without the child's CompanyID.",
+      "correction": "Scoped child reads/writes/approval/display; foreign child under same PF rejected without writes, own child edit and Manager review passed."
+    },
+    { "id": "STG-ISO-001", "severity": "HIGH", "status": "FIXED", "correction": "Installation identity and company-scoped transactional staff save/audit; forced audit failure rolls back related writes." },
+    { "id": "LOGIN-CSRF-INITIALIZATION", "status": "FIXED", "correction": "Initialize the regenerated session token before explicit save/redirect; parallel request and valid form regressions pass." }
+  ],
+  "assuranceScope": "Local source review and isolated regressions for the reviewed priority paths, not certification of an untested hosting environment or universal penetration-test assurance.",
+  "remainingBlockers": [
+    {
+      "id": "CPANEL-TARGET-ACCEPTANCE",
+      "severity": "ACCEPTANCE_GATE",
+      "finding": "No actual cPanel/Linux/Passenger/HTTPS/proxy/storage/PDF/Excel/restart/backup-restore acceptance executed on the target.",
+      "required": "Approved restricted synthetic staging environment and explicit target testing authorization; no automatic deployment.",
+      "blocksStaging": true,
+      "blocksProduction": true
+    }
+  ],
+  "reports": [
+    "docs/WAEC-STANDALONE-INSTALLATION-ARCHITECTURE.md",
+    "docs/WAEC-CPANEL-WHM-DEPLOYMENT-GUIDE.md",
+    "docs/WAEC-CPANEL-WHM-READINESS-CHECKLIST.md"
+  ]
+}

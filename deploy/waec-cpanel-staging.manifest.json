@@ -1,0 +1,2054 @@
+{
+  "status": "PASS",
+  "archive": "deploy/waec-cpanel-staging.zip",
+  "sha256": "d62522ed5c415eca27efe968ef2a36b738a9f805ea2b92b3c5068f5625a555d8",
+  "bytes": 1076515,
+  "entries": 407,
+  "schemaTables": 148,
+  "configurationRows": {
+    "tblpayrollitems": 36,
+    "tblpaytype": 17,
+    "tbltax": 1
+  },
+  "sourceReadOnly": true,
+  "liveEmployeeRowsIncluded": false,
+  "knownSecretScan": "PASS",
+  "credentialPatternScan": "PASS",
+  "archiveIntegrity": "PASS",
+  "deterministicBytes": "PASS",
+  "sqlTableCaseCheck": "PASS",
+  "literalTableReferencesChecked": 1763,
+  "relativeImportsChecked": 328,
+  "files": [
+    {
+      "path": ".env.staging.example",
+      "bytes": 1367,
+      "sha256": "b80a3c1834810e7cabca864bb47e34c9db7ce748fe40e124b8338eb91253c473"
+    },
+    {
+      "path": "app.js",
+      "bytes": 261,
+      "sha256": "dbcd6a6b12d1b9f52a6d86a0de54a975e60644392dd40a8ec2ff5f9df351ff84"
+    },
+    {
+      "path": "config/db.js",
+      "bytes": 506,
+      "sha256": "1ae472fd0a2309629d86b029dfb108d77e630ebc510717ca6bb85d31827f9123"
+    },
+    {
+      "path": "config/mailer.js",
+      "bytes": 2427,
+      "sha256": "7d35257920f7946c1d8b03518e31cdf581be8e6ccd3550319be9fd8c624858da"
+    },
+    {
+      "path": "config/sessionStore.js",
+      "bytes": 9189,
+      "sha256": "357f1c1819ff40644e08609fb3cd99d5bc699db3b5193a0d3b44af1822567975"
+    },
+    {
+      "path": "config/smtpEnvironment.js",
+      "bytes": 871,
+      "sha256": "46e5260a2f686069c4e05c34e5b84fc2e9890a872ee3bfd4f1815a2c57de8219"
+    },
+    {
+      "path": "controllers/adminController.js",
+      "bytes": 99261,
+      "sha256": "bb2bced345305d84ca2348bac8a5d01a06afabdca24e0b3c05b14d3b0d16abfd"
+    },
+    {
+      "path": "controllers/auditorController.js",
+      "bytes": 12867,
+      "sha256": "b972d3e9804fd00f59a3c9f4a5b54f359a834b0534eaf9d7c611b37eb435d367"
+    },
+    {
+      "path": "controllers/benefitController.js",
+      "bytes": 4665,
+      "sha256": "b4eb4826c7dcb8c13de4f7061e2165ad4637399ad192af3d6746288fc05cb89f"
+    },
+    {
+      "path": "controllers/dataEntryController.js",
+      "bytes": 300015,
+      "sha256": "7035cb34c5d132008dd27dd527ead38be106374745264ecc3ee8280f6c499355"
+    },
+    {
+      "path": "controllers/developerController.js",
+      "bytes": 16431,
+      "sha256": "90fa3fcddb51717ceeaf9ed1aed6b89c4c4bd370506a09038c8be25c530e9de7"
+    },
+    {
+      "path": "controllers/entityHeadController.js",
+      "bytes": 16364,
+      "sha256": "606cfbad10ebece3ccad5008d9c5c39d56ddcd550409461294da28b46ddfc72c"
+    },
+    {
+      "path": "controllers/financeController.js",
+      "bytes": 12036,
+      "sha256": "9042b39b176a6682ffe07ed73bf45c4569a11d760e39c786ff43103154c2fe7b"
+    },
+    {
+      "path": "controllers/financeManagerController.js",
+      "bytes": 18126,
+      "sha256": "1bb0ccf9f78347eb13dbafb5c36d4e98f91257a66a1e9b1a09b10afbee4ab59e"
+    },
+    {
+      "path": "controllers/managerController.js",
+      "bytes": 108488,
+      "sha256": "1266551a818eddb778c8b2260ba52f9319189f3d61c7e05c7099b0959f451381"
+    },
+    {
+      "path": "controllers/notificationController.js",
+      "bytes": 4139,
+      "sha256": "5a679c510f463d0e8f2179279213a3de39f3c7b925c99553f0bd8fdb8f12ff07"
+    },
+    {
+      "path": "controllers/parameterChangeController.js",
+      "bytes": 9165,
+      "sha256": "f2be69c5a2e63d5d4df69eec6f4979758556868f96edc2078e7f4628f587656c"
+    },
+    {
+      "path": "controllers/payrollGlPostingController.js",
+      "bytes": 11772,
+      "sha256": "d4237ed03355361700d7b91162b83af5ce6a7f8281f27b21a2150641d6b5641a"
+    },
+    {
+      "path": "controllers/payrollLiabilityReportController.js",
+      "bytes": 21699,
+      "sha256": "6dac5856bc6a72fb551c00d96bb44e685fe90dfd872c6eaf7c7567947e265354"
+    },
+    {
+      "path": "controllers/payrollReopenController.js",
+      "bytes": 19756,
+      "sha256": "3569e04fe14ce72198ba71747c7185e6a27d5eebe1246d92f9b3c2c6252e8d93"
+    },
+    {
+      "path": "controllers/payrollReversalController.js",
+      "bytes": 20568,
+      "sha256": "3df02a53b0461255efcc9a80b0da5b762713c9062ebcc99cec60d5fce1b0fc36"
+    },
+    {
+      "path": "controllers/processEmolumentsController.js",
+      "bytes": 6740,
+      "sha256": "f1da5741501d458b5bd973e6ed909c3366a70eb2424e80cac06db9fd4b3e4011"
+    },
+    {
+      "path": "controllers/profileController.js",
+      "bytes": 3149,
+      "sha256": "836c1ce1dd8a29799b45ddb5e1707b3530fcf557f657c257246f2ecf31a89891"
+    },
+    {
+      "path": "controllers/recordWorkflowController.js",
+      "bytes": 11013,
+      "sha256": "a3f26e21c018e98135881a060132d7091e1f830b59fa471be3d495d8497efe55"
+    },
+    {
+      "path": "controllers/statementReportController.js",
+      "bytes": 3669,
+      "sha256": "d2f401e6ef33509cae8ca1cd2b311791a7080e865a220cae74bca81efa33cee4"
+    },
+    {
+      "path": "controllers/workQueueController.js",
+      "bytes": 1790,
+      "sha256": "6dd5b82c96e9c0bfa66524f9910dbcc54dcefb89aab8f973ac5ea34631d7bc89"
+    },
+    {
+      "path": "controllers/yearlyPaymentController.js",
+      "bytes": 21983,
+      "sha256": "5e8c362e217bf9ad3f1c9853ae1d1ed2187707cd716166f2a99d4147ac7a7fc2"
+    },
+    {
+      "path": "database/migrations/20260324-payroll-gl-posting-seed.sql",
+      "bytes": 877,
+      "sha256": "4d7d0cc827e5c24d781b161852013631b030fd26cceb45f67d38ff2f2aca2f8d"
+    },
+    {
+      "path": "database/migrations/20260324-payroll-gl-posting.sql",
+      "bytes": 3052,
+      "sha256": "475d05b72930f8dab7e0586ade723becc926f8b3ca3b63a8e08c9634355799a5"
+    },
+    {
+      "path": "database/migrations/20260711-payroll-workflow.sql",
+      "bytes": 2672,
+      "sha256": "ff374e168dd5cc1c7dcb11e5a63b8fb863393e95b874b2b25c40a53e52529710"
+    },
+    {
+      "path": "database/migrations/20260714-parameter-change-workflow.sql",
+      "bytes": 2104,
+      "sha256": "379b7d1d001eeec54c13f775c8598270cead19d5b0491f410ccc1c2a4ec4c453"
+    },
+    {
+      "path": "database/migrations/20260714-payroll-reversal-workflow.sql",
+      "bytes": 4261,
+      "sha256": "e674e112fa53119d107fb8435152926a282f0f6e123e32d5d198f817f90276a5"
+    },
+    {
+      "path": "database/migrations/20260714-record-workflow.sql",
+      "bytes": 2106,
+      "sha256": "0f4d4c25209ce963b72765c20dced396fc50f59d7f0a8b19dd9b6c1d006671e4"
+    },
+    {
+      "path": "database/migrations/20260714-workflow-notifications.sql",
+      "bytes": 1117,
+      "sha256": "929b18caba04c323f3bd1db4ab3ecc0655fd9d6e3a48afe098daf8fbbfd99396"
+    },
+    {
+      "path": "database/migrations/20260715-payroll-reopen-workflow.sql",
+      "bytes": 7257,
+      "sha256": "8c9ee31bffad1b07357678176136ffff78defe60e361d85f9a14a71bf44d0dbd"
+    },
+    {
+      "path": "database/migrations/20260716-fix-payroll-generation-uniqueness.sql",
+      "bytes": 3979,
+      "sha256": "e4e6be976495e52a27813d160366ef0d182798a71c4112d31bc9b0c2d1ef2dda"
+    },
+    {
+      "path": "database/migrations/20260821-persistent-session-store.sql",
+      "bytes": 310,
+      "sha256": "b595313d1465403b474428a0077cb9b56ff138521a86cee179debc8963545095"
+    },
+    {
+      "path": "database/migrations/20260821-yearly-payment-batches.sql",
+      "bytes": 4017,
+      "sha256": "77f26b77b252a3d786c3e814a4afd85ab40c2234d6e79598b21256445dfbeca9"
+    },
+    {
+      "path": "database/staging/payroll-configuration.json",
+      "bytes": 12743,
+      "sha256": "f886d70f0d8322ab57940cdfb687d158e498844e8282ed805bcea3faecd5baa0"
+    },
+    {
+      "path": "database/staging/schema.sql",
+      "bytes": 149821,
+      "sha256": "be7d8096b1a07f01ea649876224be39b08fe9a052a07227632173c5ee8c01b2e"
+    },
+    {
+      "path": "docs/WAEC-CPANEL-STAGING-ACCEPTANCE.md",
+      "bytes": 7851,
+      "sha256": "2c45b419369c61ee76ed156235341889cd53dfeb52af9ca4cbb416d9ffeffac3"
+    },
+    {
+      "path": "docs/WAEC-CPANEL-STAGING-INSTALLATION.md",
+      "bytes": 14873,
+      "sha256": "dcf0caac08234021169346512538e9b260045e3774d348af945981bde859e9aa"
+    },
+    {
+      "path": "middleware/auth.js",
+      "bytes": 2360,
+      "sha256": "2180a5ee7fbeed9b18dd213b4d52c3de49fbc6096771d634e9e0686678437664"
+    },
+    {
+      "path": "middleware/branding.js",
+      "bytes": 232,
+      "sha256": "b0299d746e7162f1edd1798b4baaa71fce1267b921aed640928ab81e4ed678e9"
+    },
+    {
+      "path": "middleware/entityHeadAccess.js",
+      "bytes": 4686,
+      "sha256": "8fd1366b9a28860f9d81f4495dcd583c4400c55ea9edae9ae6c004c8f20adfff"
+    },
+    {
+      "path": "middleware/installationCompany.js",
+      "bytes": 1942,
+      "sha256": "a5ac0055bb1ab275f1b8ce0800e9ddd45bf250711818b65accd13c37807bff5f"
+    },
+    {
+      "path": "middleware/notificationContext.js",
+      "bytes": 761,
+      "sha256": "097412ba932015cee9a77e82356b8bf9e5377113185fdc9fcb083bf2c6a1fc94"
+    },
+    {
+      "path": "middleware/requestContext.js",
+      "bytes": 159,
+      "sha256": "fe677bcf89ee745d4eac4cd1dbb1425bbdf5a443d6ce159dbe8a4575150016b2"
+    },
+    {
+      "path": "middleware/security.js",
+      "bytes": 6264,
+      "sha256": "6b101f2775a5a8fb463359915fac50154c7079a4c24f757c699503767d9e9e11"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 56010,
+      "sha256": "1d1fdbda79bb35708f3b13fba8b2b1c86ef18dc11811ce611df5739739125b75"
+    },
+    {
+      "path": "package.json",
+      "bytes": 1031,
+      "sha256": "23ea9d841c95834b0099dd1cf2cba0218668a3c893dccfeb3d63d9bbb7d49c90"
+    },
+    {
+      "path": "public/css/styles.css",
+      "bytes": 10098,
+      "sha256": "31adf4448a4cc7c2f89271414f69765fd5d0e15ba17ff0775e1b8c2a25188a3f"
+    },
+    {
+      "path": "public/images/hr-vector.svg",
+      "bytes": 1346,
+      "sha256": "2307cab9bbe811f9173e3a88558cd2aa685702fd81d7dcf7d705c70eeee58626"
+    },
+    {
+      "path": "public/images/nra-logo.jpg",
+      "bytes": 21806,
+      "sha256": "12c0418d4738767376284d22aa962995a49e5b6a033b928e5b333cc9a81944d1"
+    },
+    {
+      "path": "public/js/csrf-protection.js",
+      "bytes": 2741,
+      "sha256": "32ac51b5e61fd2ac019ea235db29732c1d9d7c7a219ae9a966aefc3e0fa970c0"
+    },
+    {
+      "path": "public/js/dashboard.js",
+      "bytes": 4435,
+      "sha256": "82b9363457080d63f34893a0ae4c71fb605279dfeaff2b7866ebfa46f7d7763c"
+    },
+    {
+      "path": "public/js/report-viewer.js",
+      "bytes": 4598,
+      "sha256": "be6b4924bbb1110404fd686d9b56b96fbf230d34c4ef8df79d5a5079dfdace92"
+    },
+    {
+      "path": "public/js/sidebar.js",
+      "bytes": 4382,
+      "sha256": "68b33e5f57e9c68a0904056c332c4af0de3788330aa0356673eca28dfff09f8a"
+    },
+    {
+      "path": "public/js/theme.js",
+      "bytes": 2291,
+      "sha256": "4f79e913e6d9eef043a975638c1d897602dc457ec15d9a961bcc13e6590fa65b"
+    },
+    {
+      "path": "public/vendor/bootstrap.bundle.min.js",
+      "bytes": 80721,
+      "sha256": "0833b2e9c3a26c258476c46266e6877fc75218625162e0460be9a3a098a61c6c"
+    },
+    {
+      "path": "routes/admin.js",
+      "bytes": 11631,
+      "sha256": "314079e072b6945348a6fb090b16d3d93f4f9063c70f8cffa15350feeda916ec"
+    },
+    {
+      "path": "routes/auditor.js",
+      "bytes": 1998,
+      "sha256": "019eb8451286a2e58e20e29e7e3f0415b51ad6d56fd2d4860760df9c4e846e85"
+    },
+    {
+      "path": "routes/dataEntry.js",
+      "bytes": 12170,
+      "sha256": "3e92287b4981b05610bfcb0cc37f31beffba5d1eb886fe647225023fdcb64b87"
+    },
+    {
+      "path": "routes/developer.js",
+      "bytes": 2396,
+      "sha256": "f8edf77d954d110adad14300d606ef48d4bbafe2413fe94dc1ceeb25878fcd89"
+    },
+    {
+      "path": "routes/entityHead.js",
+      "bytes": 3902,
+      "sha256": "3272275a9965f4a0a879670a21e749c90fdac470cf43b65853be22d0c442de77"
+    },
+    {
+      "path": "routes/finance.js",
+      "bytes": 5243,
+      "sha256": "13740123bab6288cf85ba57c559877fba11213ba6a848ae57995ecd38e8fd0ad"
+    },
+    {
+      "path": "routes/financeManager.js",
+      "bytes": 2712,
+      "sha256": "25b5c7ec36abc99ee773957cd354e718979acaeb1da7b95e80da86df58a1c2f4"
+    },
+    {
+      "path": "routes/manager.js",
+      "bytes": 9724,
+      "sha256": "346e5d7cc35c22cd691aac4b6fa9026a44d24c1750727ce9cc27baa66c1eb6f2"
+    },
+    {
+      "path": "routes/notifications.js",
+      "bytes": 522,
+      "sha256": "46ea2afa81ffc5ff7932c57effb923a64d0dd535db41187e9f8f7edd77a2db7f"
+    },
+    {
+      "path": "routes/payrollGlPostingRoutes.js",
+      "bytes": 536,
+      "sha256": "4b90bbfa0279a61122acca1304703f8cd6afcaa43c2664829639664e115053b5"
+    },
+    {
+      "path": "routes/processEmolumentsRoutes.js",
+      "bytes": 516,
+      "sha256": "9359875d34ed4e0df41562380c3f43ced43b1e17a9a71926b666296691e7638c"
+    },
+    {
+      "path": "routes/profile.js",
+      "bytes": 328,
+      "sha256": "5dfebe629ac0e93280fa5c1efc36e529e1be1b16c4efedd00b42e1f4d86f62db"
+    },
+    {
+      "path": "routes/workQueue.js",
+      "bytes": 222,
+      "sha256": "4a895d65d9f37eb200b36fae6e8a1bcb3f0acac7239d809db8d5dacd8ca2a92d"
+    },
+    {
+      "path": "scripts/checkCpanelStaging.js",
+      "bytes": 3209,
+      "sha256": "cc6dcfe452560d5b6c244eede172c5cc3150d70bd3283306e850f8d07202e70f"
+    },
+    {
+      "path": "scripts/initializeCpanelStaging.js",
+      "bytes": 12693,
+      "sha256": "6a3cfe49331ffe5fb569d6c864571a08128f7081eabac1d32c53b25615063323"
+    },
+    {
+      "path": "scripts/stagingSetupSafety.js",
+      "bytes": 2058,
+      "sha256": "426d9eb4f54e8a3bdb96a478fbc70a822df5402d05f0b4d65d17e12173955c5a"
+    },
+    {
+      "path": "server.js",
+      "bytes": 17037,
+      "sha256": "b874a7b09e69c93763bf28eaf6ab07e189fd05305a7b36331432d25f406d6019"
+    },
+    {
+      "path": "services/accountSecurityService.js",
+      "bytes": 11822,
+      "sha256": "dd24ae3005a29b5d6d059ad3ad98cb125c8d0d0afaf84303152e2303ef14c6f0"
+    },
+    {
+      "path": "services/adminDashboardService.js",
+      "bytes": 10777,
+      "sha256": "5d409fac03ac4d87041daf0ff021cbc8543b8408e1fec8799b59ce7ccd358c73"
+    },
+    {
+      "path": "services/auditTrailService.js",
+      "bytes": 5815,
+      "sha256": "bd26fdec21ffb948eea0f8b5b1d5c7aff77099f1d93da1b6dfafda25f21d1bc3"
+    },
+    {
+      "path": "services/auditorDashboardService.js",
+      "bytes": 11680,
+      "sha256": "ed9cf76cdf4af63596343fe582578d386ad2669c0e682e05a8fe527287099fb3"
+    },
+    {
+      "path": "services/auditorPayrollWorkflowService.js",
+      "bytes": 16155,
+      "sha256": "7871797ca2966cc41e0472701594fd8b7c5d653ab5a986db8b4c64bb9c804764"
+    },
+    {
+      "path": "services/authService.js",
+      "bytes": 6650,
+      "sha256": "c5e8d2ef19b5f61188102ae00c9e3b872e0223c4ade3a35872e3c0cfe907a650"
+    },
+    {
+      "path": "services/brandingService.js",
+      "bytes": 1218,
+      "sha256": "d2cb20886128e946602206b74358c052028b46669ba1950fa2cfb32f85a61520"
+    },
+    {
+      "path": "services/controllerAuditHelper.js",
+      "bytes": 1992,
+      "sha256": "41909dbc2988368937b8308920e1fd8c889810158f3353d9a09232f01938cce6"
+    },
+    {
+      "path": "services/dataEntryDashboardService.js",
+      "bytes": 13944,
+      "sha256": "8872057825144f9c3ce977ab04b04f10535a983c8f689a6ad863cb50a0627b8e"
+    },
+    {
+      "path": "services/enquiryReportsService.js",
+      "bytes": 21633,
+      "sha256": "d03648a9c27d569c82d152f99c7fe394b4ea98966937dc7f81568ade35a236fe"
+    },
+    {
+      "path": "services/entityHeadPayrollWorkflowService.js",
+      "bytes": 12613,
+      "sha256": "a245f0d1610fa5100367d300ffeb0a8dd680a5ba79d9389d96990d8c17600e0d"
+    },
+    {
+      "path": "services/entityHeadService.js",
+      "bytes": 31327,
+      "sha256": "8a33def622c557dca4ba54db3035b15ce2b9c51e74abc0105b8a0c2f342bf52e"
+    },
+    {
+      "path": "services/environmentValidationService.js",
+      "bytes": 4188,
+      "sha256": "4bd4459075431cd57078b0bd620d3ef83861cbf5c479428e584f02201a78db98"
+    },
+    {
+      "path": "services/eosBenefitService.js",
+      "bytes": 13384,
+      "sha256": "d1bd545f808ac26367b0a70cd628a50d51c5be44a2fc6540a43561fe3dfcdea6"
+    },
+    {
+      "path": "services/financeDashboardService.js",
+      "bytes": 7038,
+      "sha256": "337e7f85a0400697baaf580e9abc1ad1f0c04f92e6b5d8018f4ea0329e056c3a"
+    },
+    {
+      "path": "services/financeManagerDashboardService.js",
+      "bytes": 3223,
+      "sha256": "70536f1a53da5814d488193cf041c56e95f5071d71148b42645a91d36dc4ce21"
+    },
+    {
+      "path": "services/incrementPayrollService.js",
+      "bytes": 7235,
+      "sha256": "02a77de1f7f16d35531373db13f57218df52bcb4b11ae0f945d44ebcf75d7642"
+    },
+    {
+      "path": "services/incrementProcessingService.js",
+      "bytes": 12309,
+      "sha256": "414023b16a75e7053a3c1b15c6799a4ee62f90ba216faf4eb833e281548ad15f"
+    },
+    {
+      "path": "services/installationCompanyService.js",
+      "bytes": 1243,
+      "sha256": "a2f4ce1e21360dbb898c4fd9413910cb9d707c650958180a0c654d97b5564c06"
+    },
+    {
+      "path": "services/journalReportService.js",
+      "bytes": 8237,
+      "sha256": "45639aa60e64c3756bac0206b56f14b5896174424259562b034266e679c4d820"
+    },
+    {
+      "path": "services/leavePagesService.js",
+      "bytes": 6120,
+      "sha256": "8a1ceeb071177d840b96ae1a955478fe9f2ac0c9040655296d5b44451b656c60"
+    },
+    {
+      "path": "services/loansMedicalPagesService.js",
+      "bytes": 43737,
+      "sha256": "28fde52fd1b5e3d97ef97052f9533468e4f9d0f6787e03e872afabb98c6f4f50"
+    },
+    {
+      "path": "services/lookupTableService.js",
+      "bytes": 3465,
+      "sha256": "83ee4b5e92eb78f194d68b9484413a163c90db02c7e480fbd3e01a71080d4ced"
+    },
+    {
+      "path": "services/managerDashboardService.js",
+      "bytes": 20150,
+      "sha256": "319a300d16d2f9a493047f92c1f9da99a3c3b5bd4a6b277edb527c3d7253ceec"
+    },
+    {
+      "path": "services/managerPayrollWorkflowService.js",
+      "bytes": 12162,
+      "sha256": "3b960445e7c63f2ab0c6ccc2d017139756d0cba51743a0e292169c03a6bfba6a"
+    },
+    {
+      "path": "services/parameterChangeService.js",
+      "bytes": 68877,
+      "sha256": "8fec5cd2df49d02bdfc5f9cf0c66e2319e13234a34482458ef812295240984af"
+    },
+    {
+      "path": "services/payeTaxService.js",
+      "bytes": 2892,
+      "sha256": "c815bd39210bcd4b1f114b5b6fd7d4272197a0dc5949f10e65dc412b25eca2a1"
+    },
+    {
+      "path": "services/payrollAuditService.js",
+      "bytes": 5444,
+      "sha256": "6b11e71a10e24451a5835fc1dc4e32c214c4944c536956313a353da5b827cade"
+    },
+    {
+      "path": "services/payrollGlPostingService.js",
+      "bytes": 49118,
+      "sha256": "448ce19d745fa653968ed89de9f7a3a9790e09c43332ccd8ab5ee74e925d4cc3"
+    },
+    {
+      "path": "services/payrollGlQueryService.js",
+      "bytes": 17987,
+      "sha256": "adb199637d87c55a0419a9ec7994e899f1b6cde4832d7d49f5e06d543d8468f2"
+    },
+    {
+      "path": "services/payrollLiabilityReportService.js",
+      "bytes": 26388,
+      "sha256": "8fa0d3edf8d51b8027c5e1535aa32877300399ece90912c32ac54fd1cd50cf13"
+    },
+    {
+      "path": "services/payrollPagesService.js",
+      "bytes": 38812,
+      "sha256": "3d5dc884f95aedb2e65c021ec0910598f1add571517279cd2aab9990a6a5ea56"
+    },
+    {
+      "path": "services/payrollReopenService.js",
+      "bytes": 53507,
+      "sha256": "623239fe13ca6a53adb53d8d44b7e98ae161ee6508e0c4cc91f8d568342c0adc"
+    },
+    {
+      "path": "services/payrollReversalService.js",
+      "bytes": 62989,
+      "sha256": "93fb00edd5eb126877312ce11b17f0262ffd970f131fa6c7ba57257d6c29dc90"
+    },
+    {
+      "path": "services/payrollSetupAutoCalculationService.js",
+      "bytes": 11005,
+      "sha256": "1afacd1162c5147856d1b5c1530ac7093f18d5f5fe57f9183376112e8e1c3d1a"
+    },
+    {
+      "path": "services/payrollValidationService.js",
+      "bytes": 19269,
+      "sha256": "7cf0a5df634a88cd1d5703b6d57f266295d42dd60e7972fdf976745e2ed29868"
+    },
+    {
+      "path": "services/payrollWorkflowService.js",
+      "bytes": 62023,
+      "sha256": "631116e09ef9b5237f3e36d2232f8be3648e82d9668056cc184457ed2c6fc3de"
+    },
+    {
+      "path": "services/privateFileService.js",
+      "bytes": 6792,
+      "sha256": "5e5bd4a137f3e08f84774dd7cdaf6e2e5318dcf5c57c8d303e31969056d45964"
+    },
+    {
+      "path": "services/processEmolumentsService.js",
+      "bytes": 59304,
+      "sha256": "b9e25d3c7809133580d112de3fd28640b779ae92a24240e6ab214cefd681094d"
+    },
+    {
+      "path": "services/profileService.js",
+      "bytes": 8421,
+      "sha256": "4e3dd0058d0ba287d923c30335d96a207027bf4fd59aced88f15abffe1ca1dec"
+    },
+    {
+      "path": "services/recordWorkflowService.js",
+      "bytes": 84975,
+      "sha256": "9a0f4cf24b33a9c019cb5133fe7e053a9320631ea8099042af2d31d497226fad"
+    },
+    {
+      "path": "services/requestContext.js",
+      "bytes": 343,
+      "sha256": "fdd8a2c2500e2aa0de6160a64f9af7652cece58140ab024e42f787a3b2adc4b6"
+    },
+    {
+      "path": "services/securityEventService.js",
+      "bytes": 1105,
+      "sha256": "3bae61c368b31cd0491543ca67efb422b92964f4df9baedc32bb40ce086707e7"
+    },
+    {
+      "path": "services/shutdownService.js",
+      "bytes": 1361,
+      "sha256": "282c383e885a0b3c1580de6cad123b168595a5bdd4a1b1a50263730b4211d484"
+    },
+    {
+      "path": "services/staffStatusService.js",
+      "bytes": 9311,
+      "sha256": "530a060ef4344f886c4def907d015a7bf3c0cf50145b6698160ceca36e200d29"
+    },
+    {
+      "path": "services/staffTransfersPagesService.js",
+      "bytes": 25604,
+      "sha256": "e2fb55d758ae752702802af766e0cf535744df2be04df1b70652838a145277be"
+    },
+    {
+      "path": "services/statementReportService.js",
+      "bytes": 19959,
+      "sha256": "a26b63006115c1b44de3fbd9dca58eb8922b32cad423a0b82f902cfe947e8f43"
+    },
+    {
+      "path": "services/workQueueService.js",
+      "bytes": 19297,
+      "sha256": "8eef2f47685bc941a0f28e5c5628d309b435e8b67195bf4be78f4192f2af9119"
+    },
+    {
+      "path": "services/workflowNotificationService.js",
+      "bytes": 30725,
+      "sha256": "262acf927baff05cdf272bad85677b1bf272f66ccb52a74b6204d2d737d0f6a4"
+    },
+    {
+      "path": "services/yearlyPaymentService.js",
+      "bytes": 47501,
+      "sha256": "4f63bc65b3db33aa99965504f2fad0d9b999dc35da504e4ab08a6aa636012b47"
+    },
+    {
+      "path": "utils/workspaceContext.js",
+      "bytes": 2593,
+      "sha256": "19d5425552b34ae7edbdd4cbeda76a80ddc7bab1a7fb7ad0601a1c4a58e82007"
+    },
+    {
+      "path": "validations/payrollGlPostingValidation.js",
+      "bytes": 4786,
+      "sha256": "fad05b88205c0ad5e421e217e4ddade3ac243b0fe3645db65c6575cb66af3528"
+    },
+    {
+      "path": "validations/processEmolumentsValidation.js",
+      "bytes": 1996,
+      "sha256": "86485713137180affab3183883b1209448ddfaa88420fe6e453e0a21d99c714e"
+    },
+    {
+      "path": "views/admin/activity/enquiry.ejs",
+      "bytes": 10756,
+      "sha256": "c45d9dbd95f4c698575774c1c58379d316376f9850045c4e1d463348e0d0f3e7"
+    },
+    {
+      "path": "views/admin/activity/staff-file.ejs",
+      "bytes": 18078,
+      "sha256": "11d7e8d0a325d55f72705376d381d4c18ec6e0107b2b48637d15f0e4fc18c1a5"
+    },
+    {
+      "path": "views/admin/admin-dashboard.ejs",
+      "bytes": 18964,
+      "sha256": "10bff9fa8eabe7a040b5ae530f5361fb9cb1635263d0ad906d556113a846f54f"
+    },
+    {
+      "path": "views/admin/admins-new.ejs",
+      "bytes": 2217,
+      "sha256": "dc8fe03bf9a9e54b705924a1cb8129089056c15812eccc9357599bf25f030071"
+    },
+    {
+      "path": "views/admin/admins-set-password.ejs",
+      "bytes": 2175,
+      "sha256": "8e49b7e5a0ece8763285b5a058193be178fea9f4211d597d1535cb8b9829620a"
+    },
+    {
+      "path": "views/admin/admins.ejs",
+      "bytes": 4810,
+      "sha256": "de3ca4904d1e229d87b7c43e165fca870afb73cee3db548bfafdef4010c1c4a7"
+    },
+    {
+      "path": "views/admin/auditors-new.ejs",
+      "bytes": 2182,
+      "sha256": "33c69abdabaa42c8e53cefd4b01763a3d5cc98d5a834e2bf15cff3bbf6c31380"
+    },
+    {
+      "path": "views/admin/auditors.ejs",
+      "bytes": 4803,
+      "sha256": "3c4a7f085fc168754b83125e04aa5960a99999207628bed8cb4cc2b064c94fae"
+    },
+    {
+      "path": "views/admin/company-info.ejs",
+      "bytes": 8462,
+      "sha256": "5103c5561f44407745409a241cebd11e2eb23afca6d9a8df340a5ffc60c1d5a8"
+    },
+    {
+      "path": "views/admin/data-entry-new.ejs",
+      "bytes": 2233,
+      "sha256": "69b11526dabbfc7b81afcf8eb96cf4ca5adac5422e2b42a046f364a335c8e413"
+    },
+    {
+      "path": "views/admin/data-entry-officers.ejs",
+      "bytes": 4924,
+      "sha256": "3600424e704e8358de23be07088c6b9a44c547c1d55617896d8a4b148a2b28d6"
+    },
+    {
+      "path": "views/admin/entity-heads-new.ejs",
+      "bytes": 4704,
+      "sha256": "72bf830677013dccd6eead22dd049d4b19ad51b4fbf8f685fe37b7049f97762c"
+    },
+    {
+      "path": "views/admin/entity-heads.ejs",
+      "bytes": 5224,
+      "sha256": "2125502649e3d57310ef4db085711d35a02691cfcf86df8e19af27d07a5cc2a3"
+    },
+    {
+      "path": "views/admin/finance-managers-new.ejs",
+      "bytes": 2218,
+      "sha256": "1905cbbb52ef6d4dec632df22d13224abd81b04ff88f4857507a52fb6fbb0562"
+    },
+    {
+      "path": "views/admin/finance-managers.ejs",
+      "bytes": 4705,
+      "sha256": "f2f4b36f9eb1f7ffd65c79e2625076ff00ccf6cbea53afebcc5f9ec8f1fde2af"
+    },
+    {
+      "path": "views/admin/finance-officers-new.ejs",
+      "bytes": 2218,
+      "sha256": "2ad8e5e22f10e5b2c0ee6d396d56371656416bbbd1e916b6c3ddebfbe345cd53"
+    },
+    {
+      "path": "views/admin/finance-officers.ejs",
+      "bytes": 4867,
+      "sha256": "b41a86b4b2fb98213ce7e8cffdb9ffcb57deb8c1306f13a85c2464f66b3df3ad"
+    },
+    {
+      "path": "views/admin/managers-new.ejs",
+      "bytes": 2229,
+      "sha256": "a9c2064ff34e1283b5736b39e85d4528febbc71303fec03a5a94c7f27cf042fb"
+    },
+    {
+      "path": "views/admin/managers.ejs",
+      "bytes": 4803,
+      "sha256": "08169df3d88af47c91c15b2f88e21903a7e413d38384157fbe93528e379ce750"
+    },
+    {
+      "path": "views/admin/parameter_changes/detail.ejs",
+      "bytes": 10058,
+      "sha256": "e60b211e6fd0df76c3eeaca013f854eccdaea5ee1aa8c5ff03867703c075346c"
+    },
+    {
+      "path": "views/admin/parameter_changes/index.ejs",
+      "bytes": 7349,
+      "sha256": "349bb8d4427484267456f8ae58746c65fa10b2e7bc7fc16f569f01c09eca1bab"
+    },
+    {
+      "path": "views/admin/parameters/banks.ejs",
+      "bytes": 20947,
+      "sha256": "87d2602db42667cb97f075cc978de0f60f65616c74bffec3b89131854efba601"
+    },
+    {
+      "path": "views/admin/parameters/company-bban.ejs",
+      "bytes": 21927,
+      "sha256": "4000780d37c77c27e87d83fa78b1bbcfb933a448afa35d7c801b7bac8fd96c43"
+    },
+    {
+      "path": "views/admin/parameters/courses.ejs",
+      "bytes": 15801,
+      "sha256": "a4e63dd5b21deac5c7d2f86ddc431772a5b7568b6654263a24565b9cef7bd8e2"
+    },
+    {
+      "path": "views/admin/parameters/departments.ejs",
+      "bytes": 19987,
+      "sha256": "5fbf6ad89f77abb6b5fbf825087c170186428669c5eca0af63afa271be03762d"
+    },
+    {
+      "path": "views/admin/parameters/discipline-outcomes.ejs",
+      "bytes": 14355,
+      "sha256": "e8dbf65de8cfa4c5a815f88e24e4f11eb50d2f48e3f38e5c0188707704b1858b"
+    },
+    {
+      "path": "views/admin/parameters/discipline-reasons.ejs",
+      "bytes": 14726,
+      "sha256": "456be02d5c87f74e3f94e72dace3f55c4220f9839c033e1a7f7aa75d30982d80"
+    },
+    {
+      "path": "views/admin/parameters/emp-status.ejs",
+      "bytes": 14249,
+      "sha256": "bfc98b20691449ecd530f3afa940503373394d45ca07fb43b46fb5748478da08"
+    },
+    {
+      "path": "views/admin/parameters/end-of-service-benefit.ejs",
+      "bytes": 16602,
+      "sha256": "151e2d68c6d798869e9116071e5ae37fb079ce7bc0b104926dabc49c9f308ef5"
+    },
+    {
+      "path": "views/admin/parameters/gl-accounts.ejs",
+      "bytes": 19991,
+      "sha256": "1ddb428e3bc4f6213bbc5a54ff3dfb6a21bb7d00eb97072dc249a2a525991cb8"
+    },
+    {
+      "path": "views/admin/parameters/global-params.ejs",
+      "bytes": 15633,
+      "sha256": "3925ee6a1eb7c362d65e842ca1cb7ddaeb6c0aee5d2dce8a94843848959b860c"
+    },
+    {
+      "path": "views/admin/parameters/grades.ejs",
+      "bytes": 25145,
+      "sha256": "69644fef4e10f7a540d08877ef27dfefd32df2a2a3fb0ac3a0551b10e64b42e8"
+    },
+    {
+      "path": "views/admin/parameters/job-titles.ejs",
+      "bytes": 18700,
+      "sha256": "212c402cbf08f872cdd5ee13f05ebeb8f077a7a10a931ab4719339dd57095d50"
+    },
+    {
+      "path": "views/admin/parameters/pay-types.ejs",
+      "bytes": 19220,
+      "sha256": "e4e11216a041d2b45b0d6ae86725270fa475b907dcfa0efe26a233b322e7eca6"
+    },
+    {
+      "path": "views/admin/parameters/payroll-items.ejs",
+      "bytes": 27390,
+      "sha256": "9c8488f3e91ad04fb68dd20bdc0c93d4771c173cd8ab166432a284d1480b46ab"
+    },
+    {
+      "path": "views/admin/parameters/public-holidays.ejs",
+      "bytes": 25425,
+      "sha256": "2e2d482bd607d54ed86c81d2868782dec729da043c1b0e59f5eef897636883ab"
+    },
+    {
+      "path": "views/admin/parameters/queries.ejs",
+      "bytes": 14847,
+      "sha256": "4dd4b6f325178223f97c8f8f2e69af6590c5a7f7a56cd139686a1972c6e3ef13"
+    },
+    {
+      "path": "views/admin/parameters/sponsors.ejs",
+      "bytes": 10178,
+      "sha256": "cb00eeb49484033bbe263684243027e6ac0a1964accda820e78241625fe454e4"
+    },
+    {
+      "path": "views/admin/parameters/tax-table.ejs",
+      "bytes": 14611,
+      "sha256": "04770033becd970f99327aef6c0f8dd2544efae52175806295348176fe8c0229"
+    },
+    {
+      "path": "views/admin/parameters/work-days.ejs",
+      "bytes": 9244,
+      "sha256": "62c6f9c071fee107d73ea9abe604db1ecd3880f2977ca8addd6a32280df62a19"
+    },
+    {
+      "path": "views/admin/partials/footer.ejs",
+      "bytes": 77,
+      "sha256": "d29b5d78f9f7330098b86e4acd5167223d69f374f1edf69a6bca596b48c13244"
+    },
+    {
+      "path": "views/admin/partials/sidebar.ejs",
+      "bytes": 7931,
+      "sha256": "b5c3e405050b201602c1126b1e8b7b4096105a3b8ca5f43f9bb1ee15c7565fd7"
+    },
+    {
+      "path": "views/admin/partials/topbar.ejs",
+      "bytes": 1969,
+      "sha256": "0ec7d9cecbfaaa2ca4cbdc0074375cca440c180ed54b9aa2e76eba8523a143de"
+    },
+    {
+      "path": "views/auditor/audit-trail.ejs",
+      "bytes": 6992,
+      "sha256": "2ce6ff71992dc6ad1155cc60163a6889000b542b5d061bcd66462769e90fc6f7"
+    },
+    {
+      "path": "views/auditor/dashboard.ejs",
+      "bytes": 22466,
+      "sha256": "64776eda64611b5162e3d07ba7a11d3dbac1e5b2294d94bcd2371db6c85bb14c"
+    },
+    {
+      "path": "views/auditor/partials/footer.ejs",
+      "bytes": 73,
+      "sha256": "e872d8712373cf1094fb57ad0e2d72768d64339afaabe0b4031a430b258768e5"
+    },
+    {
+      "path": "views/auditor/partials/head.ejs",
+      "bytes": 264,
+      "sha256": "a42a3184901a9b93febdf44a806ce9c65c42ccfbd65a82eb22af2108e659ee68"
+    },
+    {
+      "path": "views/auditor/partials/sidebar.ejs",
+      "bytes": 1122,
+      "sha256": "cef35ef027501c8b973814aa89639a5567bd80fff4457205403fca7cc69aa546"
+    },
+    {
+      "path": "views/auditor/partials/topbar.ejs",
+      "bytes": 2209,
+      "sha256": "9bbcf0e9d2675c136514482a86253a85a4be8c9f91b0e3396039bed5443fb326"
+    },
+    {
+      "path": "views/auditor/payroll/reopen_detail.ejs",
+      "bytes": 4681,
+      "sha256": "b8340fc0df9afe4e67a276ad4a206288fd712c72a9047e31bd0f137beaa60e6c"
+    },
+    {
+      "path": "views/auditor/payroll/reopen_queue.ejs",
+      "bytes": 2305,
+      "sha256": "827db976e1dd443976ca59f7254c59a6ea19435267c6c2e6373069bc2917f160"
+    },
+    {
+      "path": "views/auditor/payroll/reversals_detail.ejs",
+      "bytes": 5520,
+      "sha256": "8687837a64867f3ada01372fca5654ec54f95f36e0092839f54525e218c1edff"
+    },
+    {
+      "path": "views/auditor/payroll/reversals_queue.ejs",
+      "bytes": 2351,
+      "sha256": "467ef797996e25456c5ac0de2ce11db970aeff9f626994fd4c2a0147fa797ba7"
+    },
+    {
+      "path": "views/auditor/payroll/review_detail.ejs",
+      "bytes": 32844,
+      "sha256": "93e87de9f07b94ba84bba0776173d2b718abfb866fb5c6d07be82ef2544f1fb0"
+    },
+    {
+      "path": "views/auditor/payroll/review_queue.ejs",
+      "bytes": 7052,
+      "sha256": "f82124add191517c18e7bd47ca23d3d7818d38fbd70f7f47330c75d359889f22"
+    },
+    {
+      "path": "views/dashboard.ejs",
+      "bytes": 13089,
+      "sha256": "8e2a5cf9a5df3252b3db329e9d47377fbb707398528d17eab13a5e1ab3f09644"
+    },
+    {
+      "path": "views/data_entry/dashboard.ejs",
+      "bytes": 23865,
+      "sha256": "349c1460d969227a224792d05fffc726b787268609fad34fe700c0f1dd768e58"
+    },
+    {
+      "path": "views/data_entry/enquiry/applications.ejs",
+      "bytes": 12741,
+      "sha256": "b062e38c9667e1ae73bf355a2340085eaefa31911a1ac274ebe7bd44bd0f8ea7"
+    },
+    {
+      "path": "views/data_entry/enquiry/discipline.ejs",
+      "bytes": 10853,
+      "sha256": "f1a56bb34e577aebb775c1d20d2aa3505c37d1da786038af6d158509defd74f2"
+    },
+    {
+      "path": "views/data_entry/enquiry/loan_balance.ejs",
+      "bytes": 7889,
+      "sha256": "7b47c34ef8ae5dae2202596c22fe380a2daf8e4b1819f451361266e5a7429507"
+    },
+    {
+      "path": "views/data_entry/enquiry/medical.ejs",
+      "bytes": 7037,
+      "sha256": "047dee245fd6973528abc86882dbcfb066838e1a25daa235392fabedc6081c49"
+    },
+    {
+      "path": "views/data_entry/enquiry/staff.ejs",
+      "bytes": 11098,
+      "sha256": "aa7c308ad40df4b6543970cfd47f047917ff2a6ede84271041a97528261fa9f8"
+    },
+    {
+      "path": "views/data_entry/enquiry/staff_general_info.ejs",
+      "bytes": 15251,
+      "sha256": "fd788a0b4850acbe6f61e63b8f7ec0534e25c2ddbebf096050582dd97d460ddd"
+    },
+    {
+      "path": "views/data_entry/enquiry/training.ejs",
+      "bytes": 13028,
+      "sha256": "4c5a415a272e976b967827000d5022c151d84aa3d6ba9c0cf88a2b88f9f0c7c8"
+    },
+    {
+      "path": "views/data_entry/enquiry/transfer_promotion.ejs",
+      "bytes": 8793,
+      "sha256": "53892e0486771eebdd46a0b4262d891bb588c2650a65a508b97a8d87504115a0"
+    },
+    {
+      "path": "views/data_entry/leave/application.ejs",
+      "bytes": 20413,
+      "sha256": "cf02d766fc211ce0c2c9718f92f8c96077c5487585fc02c8b450eaa52a70f0b8"
+    },
+    {
+      "path": "views/data_entry/leave/on_leave.ejs",
+      "bytes": 7335,
+      "sha256": "0188af123e7f7a59ac383c4f26f24ef1ca7508430aac0c1d534e5691c064d4da"
+    },
+    {
+      "path": "views/data_entry/leave/outstanding_modal.ejs",
+      "bytes": 3221,
+      "sha256": "3a59e57e3962153ff06c4ca1fa6c6a73ab81dafaa41ced9cfe91c20045a2de69"
+    },
+    {
+      "path": "views/data_entry/leave/purchase.ejs",
+      "bytes": 14408,
+      "sha256": "33948da8aca234713661039b0066a6da45319b61ce6e62780913da107e8efc1e"
+    },
+    {
+      "path": "views/data_entry/leave/recall.ejs",
+      "bytes": 10859,
+      "sha256": "d2b9ac7b873c7b671a1edbce3f03c216ec380e0994627cc8857a67a22b9fa2fd"
+    },
+    {
+      "path": "views/data_entry/leave/report_preview.ejs",
+      "bytes": 6383,
+      "sha256": "0b5e02ce377f2ff01d0638abb35063ad0784727150d861c10ac28a3bcf7ea2ae"
+    },
+    {
+      "path": "views/data_entry/partials/footer.ejs",
+      "bytes": 209,
+      "sha256": "6ed2f4361a936d2c99bb954a5e6b7868db4c45e171174785632d60880b78933e"
+    },
+    {
+      "path": "views/data_entry/partials/sidebar.ejs",
+      "bytes": 9025,
+      "sha256": "9443f719e8de1583ac57652810b78412f3bdc39dc0d8d1edbf9f6ab92d7cc9b2"
+    },
+    {
+      "path": "views/data_entry/partials/topbar.ejs",
+      "bytes": 1991,
+      "sha256": "99ee87e6d9ac1cbb42326ab975fdc4ed32b9354d5c849661802354d75c01e0e1"
+    },
+    {
+      "path": "views/data_entry/payroll/acting_allowance.ejs",
+      "bytes": 18172,
+      "sha256": "d8ae93a6e38bc767719aa4a619a49e74d0a53aef98d976f0480449aa3b81e1f1"
+    },
+    {
+      "path": "views/data_entry/payroll/bonus.ejs",
+      "bytes": 12494,
+      "sha256": "de65803d3dd525c7efc9063f32f9b8a5ed99ff128d4778241b0a8ba52efecac7"
+    },
+    {
+      "path": "views/data_entry/payroll/edit_payroll.ejs",
+      "bytes": 23318,
+      "sha256": "9310212370134e96f38c07a5522eb90e7258bc8bb9c2b6ed73c822500a09b4d2"
+    },
+    {
+      "path": "views/data_entry/payroll/entitle.ejs",
+      "bytes": 13189,
+      "sha256": "11c9d98c71af627cc6836e448fdb144b18e9d1a16d18c57d975fd121fe0beda4"
+    },
+    {
+      "path": "views/data_entry/payroll/income_setup.ejs",
+      "bytes": 21819,
+      "sha256": "2698224d87229f5114e96486c555b828a13b4858c20ce86c20bd09f4b4a3c9ec"
+    },
+    {
+      "path": "views/data_entry/payroll/increments_pay_cut_backlog.ejs",
+      "bytes": 9899,
+      "sha256": "8ac30f2df987d80d4d35f662c0f258b3f90d846970c32ca860e906492eb450cb"
+    },
+    {
+      "path": "views/data_entry/payroll/payroll_setup.ejs",
+      "bytes": 20530,
+      "sha256": "83b751cc53735dd210a98e424b21398be50d89dfb183ad8904da87f9ce9ed706"
+    },
+    {
+      "path": "views/data_entry/payroll/process_emoluments.ejs",
+      "bytes": 12220,
+      "sha256": "6c5ea310c35ce94b22b8eea84419af53909b79451beb17cadb5ae1fb8289ba7f"
+    },
+    {
+      "path": "views/data_entry/payroll/salary_reviews.ejs",
+      "bytes": 8542,
+      "sha256": "843ed4af9fab3d0e1a6710178b0e15abf7db6fc115f3ff05176f0882f85ff083"
+    },
+    {
+      "path": "views/data_entry/payroll/vehicle_insurance.ejs",
+      "bytes": 13306,
+      "sha256": "6400e79559e602a02159adcfc6f23287870f1607241b74c4778926ab42547dc0"
+    },
+    {
+      "path": "views/data_entry/payroll/view_payroll.ejs",
+      "bytes": 4705,
+      "sha256": "12806308d68254f0f99ab70d7dd77eb9d9001f4381bb6572364a1df41bb09f40"
+    },
+    {
+      "path": "views/data_entry/payroll/view_payroll_report.ejs",
+      "bytes": 6422,
+      "sha256": "5b122ae42a0fb5752cff98c984ed1a428ae607ed9ee00e57468a3cbbe8e9b6d8"
+    },
+    {
+      "path": "views/data_entry/payroll/yearly_payments.ejs",
+      "bytes": 13001,
+      "sha256": "d7f7b2f075f759495722f98c9223edda75078c3fd6bbf08222e7cdfb1f26ebc4"
+    },
+    {
+      "path": "views/data_entry/record_workflow/index.ejs",
+      "bytes": 5885,
+      "sha256": "b52bb950c52b0119a8a1741e18d1409419fab77b22a1c97edae59c6feadd9fcc"
+    },
+    {
+      "path": "views/data_entry/reports/acting_allowance.ejs",
+      "bytes": 6494,
+      "sha256": "cf89cc8db61b9eb84db566776c44679e5e4f706eb13d54220b18745803a891b3"
+    },
+    {
+      "path": "views/data_entry/reports/attendance.ejs",
+      "bytes": 6270,
+      "sha256": "5509f1a863508089524bffb35b3cbb23bdceec8a64b2fdf8d273bfabe4915f1d"
+    },
+    {
+      "path": "views/data_entry/reports/benefit_status.ejs",
+      "bytes": 4810,
+      "sha256": "34a49e931ee666327b01d5c69f782aa813ab0d4136fd5e5ddfbfca74b0f41a7e"
+    },
+    {
+      "path": "views/data_entry/reports/bio_data.ejs",
+      "bytes": 6593,
+      "sha256": "97aa8875c98a9bd2d273424a5a05531ad612dc4d03d463a08b6ff355d09ed237"
+    },
+    {
+      "path": "views/data_entry/reports/guarantees.ejs",
+      "bytes": 6347,
+      "sha256": "263d15c42a7fb7acfeca4b0ee883cd7f3ddad76dbbcf77bc79cc6da25153000b"
+    },
+    {
+      "path": "views/data_entry/reports/leave.ejs",
+      "bytes": 9672,
+      "sha256": "4f15ffe0a842a09efee7ec341db0e75e78e1d76b7a9b0dc1c7eae4c2b8621335"
+    },
+    {
+      "path": "views/data_entry/reports/loan.ejs",
+      "bytes": 8092,
+      "sha256": "3f2ba62c2756f64cbfb19b43cff108e0e5d3bc6632b33ba51595497b156bf3f7"
+    },
+    {
+      "path": "views/data_entry/reports/master_pay_sheet.ejs",
+      "bytes": 6048,
+      "sha256": "60223a3ac8239e98b2158efe36a5a2eb28ecd1dad7ce78f8ddeb9e04458f5931"
+    },
+    {
+      "path": "views/data_entry/reports/payroll.ejs",
+      "bytes": 61319,
+      "sha256": "0ccd0a69109954b466a9be423a028c1d6bbdfbd5f9a088885aed852679ed5578"
+    },
+    {
+      "path": "views/data_entry/reports/payroll_non_active_audit.ejs",
+      "bytes": 12112,
+      "sha256": "7ec0fc7d0e41e796d920202d3298bb5059c7efef602a905393ee997626ad1946"
+    },
+    {
+      "path": "views/data_entry/reports/redundancy.ejs",
+      "bytes": 13447,
+      "sha256": "91b41e3b06e9bbbf1b297aaac57fa05cc3e8e1c063d099aeeff5466624edf051"
+    },
+    {
+      "path": "views/data_entry/reports/vehicle_insurance_status.ejs",
+      "bytes": 5738,
+      "sha256": "3d26f3fe530fb83283e0d2cb134e55fd87cfd8d80bd8f5e3d741cb47da2085f9"
+    },
+    {
+      "path": "views/data_entry/reports/yearly_payments.ejs",
+      "bytes": 5037,
+      "sha256": "526c081f1b1241a3f93351a6ec0531e84120a566e6468f7a3674894ac9b906a6"
+    },
+    {
+      "path": "views/data_entry/staff/applications.ejs",
+      "bytes": 11112,
+      "sha256": "02c75ef1a1e11dafc3716717867cbfc6870b115025cc7db85c7d354d7444d860"
+    },
+    {
+      "path": "views/data_entry/staff/appraisal.ejs",
+      "bytes": 21504,
+      "sha256": "3de8c5572fdbe1a808657da1edaf1c4ee57d9afe44fa79d0ab0a2fd47a9424b0"
+    },
+    {
+      "path": "views/data_entry/staff/attendance.ejs",
+      "bytes": 9527,
+      "sha256": "8f8cec38473bd4ee44bc1fb0e0716262080f3aecded489d18c35ec746f243df3"
+    },
+    {
+      "path": "views/data_entry/staff/dependants.ejs",
+      "bytes": 13940,
+      "sha256": "4e9a835c450a45e6a6cc918ef6232f9b2e3017f8be58e23ca2e0a32f5e8d8576"
+    },
+    {
+      "path": "views/data_entry/staff/exit.ejs",
+      "bytes": 8835,
+      "sha256": "a641e9e1ecd5bfac34b7c1876337868da5669284d20173330ab4f4fe68c422cc"
+    },
+    {
+      "path": "views/data_entry/staff/interview.ejs",
+      "bytes": 9056,
+      "sha256": "598146d24234de94bee036173b0b8d53ed707b9207fdec8ac314cb79ef509680"
+    },
+    {
+      "path": "views/data_entry/staff/new_edit.ejs",
+      "bytes": 62729,
+      "sha256": "dd18dcd9eb6365107dea736b4115510eb63ce9e171aacfa421076ec0c512874d"
+    },
+    {
+      "path": "views/data_entry/staff/promotion.ejs",
+      "bytes": 13335,
+      "sha256": "c451159eaf98cce24d6a7e72a42515fafbc519191a3ad17615314468362d3317"
+    },
+    {
+      "path": "views/data_entry/staff/queries.ejs",
+      "bytes": 15683,
+      "sha256": "92955ba669a8f032eda1af56aeda1762a4487eb34693c39e4ae6921e4b81812a"
+    },
+    {
+      "path": "views/data_entry/staff/redundancy.ejs",
+      "bytes": 6787,
+      "sha256": "1701aca20ca3c9765cfeb667dcb4821146014fc2f9b3be5d1b1a16588257b69c"
+    },
+    {
+      "path": "views/data_entry/staff/training.ejs",
+      "bytes": 16929,
+      "sha256": "3fd76603f34d2e13bc6bbe3f2fb9bf8ba5784f7a9baa8f6720f687b897b04aaa"
+    },
+    {
+      "path": "views/data_entry/staff/transfer.ejs",
+      "bytes": 8085,
+      "sha256": "5d7c20b54bdcb1d45344367f4e63e9eb578d3dbef7f9310d8c47b0fc2392b023"
+    },
+    {
+      "path": "views/data_entry/welfare/benefits.ejs",
+      "bytes": 7992,
+      "sha256": "7d0e3a8313a438a07578774403134b57c453f45483abaa4cd5e250a4c4974bf5"
+    },
+    {
+      "path": "views/data_entry/welfare/guarantee.ejs",
+      "bytes": 16690,
+      "sha256": "30e95178e42c1ac09e58365edc6696cd19c1a7015083602c39ed61c703ed4399"
+    },
+    {
+      "path": "views/data_entry/welfare/leave.ejs",
+      "bytes": 4859,
+      "sha256": "f20c3558491dc5364f3bbb573c9e1ed897aa10c6f1868949d3e2452fd296f8c9"
+    },
+    {
+      "path": "views/data_entry/welfare/loan.ejs",
+      "bytes": 27927,
+      "sha256": "b78aaeeb63f25522324f352e0a5d721d5349c6d9d900af00cc416a1a87f6bc16"
+    },
+    {
+      "path": "views/data_entry/welfare/medical.ejs",
+      "bytes": 24905,
+      "sha256": "5dfe4199d06475dc10b44b957eb2bae26507e0edd8d45a952138f18416fd07b1"
+    },
+    {
+      "path": "views/data_entry/welfare/redundancy.ejs",
+      "bytes": 13625,
+      "sha256": "df328d9215d48028105f77c064c74cffd84866d32676fa895d8ae3f75611f2a0"
+    },
+    {
+      "path": "views/data_entry/welfare/surcharge.ejs",
+      "bytes": 11345,
+      "sha256": "3b00af02993dc095379f90c04fe6467e4798a0856258f3a6ca3b7d1e588b97bd"
+    },
+    {
+      "path": "views/developer/admins-new.ejs",
+      "bytes": 2642,
+      "sha256": "6abf2635ebc5b6622a6c210f1dd3ae36578850373fabc809af1c37059c607f56"
+    },
+    {
+      "path": "views/developer/admins-set-password.ejs",
+      "bytes": 1988,
+      "sha256": "7e60c4849f55efa77be3577afcf36e607445ba4decd87d277c454918acbbd968"
+    },
+    {
+      "path": "views/developer/admins.ejs",
+      "bytes": 3373,
+      "sha256": "4ebadbe83b4c5b35b6a98f11e0263cbffd8930221acd0cd503beba62f580ec0a"
+    },
+    {
+      "path": "views/developer/companies-new.ejs",
+      "bytes": 3282,
+      "sha256": "66598cf1f420d53f5154f5ace0934049edf2d439c706f58cb744665ce29edcca"
+    },
+    {
+      "path": "views/developer/companies.ejs",
+      "bytes": 3864,
+      "sha256": "cff607e5354bfc40a17c6ec93ae5b11c0dc989c1333ba2468a98db4037b50b1d"
+    },
+    {
+      "path": "views/developer/developers-dashboard.ejs",
+      "bytes": 7272,
+      "sha256": "10c2f9fee38827b3528f7f615903077114bbfe1030b826b6828bbceb72df76c4"
+    },
+    {
+      "path": "views/developer/developers-edit.ejs",
+      "bytes": 3045,
+      "sha256": "e23cb5baccf94146cc4b2fd2fcd0ff2b075df927db2e120f8e96e67ff12849d9"
+    },
+    {
+      "path": "views/developer/developers-new.ejs",
+      "bytes": 2680,
+      "sha256": "69a8f7770542f05282f4736f4c21c649352e4812822d48605469aa21fc817af1"
+    },
+    {
+      "path": "views/developer/developers.ejs",
+      "bytes": 4052,
+      "sha256": "1169fc4e1c289804e77bfb1e0e1573ef9c3844ed80de21cfd7353e1e1977d468"
+    },
+    {
+      "path": "views/developer/licenses-new.ejs",
+      "bytes": 3195,
+      "sha256": "774459632e042bfef0783c3913e12dc4e9b8e9c98b7c9a04a2a2141c7988042c"
+    },
+    {
+      "path": "views/developer/licenses.ejs",
+      "bytes": 3717,
+      "sha256": "a0e1c6d9f95413679ca4d491c95acac479ac214835b9c42915f4b282b9643603"
+    },
+    {
+      "path": "views/developer/partials/footer.ejs",
+      "bytes": 77,
+      "sha256": "d29b5d78f9f7330098b86e4acd5167223d69f374f1edf69a6bca596b48c13244"
+    },
+    {
+      "path": "views/developer/partials/sidebar.ejs",
+      "bytes": 1532,
+      "sha256": "da0a4138cbb9d9b08e41ff5e34331730f7f7f1395e089ce49b2e2d0322128237"
+    },
+    {
+      "path": "views/developer/partials/topbar.ejs",
+      "bytes": 1907,
+      "sha256": "4067f4d03ec603c0fae53aa3d2fbc7f27c3f6818ff3ef06235ac10a0e31eb355"
+    },
+    {
+      "path": "views/entity_head/attendance.ejs",
+      "bytes": 6416,
+      "sha256": "06f4057f9a10de9f79395d968185a21aee2b514c585688a5ac2f3878348b23ba"
+    },
+    {
+      "path": "views/entity_head/dashboard.ejs",
+      "bytes": 20378,
+      "sha256": "461707d7bda83a0499766f48ed48bad144d11288a81438cfc658286aca28fc91"
+    },
+    {
+      "path": "views/entity_head/leave.ejs",
+      "bytes": 6374,
+      "sha256": "f7073fcbf1fb3c38af3684cce3dc0f947b8f29566988e359a17e263b1f347a55"
+    },
+    {
+      "path": "views/entity_head/parameter_changes/detail.ejs",
+      "bytes": 10633,
+      "sha256": "c56888a7faa81ceb9437cd16a19f414301558a2e946e269aa21f3aa58396366c"
+    },
+    {
+      "path": "views/entity_head/parameter_changes/index.ejs",
+      "bytes": 5714,
+      "sha256": "693ea9d2c59daab0c315229ec30c6c5340ac4ba4fdd2e0d0c854fef29b2f6076"
+    },
+    {
+      "path": "views/entity_head/partials/footer.ejs",
+      "bytes": 80,
+      "sha256": "21f51864fb35b02b90e58dd0e1a2448caab69ec8f7bf7fc798c8f1fccf22354d"
+    },
+    {
+      "path": "views/entity_head/partials/head.ejs",
+      "bytes": 264,
+      "sha256": "a42a3184901a9b93febdf44a806ce9c65c42ccfbd65a82eb22af2108e659ee68"
+    },
+    {
+      "path": "views/entity_head/partials/sidebar.ejs",
+      "bytes": 1922,
+      "sha256": "d432f3ad09791262d5c71cc682903f2dbb94168d2c210d2ea4db8eb659c88587"
+    },
+    {
+      "path": "views/entity_head/partials/topbar.ejs",
+      "bytes": 2503,
+      "sha256": "e194e5f945f0fa4cf7a595dcecc290e71337d7cbbe45f430e737c6da9dd64d97"
+    },
+    {
+      "path": "views/entity_head/payroll/approval_detail.ejs",
+      "bytes": 23609,
+      "sha256": "15a0f82f7342402d6030762021dbd3283d08a7c085740ac23c5d07c24ec5aaab"
+    },
+    {
+      "path": "views/entity_head/payroll/approvals_queue.ejs",
+      "bytes": 7268,
+      "sha256": "9295fb62714f70d4df3afcf596d27e3c79731f9052154c55dc011d1d4631fa45"
+    },
+    {
+      "path": "views/entity_head/payroll/reopen_detail.ejs",
+      "bytes": 5391,
+      "sha256": "677dfb47dfe83a162a0d438d4967acb3ec103e0dd5eb86bcf09b772d968ee322"
+    },
+    {
+      "path": "views/entity_head/payroll/reopen_queue.ejs",
+      "bytes": 2317,
+      "sha256": "2e02ac47ee0972df86a0665a8765472a485d8dec367e84b1527798e3ffd38656"
+    },
+    {
+      "path": "views/entity_head/payroll/reversals_detail.ejs",
+      "bytes": 6222,
+      "sha256": "0872a7b3dba7372c59a05852e6e21337d63c8680f9557dc1004496da0a47f80b"
+    },
+    {
+      "path": "views/entity_head/payroll/reversals_queue.ejs",
+      "bytes": 2378,
+      "sha256": "20d55986fe5606c5ac7b943d8953366c286208d76211f82dd6dd75ddd9d7eb1c"
+    },
+    {
+      "path": "views/entity_head/record_workflow/detail.ejs",
+      "bytes": 4963,
+      "sha256": "f20ecc0412628151f2a921904ae30f1b6eefbdcc1ac7cc3e4273e8fa0e42f413"
+    },
+    {
+      "path": "views/entity_head/record_workflow/queue.ejs",
+      "bytes": 3122,
+      "sha256": "41e1caf672fac20e1e2149577669e8f58ed4822ba7320d7c93ee9f7dd2220a48"
+    },
+    {
+      "path": "views/entity_head/reports.ejs",
+      "bytes": 5542,
+      "sha256": "e5e0098974260c818fcb7841f808ab61f16174ec76d8eacec9498c86231cdf8f"
+    },
+    {
+      "path": "views/entity_head/staff.ejs",
+      "bytes": 5027,
+      "sha256": "5612b5b431ffa28944bbb11561ed69c7d4a068d0d35e0baa6cba23089c3cc554"
+    },
+    {
+      "path": "views/entity_head/training.ejs",
+      "bytes": 6351,
+      "sha256": "5acfc74b564dd12a9bca31d07f700f251beb3bc5426fe3bfe4832d140c8f2ed2"
+    },
+    {
+      "path": "views/entity_head/transfers.ejs",
+      "bytes": 5654,
+      "sha256": "092a016572a02d1134091825b0b9a0542de2bb0ef48e9731832f179aa6c33f0b"
+    },
+    {
+      "path": "views/finance/dashboard.ejs",
+      "bytes": 17922,
+      "sha256": "f49d778924b6718d8dedaf746ee472578e58dc42308d0de84a1a2de97d731abc"
+    },
+    {
+      "path": "views/finance/partials/footer.ejs",
+      "bytes": 69,
+      "sha256": "0bfc29c0a979acd6eba02798b40e78160ec7b378bbe125120458a80ac03f040c"
+    },
+    {
+      "path": "views/finance/partials/sidebar.ejs",
+      "bytes": 4300,
+      "sha256": "7fcb5994aaaae725e3ae6e393c6f36de34d003ac4313722cee93ca083ab8da94"
+    },
+    {
+      "path": "views/finance/partials/topbar.ejs",
+      "bytes": 2091,
+      "sha256": "666d4f4154ab0cfffa628b3dccba1d35b6670ad156b23324fe90bff3f26c8afa"
+    },
+    {
+      "path": "views/finance/payroll-reopen/detail.ejs",
+      "bytes": 8811,
+      "sha256": "82c4f4ffc2ffe8fd5cacb5d32b7c7dcc2a9c489828d19189fae7398e39a9cab0"
+    },
+    {
+      "path": "views/finance/payroll-reopen/index.ejs",
+      "bytes": 3417,
+      "sha256": "925a61097e03eeed5b8e6d090401e384932966b61d24f78318f35ed71ddcd36e"
+    },
+    {
+      "path": "views/finance/payroll-reopen/new.ejs",
+      "bytes": 4828,
+      "sha256": "0cb8a9ca6eb12c7c10dc6d3c4a7647e0994ab5263e965348666f57749ff5d2da"
+    },
+    {
+      "path": "views/finance/payroll-reversals/detail.ejs",
+      "bytes": 12637,
+      "sha256": "f29fd6ab6a8f3a54a8a257503ae4d8bf3df6c3b6628a9697aeeb74e5a74657ea"
+    },
+    {
+      "path": "views/finance/payroll-reversals/index.ejs",
+      "bytes": 6718,
+      "sha256": "b99c8b27368c3f41c8a0aa0f653538eaf3637aab5def6ccdeb0d6a4d9c189009"
+    },
+    {
+      "path": "views/finance/payroll-reversals/new.ejs",
+      "bytes": 5678,
+      "sha256": "18c0cab4423f071a16c3d6a5b31c51ca31ba232a68df7c188cece6ad684d2067"
+    },
+    {
+      "path": "views/finance/payroll-workflow/detail.ejs",
+      "bytes": 19351,
+      "sha256": "10d218121388f813b21deadff869a89aa4433432972f06ac4a463c483c92f70f"
+    },
+    {
+      "path": "views/finance/payroll-workflow/index.ejs",
+      "bytes": 8152,
+      "sha256": "8be320a0a0e71547e199bdf906535ff4d1d2460507676a397baa08000e67597c"
+    },
+    {
+      "path": "views/finance/reports.ejs",
+      "bytes": 2948,
+      "sha256": "c6128809d9e6a8d0aa9f8954bcf42783ce7eadd95b7db3640470a10c504ebafe"
+    },
+    {
+      "path": "views/finance/reports/benefit_status.ejs",
+      "bytes": 4208,
+      "sha256": "8c5fef1c95df32406c60a364974ebb3c25ae2f840bf1d19e5c45c6025eb83062"
+    },
+    {
+      "path": "views/finance/reports/financial_deductions.ejs",
+      "bytes": 9195,
+      "sha256": "8c7e089c5b9c522a9b60f48a983dbab3926212e116a47286635d0739be4638b2"
+    },
+    {
+      "path": "views/finance/reports/payslip.ejs",
+      "bytes": 9737,
+      "sha256": "2c2fc9f5e73f64966bf2da7ef320ee8caf1410d4884c3cc903c528422b370fd0"
+    },
+    {
+      "path": "views/finance_manager/dashboard.ejs",
+      "bytes": 15661,
+      "sha256": "9e2e68499e0c2e7cfe42d294306467ae8b273f572fe0d9b3f441369252b510e0"
+    },
+    {
+      "path": "views/finance_manager/partials/footer.ejs",
+      "bytes": 74,
+      "sha256": "c4de18d0540407a0d9d03f7472df3a62e16e2cbd3eee91cbfbc775bc07c1bb0a"
+    },
+    {
+      "path": "views/finance_manager/partials/sidebar.ejs",
+      "bytes": 3158,
+      "sha256": "e32f20bbb580c12b0502db775a0b45d7f6eb04d52c827f2688e174f8851db919"
+    },
+    {
+      "path": "views/finance_manager/partials/topbar.ejs",
+      "bytes": 2478,
+      "sha256": "1651f2643c01926f5a2cb0d3d5915bc2837c75032dfa66024652ff44fddb4169"
+    },
+    {
+      "path": "views/finance_manager/payroll_reopen_detail.ejs",
+      "bytes": 6255,
+      "sha256": "e35c2b3d5b3c5aff65343325fc91254edb6173265b4104e708603f07a410954e"
+    },
+    {
+      "path": "views/finance_manager/payroll_reopen_index.ejs",
+      "bytes": 2873,
+      "sha256": "3b1b4cbb59c7d7f860d322359a5f00c74e0b150bca036ede3d1f582031fa51a3"
+    },
+    {
+      "path": "views/finance_manager/payroll_reversals_detail.ejs",
+      "bytes": 6105,
+      "sha256": "9c26970dc50d38a1352f929122c45264ebc51aeca298d0d5790ff1d71b79abec"
+    },
+    {
+      "path": "views/finance_manager/payroll_reversals_index.ejs",
+      "bytes": 2879,
+      "sha256": "c5a947aebaa34e3b186835c4b4453e7247d261c1b0ed5e0f0bc382ccf4e676db"
+    },
+    {
+      "path": "views/finance_manager/payroll_workflow_detail.ejs",
+      "bytes": 13941,
+      "sha256": "d790e1b8ae18510a317d9b0d460ac005052b09cf298fb2901ba28f6a8668d5c6"
+    },
+    {
+      "path": "views/finance_manager/payroll_workflow_index.ejs",
+      "bytes": 5523,
+      "sha256": "dcb42fa8d1f859433615b7eefb02d8c4c04ccdd1eb2038c944af605e95c1fbf5"
+    },
+    {
+      "path": "views/finance_manager/reports/benefit_status.ejs",
+      "bytes": 4208,
+      "sha256": "430b927d6a0893c6e112d0c82b76b224a8f24333314d48649f34826eadfbc0bc"
+    },
+    {
+      "path": "views/finance_manager/reports/payslip.ejs",
+      "bytes": 9746,
+      "sha256": "95ab7cbce8e74dbf17f70db8ceb1528618ab7100ef2aed4ec2b4ba6c73eea140"
+    },
+    {
+      "path": "views/login.ejs",
+      "bytes": 6487,
+      "sha256": "d11cd98b2e7cb8a43e5b3ab3a633a7b2c870eb906d2180bbc9477fa530b8597c"
+    },
+    {
+      "path": "views/manager/approve/acting_allowance.ejs",
+      "bytes": 7929,
+      "sha256": "01411c03ba433ebc2b83ad354460d811314bf93559f1239858b08e652d69ff59"
+    },
+    {
+      "path": "views/manager/approve/appraisal_view.ejs",
+      "bytes": 8746,
+      "sha256": "b46a240f4b81001b0eee383fdd0f56bf41a351cdcb548fbe8cfd113c5011b0ba"
+    },
+    {
+      "path": "views/manager/approve/appraisals.ejs",
+      "bytes": 3954,
+      "sha256": "b63a6b64cb3f7bda44f53dbeb7bcc07f6e16a30bba7d1d72013f43896d27b815"
+    },
+    {
+      "path": "views/manager/approve/bonus.ejs",
+      "bytes": 8274,
+      "sha256": "0c40a364bb19e72010e89c6bf437b2b34df61dc96b9deee5803ecb7534fd008f"
+    },
+    {
+      "path": "views/manager/approve/dependants.ejs",
+      "bytes": 6116,
+      "sha256": "709cc7e2ea2b28b9ce6459dddad2545d9be7d27c9cf2d6f2d63dec49cd562ae4"
+    },
+    {
+      "path": "views/manager/approve/edited_payroll.ejs",
+      "bytes": 3306,
+      "sha256": "8341946e7227fe91f74b00c549e22abb88aa6e9347c20aaba97b9bc2920af6a2"
+    },
+    {
+      "path": "views/manager/approve/edited_payroll_view.ejs",
+      "bytes": 11927,
+      "sha256": "5cfb763e059e4be510f106398cf715797b9fdc758fca48909e5439691104283d"
+    },
+    {
+      "path": "views/manager/approve/end_of_service.ejs",
+      "bytes": 4211,
+      "sha256": "9b186519178ac9ef342501c73bf73701bd42a7d0570b9ad036229b0530a7965d"
+    },
+    {
+      "path": "views/manager/approve/entitlement.ejs",
+      "bytes": 3736,
+      "sha256": "88bc083efbeed08183538c1304242f29fa41fd7e1d5c058256725346adb70622"
+    },
+    {
+      "path": "views/manager/approve/entitlement_view.ejs",
+      "bytes": 6727,
+      "sha256": "464dc1fa6bc6ffe44312edd9e146e023c612cd0b77284711529facb1a1eb19b4"
+    },
+    {
+      "path": "views/manager/approve/exit.ejs",
+      "bytes": 4266,
+      "sha256": "18b0c71601dc9a12656814775bc7d4379dac91209557d689bb072ff65c08313f"
+    },
+    {
+      "path": "views/manager/approve/guarantee.ejs",
+      "bytes": 4457,
+      "sha256": "60ebb9342917b2877d02c351d44477a331c4b20291dac9eb7f8eaec485de1c03"
+    },
+    {
+      "path": "views/manager/approve/income_setup.ejs",
+      "bytes": 4407,
+      "sha256": "50f3250bf7f1b3bdedddddc0a6236862987ef252b5b4496fa8cf2d65cb99ab85"
+    },
+    {
+      "path": "views/manager/approve/income_setup_view.ejs",
+      "bytes": 8116,
+      "sha256": "22ae1ec31da95bd7a4d4ca7a8e310c52c60cf13058cc27a755c056cf2383f379"
+    },
+    {
+      "path": "views/manager/approve/increment.ejs",
+      "bytes": 8944,
+      "sha256": "038fd870ed24cde140050a9b964c48e2c673f1ad2df20d2024683ea1526e70b3"
+    },
+    {
+      "path": "views/manager/approve/interview.ejs",
+      "bytes": 10507,
+      "sha256": "c4685c1eadf235390a1aed7a3a4d742e56f37a7c8300ac89dfd38552efc0d03a"
+    },
+    {
+      "path": "views/manager/approve/leave.ejs",
+      "bytes": 7948,
+      "sha256": "20d862204097faa6364bc1c04f96634549dd9a4e12800c402246bceacc232397"
+    },
+    {
+      "path": "views/manager/approve/leave_application.ejs",
+      "bytes": 15629,
+      "sha256": "d88836d3b4c666363d75f8f9b952483068312a968d05b7c29427e839372969a8"
+    },
+    {
+      "path": "views/manager/approve/leave_purchase.ejs",
+      "bytes": 9851,
+      "sha256": "03220f6558a376326269337a6bd15ee3b03e099bdb70022c446ef5c8636d8b86"
+    },
+    {
+      "path": "views/manager/approve/leave_recall.ejs",
+      "bytes": 12289,
+      "sha256": "6a62d2380d0a5c8591964e7150a3e8f56bb002e2d29896b25950e074a009d025"
+    },
+    {
+      "path": "views/manager/approve/loan.ejs",
+      "bytes": 17140,
+      "sha256": "69e5b2808638892cfc4365c7a49521c0d7b038b944b8152808502a8b21f22328"
+    },
+    {
+      "path": "views/manager/approve/new_staff.ejs",
+      "bytes": 4060,
+      "sha256": "796619a84f72f7b7bdfc343e78cbc2da49a87ae4fee179b59ae7d0b8052fea22"
+    },
+    {
+      "path": "views/manager/approve/new_staff_view.ejs",
+      "bytes": 28975,
+      "sha256": "c7565779459fe107e0f568bf18260d3717fa799747b4c780f8d6b7e1eb186d2a"
+    },
+    {
+      "path": "views/manager/approve/on_leave.ejs",
+      "bytes": 6624,
+      "sha256": "60e69ec7f791ae1d2db29b376f6c14f36311d7d7f609e32f025c0407e6531519"
+    },
+    {
+      "path": "views/manager/approve/promotion_letter.ejs",
+      "bytes": 4555,
+      "sha256": "36bf8da3ba9f4096bbdc5f594ad0a6f3a9092c65801df9806997f7f245e5b973"
+    },
+    {
+      "path": "views/manager/approve/promotions.ejs",
+      "bytes": 5622,
+      "sha256": "d472f2945f45619e1670f2dd954269a6205c3fc0d3f31d3df274417468bd58a3"
+    },
+    {
+      "path": "views/manager/approve/query.ejs",
+      "bytes": 5534,
+      "sha256": "17a6584788586a98d4cd42d71e63a4f82467391cc697f92b9b5a13ddf77e2c43"
+    },
+    {
+      "path": "views/manager/approve/redundancy.ejs",
+      "bytes": 3510,
+      "sha256": "e67821a47b2b08f3f9aac2bfaba7ad24729113b822e5f369d640859f6e13b218"
+    },
+    {
+      "path": "views/manager/approve/salary_list.ejs",
+      "bytes": 3194,
+      "sha256": "bd22a09840c9efe5f36c0ff0bce9daa29cb6812850b8cc911771f71f8df8c087"
+    },
+    {
+      "path": "views/manager/approve/salary_review.ejs",
+      "bytes": 3893,
+      "sha256": "bd95cad964430242c23299d098110baebf1bf31e2b5d41fb050419194dd2f0c5"
+    },
+    {
+      "path": "views/manager/approve/salary_view.ejs",
+      "bytes": 14068,
+      "sha256": "6b714950ad2e74cd791d87285a85dbe73f98d08735635e8b901c05670c3318de"
+    },
+    {
+      "path": "views/manager/approve/training.ejs",
+      "bytes": 3586,
+      "sha256": "e7d10fa97b7d5e9b667c90aac14aec12fc615dfb08e0994e4bffd6be78e0598c"
+    },
+    {
+      "path": "views/manager/approve/training_view.ejs",
+      "bytes": 7000,
+      "sha256": "fefc755e91601dddc2fb6a230f4d254348a756eae2283f4ea1250342f9cf6111"
+    },
+    {
+      "path": "views/manager/approve/transfer.ejs",
+      "bytes": 6184,
+      "sha256": "e159e03d19b42c59b3ad52786031abda60515eff43a34edbbee256ecf1072c4e"
+    },
+    {
+      "path": "views/manager/dashboard.ejs",
+      "bytes": 42482,
+      "sha256": "f9e529c8c94cdbb6b02a7bc4d4387ec8db881a10243db056389e89f604deb01f"
+    },
+    {
+      "path": "views/manager/enquiry/medical.ejs",
+      "bytes": 6044,
+      "sha256": "d8abc125a3320b6bf4eb9dee95d7588731151f92230c9ca53d2b3a3b30c28364"
+    },
+    {
+      "path": "views/manager/enquiry/on_leave.ejs",
+      "bytes": 9410,
+      "sha256": "8bc3686ee9fecd2fc6ff8d2a7efc82c9990664ea08de4ff00cb16da9f40c212a"
+    },
+    {
+      "path": "views/manager/enquiry/staff.ejs",
+      "bytes": 3299,
+      "sha256": "149bfbc288cf1dfc1199cfb1a3ac3576935fd6e296f2431beefa940fde77dede"
+    },
+    {
+      "path": "views/manager/enquiry/staff_general_info.ejs",
+      "bytes": 15248,
+      "sha256": "e6fab75525f31894bef113192513adb2b11119e3c9d4bdcf4847746798686dfa"
+    },
+    {
+      "path": "views/manager/enquiry/training.ejs",
+      "bytes": 11000,
+      "sha256": "10d451e252466a8fe6e729ecf7078f3b3769153eb90b373ae6b59750a533ba83"
+    },
+    {
+      "path": "views/manager/enquiry/transfer_promotion.ejs",
+      "bytes": 9122,
+      "sha256": "28fb1b91229f1e65fecc250f2519854674ef80ab1b40d77bfed5eb0a088ccb54"
+    },
+    {
+      "path": "views/manager/partials/footer.ejs",
+      "bytes": 79,
+      "sha256": "b7d2f584756fdf783826643321e14b6151574173238c14b2b1d1103e2e491374"
+    },
+    {
+      "path": "views/manager/partials/head.ejs",
+      "bytes": 264,
+      "sha256": "a42a3184901a9b93febdf44a806ce9c65c42ccfbd65a82eb22af2108e659ee68"
+    },
+    {
+      "path": "views/manager/partials/sidebar.ejs",
+      "bytes": 8649,
+      "sha256": "a8ae14bb19c1e37f5b10923a222fe172c09a9cb4fa25d085b639e82a067ee0a8"
+    },
+    {
+      "path": "views/manager/partials/topbar.ejs",
+      "bytes": 1973,
+      "sha256": "2b87a7c177ea51351da6d925f6e4242113d013c8bb420e6c6d2b4ef88f7f5a3f"
+    },
+    {
+      "path": "views/manager/payroll/endorsement_detail.ejs",
+      "bytes": 21574,
+      "sha256": "69e2cfc6b437abdd3f2cad89df254c26d240d2e79a4361a547f119635140969b"
+    },
+    {
+      "path": "views/manager/payroll/endorsement_queue.ejs",
+      "bytes": 6812,
+      "sha256": "2cd7c3bfa50262cd819ba7a56db59ff0b7ae93d0053f6084416fcc90118785d6"
+    },
+    {
+      "path": "views/manager/payroll/reopen_detail.ejs",
+      "bytes": 4655,
+      "sha256": "3457062396aad87ea780a7331c0bd7a20d3ec494ab4c43abd6b28e57c4d4709f"
+    },
+    {
+      "path": "views/manager/payroll/reopen_queue.ejs",
+      "bytes": 2298,
+      "sha256": "83e496638156f5f94b0d5d1147e5487b22658562539e52f8a72042ab0a0b3aa3"
+    },
+    {
+      "path": "views/manager/payroll/reversals_detail.ejs",
+      "bytes": 7353,
+      "sha256": "9b287946230eecf323f2f674e2ea66abdb71b9bb8d9f3b9b70de458821dc3f79"
+    },
+    {
+      "path": "views/manager/payroll/reversals_queue.ejs",
+      "bytes": 4763,
+      "sha256": "fd58315836bb476fba4be370de82b71b83cc9d2601fe5c86701d05e815053f86"
+    },
+    {
+      "path": "views/manager/payroll/run_salary_review.ejs",
+      "bytes": 7129,
+      "sha256": "52f9357499e8b3bcb20fcfc9162fc536d58df36bb3baa1fdf53bb82a792ae79b"
+    },
+    {
+      "path": "views/manager/record_workflow/detail.ejs",
+      "bytes": 4478,
+      "sha256": "858895a9e3d6a9cd7fed909d950d1c5bae051f9da2fb1c530d918c87f2b07294"
+    },
+    {
+      "path": "views/manager/record_workflow/queue.ejs",
+      "bytes": 3329,
+      "sha256": "bff46e7256ed5f73aecd424d278e612a42dec98229f94351b2c26bae9c588bc1"
+    },
+    {
+      "path": "views/manager/reports/acting_allowance.ejs",
+      "bytes": 6191,
+      "sha256": "e4f84184c273f92df8d2a7060f496aaca52145dad7ebb7d494df42535f1e6d22"
+    },
+    {
+      "path": "views/manager/reports/attendance.ejs",
+      "bytes": 5979,
+      "sha256": "3b6341262fc3733782aa14fd2993fc377aa10f9b07275a5b260aa441b89d7f01"
+    },
+    {
+      "path": "views/manager/reports/benefit_status.ejs",
+      "bytes": 4801,
+      "sha256": "0d0b80b575b04ff228204b88dcf2fce86e9491679951dcf5ae7d490b5253f9e3"
+    },
+    {
+      "path": "views/manager/reports/bio_data.ejs",
+      "bytes": 4700,
+      "sha256": "aeaa1441604edc610e5f8b050d2edddc518678bdccee0e5b9753885fb92edb08"
+    },
+    {
+      "path": "views/manager/reports/guarantees.ejs",
+      "bytes": 6035,
+      "sha256": "9e7de0a5e605c4ff518bb8c53f95ed3692fc711dafff9072d9de9a91523a8fde"
+    },
+    {
+      "path": "views/manager/reports/leave.ejs",
+      "bytes": 9485,
+      "sha256": "25a1747dd86d5fc70222cf45b392396d821fb2c0e629ac11cf2905e995e9cf9d"
+    },
+    {
+      "path": "views/manager/reports/loan.ejs",
+      "bytes": 7968,
+      "sha256": "ad0956622e92ee7926cbb6bcc012e96412716a80aeb6b43b34ac5bce297b30ea"
+    },
+    {
+      "path": "views/manager/reports/master_pay_sheet.ejs",
+      "bytes": 5864,
+      "sha256": "77958a28396016b4b8ccb11d5a21dddf11fe91cc401b955ee123b4c465deda86"
+    },
+    {
+      "path": "views/manager/reports/payroll.ejs",
+      "bytes": 69177,
+      "sha256": "e6410221e91800ec3d06a515c44f7d9d16442b9654e444aa5efe5978aeaa2f19"
+    },
+    {
+      "path": "views/manager/reports/redundancy.ejs",
+      "bytes": 13447,
+      "sha256": "91b41e3b06e9bbbf1b297aaac57fa05cc3e8e1c063d099aeeff5466624edf051"
+    },
+    {
+      "path": "views/manager/reports/vehicle_insurance.ejs",
+      "bytes": 5329,
+      "sha256": "6322bbf59c09ba0e943268a1a038959856c4eaddc8d5df3ddf4d3121a024a044"
+    },
+    {
+      "path": "views/manager/reports/yearly_payments.ejs",
+      "bytes": 4657,
+      "sha256": "089fa044a78495b07f262d08e43359df2caeeab4692c15adbf255d2498110088"
+    },
+    {
+      "path": "views/payroll/gl-posting/history.ejs",
+      "bytes": 13994,
+      "sha256": "9391f61786a960911eadc7a52d02f28308fef84d0a291271c23d394acbb13ac3"
+    },
+    {
+      "path": "views/payroll/gl-posting/index.ejs",
+      "bytes": 31603,
+      "sha256": "f2d1fcb43067ca96d6e5d961e70452b265d4c41cd00449b08dba170590a2ded2"
+    },
+    {
+      "path": "views/payroll/process-emoluments/details.ejs",
+      "bytes": 9557,
+      "sha256": "bd15b7c5a05ff1655bf3270621545d5dd8c80b4c1da37678e774e13366f15400"
+    },
+    {
+      "path": "views/payroll/process-emoluments/history.ejs",
+      "bytes": 8058,
+      "sha256": "6eab9be366ff5f3da1a9201fa6039f7c6f3984b2d73d4307c2628a75abfabe2e"
+    },
+    {
+      "path": "views/payroll/process-emoluments/index.ejs",
+      "bytes": 14534,
+      "sha256": "9edabe93445205145526860353a4574b30ecd5f63fe714557ea58b6a4c9d167c"
+    },
+    {
+      "path": "views/profile.ejs",
+      "bytes": 5954,
+      "sha256": "f50afbe5dbdffea9f9a3b252ce00110cf149355a9d26b80f91e5826d074750cd"
+    },
+    {
+      "path": "views/reports/benefit_preview.ejs",
+      "bytes": 10136,
+      "sha256": "81ad797514f15dce44875698e45da64808d9eebc355e964939bce8681e67a690"
+    },
+    {
+      "path": "views/reports/bio_data_statement.ejs",
+      "bytes": 21568,
+      "sha256": "4b6ede4adf15869b868aa53b72ecf746fd3bfc86041409d9d1a5937f4404d738"
+    },
+    {
+      "path": "views/reports/bonus_backlog_preview.ejs",
+      "bytes": 4293,
+      "sha256": "a955f1556d19db11a8f8a32a108fd960093f09e9f59fd96aeaad8471fbfd4800"
+    },
+    {
+      "path": "views/reports/journal_index.ejs",
+      "bytes": 5018,
+      "sha256": "5e69fc1119bc3a3f497608b471a7c8cce818e09af92891f091ea81edf6ed6e41"
+    },
+    {
+      "path": "views/reports/journal_preview.ejs",
+      "bytes": 4001,
+      "sha256": "44ed761019340968f4b8d5bc894f13c0b1e6b0cd20f8f8d71a22041470792dce"
+    },
+    {
+      "path": "views/reports/medical.ejs",
+      "bytes": 9303,
+      "sha256": "69dff47ec62cd74327d8f45c17fe8d6b70ab1a7f09da2433acbde571e99b6c6b"
+    },
+    {
+      "path": "views/reports/nassit_gratuity.ejs",
+      "bytes": 17951,
+      "sha256": "7895e713bc26ec7e1a5daaefdc06c35b02c967dbcd6966388411afde44c073a5"
+    },
+    {
+      "path": "views/reports/partials/nra_income_tax_header.ejs",
+      "bytes": 336,
+      "sha256": "a3ce62e9d49d00604ea5a34b9acf3c78d63996654ea8e5ca9fdbd44d72585669"
+    },
+    {
+      "path": "views/reports/payroll_liabilities/index.ejs",
+      "bytes": 12072,
+      "sha256": "a768930a4cd82c7dac092ded02e83cdc29e0399037983d001c8ffd26f41424d8"
+    },
+    {
+      "path": "views/reports/payroll_liabilities/preview.ejs",
+      "bytes": 24900,
+      "sha256": "727a086c02c356049407f0466ff1ca0ff7fb94f02c7e2eaeac274a9f931c6a12"
+    },
+    {
+      "path": "views/reports/payroll_liabilities/staff_statement.ejs",
+      "bytes": 13796,
+      "sha256": "01179057b7beb996a857a9dc671b33aa2d19abf621891f044b52b61d53f27dda"
+    },
+    {
+      "path": "views/shared/coming-soon.ejs",
+      "bytes": 2687,
+      "sha256": "aa2aa7f33ccb7ec27413cf6a1b2303fe990513e973f0b8d4267e0ca82c54f957"
+    },
+    {
+      "path": "views/shared/error.ejs",
+      "bytes": 853,
+      "sha256": "2b878d5ad8e3a2cce69ea2330fcc295673dec0cd9d55010b54b75e268440852b"
+    },
+    {
+      "path": "views/shared/notifications/index.ejs",
+      "bytes": 7540,
+      "sha256": "092b0f8dd5e01090d1d00e454f0f85b460c0c8674b6ad72431ccb7fb2fa02d43"
+    },
+    {
+      "path": "views/shared/partials/notification_bell.ejs",
+      "bytes": 2284,
+      "sha256": "fe9e7373f371e615b524a2f808d858cc5d00a783198f9dc2e1d119be6d476862"
+    },
+    {
+      "path": "views/shared/pending_approvals.ejs",
+      "bytes": 4713,
+      "sha256": "7e1437a6270b01271269ae1662c0b71cc5b3c6ce54b724ab375b5fe088121004"
+    },
+    {
+      "path": "views/shared/work_queue/index.ejs",
+      "bytes": 6373,
+      "sha256": "719f8383eeafe2d4c83ca97f9007e76aac33057361504a137325ff3a82662e55"
+    },
+    {
+      "path": "views/yearly-payments/detail.ejs",
+      "bytes": 13783,
+      "sha256": "3208d5453e7558eabc87a2d7bccd447d88cf7c7eb1398cb24a0692f15e863acb"
+    },
+    {
+      "path": "views/yearly-payments/finance_index.ejs",
+      "bytes": 9297,
+      "sha256": "657fb9c6a89716a9490ad87f3b3d2ae518d88c64b407f8354202c9164bee740a"
+    },
+    {
+      "path": "views/yearly-payments/queue.ejs",
+      "bytes": 3460,
+      "sha256": "fbfe5df4c61bfbf7d07e4637a2c5fd97821fde85f696177223c508d960b35a23"
+    }
+  ]
+}

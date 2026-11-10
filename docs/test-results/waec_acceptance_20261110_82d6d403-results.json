@@ -1,0 +1,22 @@
+{
+  "startedAt": "2026-11-10T09:04:46.132Z",
+  "database": "waec_acceptance_20261110_82d6d403",
+  "mode": "PACKAGE_VERIFICATION",
+  "syntheticOnly": true,
+  "liveDatabase": "personnel_master",
+  "tests": [
+    {
+      "script": "scripts/testCpanelStagingPackage.js",
+      "status": "FAIL",
+      "exitCode": 1,
+      "failureTail": "PACKAGE_VERIFICATION_FAILED ER_WARN_DATA_OUT_OF_RANGE Out of range value for column 'Salary' at row 1\n"
+    }
+  ],
+  "status": "BLOCKED",
+  "liveAccessDenied": true,
+  "sanitizedWorkspace": "private\\acceptance-work\\waec_acceptance_20261110_82d6d403",
+  "liveProtectedRecordsUnchanged": true,
+  "disposableDatabaseRemoved": true,
+  "restrictedDatabaseUsersRemoved": true,
+  "completedAt": "2026-11-10T09:06:33.404Z"
+}

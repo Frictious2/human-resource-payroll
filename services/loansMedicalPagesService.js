@@ -751,7 +751,7 @@ async function saveLoanRepaymentDraft({ companyId, user, payload }) {
 async function getWelfareMedicalPageData({ companyId }) {
     const resolvedCompanyId = Number(companyId) || 1;
     const [mCodes, staffList] = await Promise.all([
-        pool.query('SELECT TCode, TransName FROM tblMCode ORDER BY TransName'),
+        pool.query('SELECT TCode, TransName FROM tblmcode ORDER BY TransName'),
         pool.query(staffStatusService.getActiveStaffQuery({ fields: 'PFNo, SName', orderBy: 'PFNo' }))
     ]);
 
@@ -791,7 +791,7 @@ async function getStaffMedicalHistoryData({ companyId, pfNo }) {
                 m.Amount,
                 m.PicturePath
             FROM tblmedical m
-            LEFT JOIN tblMCode mc ON m.MCode = mc.TCode
+            LEFT JOIN tblmcode mc ON m.MCode = mc.TCode
             WHERE m.PFNo = ?
               AND (m.CompanyID = ? OR m.CompanyID IS NULL)
             ORDER BY m.EntryDate DESC, m.TransNo DESC

@@ -40,7 +40,8 @@
               </div>
               <div class="col-md-6">
                 <label class="form-label">Password</label>
-                <input type="text" name="password" class="form-control" value="<%= dev.password || '' %>" />
+                <input type="password" name="password" class="form-control" value="" autocomplete="new-password" minlength="12" />
+                <p class="small text-muted">Leave blank to keep the existing password. A new password requires 12+ characters with upper/lower case, a number and a symbol.</p>
               </div>
               <div class="col-md-6">
                 <label class="form-label">Created By</label>

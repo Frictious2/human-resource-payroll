@@ -199,7 +199,7 @@ async function getPayrollItemFieldMapping(companyId) {
     const [rows] = await pool.query(
         `SELECT Code, Income, Taxable, Threshhold, TPercent, TPercentage, TAmount, Mode, AddBack, Fixed, Percent, Freq, CompanyID
          FROM tblpayrollitems
-         WHERE CompanyID = ? OR CompanyID IS NULL
+         WHERE CompanyID = ?
          ORDER BY Code`,
         [normalizeCompanyId(companyId)]
     );
@@ -228,7 +228,7 @@ async function getCurrentLoanParameterSnapshot(companyId) {
     const [rows] = await pool.query(
         `SELECT SeqNo, AdvanceInt, LoanDuration, QueryLimit, RetireAge, CompanyID
          FROM tblparams1
-         WHERE CompanyID = ? OR CompanyID IS NULL
+         WHERE CompanyID = ?
          LIMIT 1`,
         [normalizeCompanyId(companyId)]
     );
@@ -239,7 +239,7 @@ async function getSupportedYearlyTypes(companyId) {
     const [rows] = await pool.query(
         `SELECT Code, PayType
          FROM tblpaytype
-         WHERE (CompanyID = ? OR CompanyID IS NULL)
+         WHERE (CompanyID = ?)
            AND Code IN ('02', '05', '13')
          ORDER BY Code`,
         [normalizeCompanyId(companyId)]
@@ -256,7 +256,7 @@ async function getPaymentTypeConfig(connection, companyId, paymentType) {
     const [payTypeRows] = await connection.query(
         `SELECT Code, PayType
          FROM tblpaytype
-         WHERE (CompanyID = ? OR CompanyID IS NULL)
+         WHERE (CompanyID = ?)
            AND Code = ?
          LIMIT 1`,
         [normalizeCompanyId(companyId), normalizedType]
@@ -265,7 +265,7 @@ async function getPaymentTypeConfig(connection, companyId, paymentType) {
     const [itemRows] = await connection.query(
         `SELECT Code, Income, Taxable, Threshhold, TPercent, TPercentage, TAmount, Mode, AddBack, Fixed, Percent, Freq
          FROM tblpayrollitems
-         WHERE (CompanyID = ? OR CompanyID IS NULL)
+         WHERE (CompanyID = ?)
            AND Code = ?
          ORDER BY CompanyID DESC
          LIMIT 1`,
@@ -343,17 +343,17 @@ async function calculatePreview(connection, { companyId, paymentYear, paymentTyp
                     SELECT PFNo, MAX(PDate) AS MaxPDate
                     FROM tblsalary
                     WHERE COALESCE(Approved, 0) IN (-1, 1)
-                      AND (CompanyID = ? OR CompanyID IS NULL)
+                      AND (CompanyID = ?)
                     GROUP BY PFNo
                 ) latest
                     ON latest.PFNo = s1.PFNo
                    AND latest.MaxPDate = s1.PDate
                 WHERE COALESCE(s1.Approved, 0) IN (-1, 1)
-                  AND (s1.CompanyID = ? OR s1.CompanyID IS NULL)
+                  AND (s1.CompanyID = ?)
                 GROUP BY s1.PFNo
             ) sal
                 ON sal.PFNo = s.PFNo
-            WHERE (s.CompanyID = ? OR s.CompanyID IS NULL)
+            WHERE (s.CompanyID = ?)
               AND ${staffStatusService.getActiveStaffFilter('s')}
             ORDER BY s.PFNo, (s.CompanyID = ?) DESC
         `,

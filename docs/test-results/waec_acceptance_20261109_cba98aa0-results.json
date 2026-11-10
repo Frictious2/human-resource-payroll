@@ -1,0 +1,27 @@
+{
+  "startedAt": "2026-11-09T21:22:41.011Z",
+  "database": "waec_acceptance_20261109_cba98aa0",
+  "mode": "EMPLOYEE_DIAGNOSTIC",
+  "syntheticOnly": true,
+  "liveDatabase": "personnel_master",
+  "tests": [
+    {
+      "script": "scripts/testDisposableEmployeeSetup.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testCsrfProtection.js",
+      "status": "PASS",
+      "exitCode": 0
+    }
+  ],
+  "status": "PASS",
+  "liveAccessDenied": true,
+  "schemaOnlyTables": 148,
+  "sanitizedWorkspace": "private\\acceptance-work\\waec_acceptance_20261109_cba98aa0",
+  "liveProtectedRecordsUnchanged": true,
+  "disposableDatabaseRemoved": true,
+  "restrictedDatabaseUsersRemoved": true,
+  "completedAt": "2026-11-09T21:24:38.865Z"
+}

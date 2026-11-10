@@ -89,14 +89,43 @@ function getExpirySeconds(sess = {}) {
 }
 
 class MysqlSessionStore extends session.Store {
-    constructor(connection = pool) {
+    constructor(connection = pool, options = {}) {
         super();
         this.connection = connection;
+        this.cleanupIntervalMs = options.cleanupIntervalMs ?? Math.max(1000, normalizeNumber(process.env.SESSION_CLEANUP_INTERVAL_MS, DEFAULT_EXPIRATION_SWEEP_MS));
+        this.cleanupBatchSize = Math.min(1000, Math.max(1, Math.floor(Number(options.cleanupBatchSize || process.env.SESSION_CLEANUP_BATCH_SIZE) || 100)));
+        this.cleanupTimer = null;
+        this.cleanupOperation = null;
+        this.closed = false;
     }
 
     async onReady() {
         await ensureSessionTableExists(this.connection);
+        this.startCleanup();
         return true;
+    }
+
+    startCleanup() {
+        if (this.cleanupTimer || this.closed) return;
+        this.cleanupTimer = setInterval(() => {
+            this.clearExpiredSessions().catch(() => console.error('Session cleanup failed; will retry at next interval.'));
+        }, this.cleanupIntervalMs);
+        this.cleanupTimer.unref?.();
+    }
+
+    clearExpiredSessions() {
+        if (this.closed) return Promise.resolve();
+        if (this.cleanupOperation) return this.cleanupOperation;
+        // The indexed predicate is rechecked by InnoDB; concurrent workers may safely sweep.
+        this.cleanupOperation = Promise.resolve().then(() => this.connection.query(
+            `DELETE FROM ${SESSION_TABLE} WHERE expires < UNIX_TIMESTAMP() ORDER BY expires LIMIT ${this.cleanupBatchSize}`
+        )).finally(() => { this.cleanupOperation = null; });
+        return this.cleanupOperation;
+    }
+
+    stopCleanup() {
+        clearInterval(this.cleanupTimer);
+        this.cleanupTimer = null;
     }
 
     async getSession(sessionId) {
@@ -113,7 +142,7 @@ class MysqlSessionStore extends session.Store {
         }
 
         if (Number(row.expires || 0) <= Math.floor(Date.now() / 1000)) {
-            await this.destroySession(sessionId);
+            await this.connection.query(`DELETE FROM ${SESSION_TABLE} WHERE session_id = ? AND expires <= ?`, [sessionId, Math.floor(Date.now() / 1000)]);
             return null;
         }
 
@@ -165,14 +194,23 @@ class MysqlSessionStore extends session.Store {
     }
 
     touch(sessionId, sess, callback) {
-        return this.set(sessionId, sess, callback);
+        const operation = this.connection.query(
+            `UPDATE ${SESSION_TABLE} SET expires = ? WHERE session_id = ?`,
+            [getExpirySeconds(sess), sessionId]
+        );
+        if (typeof callback === 'function') {
+            operation.then(() => callback(null)).catch(callback);
+            return;
+        }
+        return operation;
     }
 
     close(callback) {
-        if (typeof callback === 'function') {
-            callback(null);
-        }
-        return Promise.resolve();
+        this.closed = true;
+        this.stopCleanup();
+        const operation = Promise.resolve(this.cleanupOperation).then(() => undefined);
+        if (typeof callback === 'function') operation.then(() => callback(null)).catch(callback);
+        return operation;
     }
 }
 

@@ -89,7 +89,8 @@
         const id = resendButton.dataset.id;
         try {
           const res = await fetch('/admin/api/admins/' + id + '/resend-link', { method: 'POST' });
-          if (res.ok) alert('Link resent');
+          const result = await res.json();
+          alert(res.ok && result.ok ? 'Setup email accepted by the mail server. Check the inbox and spam folder.' : (result.error || 'Failed to resend link'));
         } catch (e) {
           alert('Failed to resend link');
         }

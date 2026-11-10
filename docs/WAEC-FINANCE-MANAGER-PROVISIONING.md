@@ -1,160 +1,74 @@
 # WAEC Finance Manager Provisioning
 
-Date: 2026-10-09
+## Security Remediation Update
 
-Project: WAEC HR & Payroll Management System
+The earlier gaps below are preserved as historical findings. Scoped account management, state-bound one-time setup links, strong passwords, reset-secret validation, transactional account/password audits and disabled Developer bootstrap are now implemented. See `WAEC-FINAL-SECURITY-HARDENING.md` for the authoritative current behavior and executed tests. No real account was created or reset; holder authorization remains outstanding. Use only newly issued invitations after restart because legacy-format links are rejected.
 
-Database: `personnel_master`
+Reviewed 9 November 2026. Database: `personnel_master`; company: 1.
 
-Company scope: `CompanyID = 1`
+FINANCE MANAGER PROVISIONING: AWAITING AUTHORIZATION
 
-## Status
+## Current verified state
 
-`FINANCE MANAGER PROVISIONING: AWAITING AUTHORIZATION`
+A read-only aggregate query found **one Company 1 Finance Manager account**, with a non-empty password field. This supersedes the older inventory reporting zero accounts. Password presence does not prove successful login, account ownership or WAEC authorization. No identifying account data or password was exported. No user was created, reassigned, reset or approved during this review.
 
-No Finance Manager account was created or modified during this review.
+WAEC must identify the authorized holder and confirm whether this existing account belongs to that person. Do not create a duplicate or assign an existing Manager/Finance Officer extra powers. There is no reviewed role-reassignment workflow; do not update `tblpassword.Level` directly.
 
-## Role Architecture Confirmed
+## Role and permission architecture
 
-The application stores active portal users in `tblpassword`.
-
-Relevant fields:
-
-| Field | Purpose |
+| Layer | Implementation |
 | --- | --- |
-| `PFNo` | Portal account primary key |
-| `Username` | Login username |
-| `FullName` | Display name |
-| `Email` | Login email and setup-link destination |
-| `Pword` | Password hash, null before setup |
-| `Level` | Legacy role value |
-| `CompanyID` | Company scope |
-| `DateCreated` | Account creation timestamp |
+| Account table | `tblpassword`; portal key `PFNo`, `CompanyID`, `Level`, `Username`, `FullName`, `Email`, `Pword`, `DateCreated` |
+| Separate role/permission tables | No separate tables used by the reviewed login/route authorization path; permissions are code-defined |
+| Stored role | `Finance Manager` |
+| Normalized role | `finance-manager` in `services/authService.js` |
+| Authentication/session | Existing login, bcrypt, session regeneration, company-scoped identity; no separate authentication system |
+| Route mount | `server.js`: `requireRoles('finance-manager')` |
+| Manager approvals | Separate `/manager` mount restricted to `manager`; Finance Manager is not an approval stage |
 
-Finance Manager is represented as:
-
-| Layer | Value |
+| Allowed oversight/report area | Route under `/finance-manager` |
 | --- | --- |
-| Database role | `Finance Manager` |
-| Normalized application role | `finance-manager` |
-| Dashboard | `/finance-manager/dashboard` |
-| Route middleware | `requireRoles('finance-manager')` |
+| Dashboard | `/dashboard` |
+| Payroll list/detail | `/payroll/workflow`, `/payroll/workflow/:batchId` |
+| Annual payment list/detail | `/payroll/yearly-payments`, `/payroll/yearly-payments/:batchId` |
+| Reversals and corrections | `/payroll/reversals`, `/payroll/reopen` and their detail routes |
+| Journal, Payslip, GL, EOS | `/reports/journal`, `/reports/payslip`, `/reports/general-ledger`, `/reports/end-of-service` |
+| Liabilities | `/reports/payroll-liabilities` plus preview/PDF/Excel/staff statement routes; PAYE/EOS/NASSIT only |
 
-The role is recognized in `services/authService.js` by `normalizeRole()`.
+The benefit-status calculation POST is a read-only report calculation, not approval permission. Processing, submission, endorsement, review, approval, posting, reversals, reopen, staff edits, parameters and sensitive-record approvals remain forbidden. Report services and calculations are reused.
 
-## Current Account Inventory
+## Company isolation and verification limits
 
-Read-only query result on 2026-10-09:
+Authenticated sessions hold `user.companyId`, `companyId` and `CompanyID`. Oversight controllers pass that scope to workflow/reversal/reopen/GL services. Detail lookups use record ID plus company, not URL ID alone. Resend-link queries now use PFNo, role and the authenticated company.
 
-| Role | CompanyID | Count |
-| --- | ---: | ---: |
-| Admin | 1 | 2 |
-| Auditor | 1 | 1 |
-| Data Entry | 1 | 3 |
-| Developer | 1 | 1 |
-| Entity Head | 1 | 4 |
-| Finance Officer | 1 | 1 |
-| Manager | 1 | 3 |
-| User | 1 | 1 |
-| Admin | 2 | 1 |
-| Finance Manager | 1 | 0 |
+The existing `testFinanceManagerOversight.js` checks ten read pages/eight forbidden POSTs, but its cross-company branches skip when no foreign-company fixture exists. Those branches are not unconditional proof. Its startup invokes application seed behavior, so it was not rerun against this database. Run it on an isolated staging database only, after startup hardening, and add explicit two-company fixtures for payroll, yearly payments, staff statements and GL.
 
-Finding: No `Finance Manager` account currently exists for `CompanyID = 1`.
+`financeManagerController.getCompanyId()` still defaults a missing scope to company 1. Normal login supplies a company, but malformed/missing-scope sessions need fail-closed verification before external deployment. No authorization logic was changed in this preparation task.
 
-## Permissions Confirmed
+## Authorized provisioning procedure
 
-Finance Manager is an oversight role only.
+1. Obtain written holder/role authorization, official email, full name and approved username. Reconcile the existing account first using the authorized Admin UI.
+2. Sign in as an authorized Company 1 Admin. Confirm the account company before any action.
+3. For a genuinely new authorized holder, open `/admin/finance-managers/new`. Existing shared creation code obtains CompanyID from the Admin session and inserts `Pword = NULL`; never enter a default password or set approval flags by SQL.
+4. Configure account email in the project-root `.env`: `ACCOUNT_EMAIL_ENABLED=true`, exact SMTP server/port/TLS/username/password, optional sender and HTTPS `APP_BASE_URL`. SMTP does not inherit Windows/shell settings. Restart after configuration changes.
+5. The system emails a signed link valid for 30 minutes. Required mail failures now show warnings; use Resend Link once corrected, rather than deleting/recreating accounts. SMTP acceptance alone is not proof of inbox receipt.
+6. The holder sets their own password at `/admin/admins/set-password`; bcrypt hashes it. Do not send passwords through chat or store them in handover documents.
+7. Verify real login redirects to `/finance-manager/dashboard`, company isolation, report access, forbidden actions, logout and post-logout protected access.
+8. Record holder confirmation and provisioning evidence in an approved external access register until the account-audit gap below is fixed. This is not a substitute for application audit logging and must not fabricate historical events.
 
-Allowed read-only areas:
+## Activation, passwords and governance gaps
 
-| Area | Route |
+| Finding | Severity / release condition |
 | --- | --- |
-| Dashboard | `/finance-manager/dashboard` |
-| Payroll workflow oversight | `/finance-manager/payroll/workflow` |
-| Payroll workflow detail | `/finance-manager/payroll/workflow/:batchId` |
-| Yearly payment oversight | `/finance-manager/payroll/yearly-payments` |
-| Reversal oversight | `/finance-manager/payroll/reversals` |
-| Reopen/correction oversight | `/finance-manager/payroll/reopen` |
-| Journal report | `/finance-manager/reports/journal` |
-| Payslip report | `/finance-manager/reports/payslip` |
-| General Ledger history | `/finance-manager/reports/general-ledger` |
-| End of Service report | `/finance-manager/reports/end-of-service` |
-| Payroll Liabilities reports | `/finance-manager/reports/payroll-liabilities` |
+| Creation does not call the centralized audit helper | Medium; fix/test creation, resend and deletion audit before acceptance |
+| Password setup token can be reused until expiry; no explicit activation or forced-first-change field | Medium; document and harden before real account onboarding |
+| Setup handler has no password-strength validation and updates by PFNo alone | High for external provisioning; bind token to intended identity/current state and enforce password policy |
+| `RESET_SECRET` falls back to a known development string; production validator does not require reset secret | High; local secret is configured (value not disclosed), but target startup must reject missing/unsafe reset secret |
+| Admin role lists and deletion queries are not CompanyID-filtered | High company-isolation issue in provisioning administration; correct/test before external release |
+| Startup may seed a default Developer account and log its credentials | High; disable automatic production seeding and secret logging before staging startup |
 
-Forbidden operational actions:
+Do not claim that creating an account already meets every requested governance control. No production account changes are authorized by this document.
 
-| Action family | Status |
-| --- | --- |
-| Process payroll | Not permitted |
-| Submit payroll | Not permitted |
-| Manager endorsement | Not permitted |
-| Auditor review | Not permitted |
-| Entity Head/HNO approval | Not permitted |
-| Post to Accounts | Not permitted |
-| Request or execute reversal | Not permitted |
-| Request or approve reopen | Not permitted |
-| Create/edit employee records | Not permitted |
-| Change payroll parameters | Not permitted |
-| Approve sensitive records | Not permitted |
+## Staging acceptance
 
-Finance Manager report access reuses existing report services and does not create a second calculation engine.
-
-## CompanyID Scoping
-
-The authenticated session stores:
-
-- `req.session.user.companyId`
-- `req.session.companyId`
-- `req.session.CompanyID`
-
-Finance Manager services use the authenticated user's company context. Cross-company access remains forbidden by route authorization and service-level `CompanyID` filters verified by the Finance Manager oversight regression suite.
-
-## Provisioning Procedure
-
-Provisioning must be performed by an authorized Admin user through the application UI.
-
-1. Confirm WAEC has named the Finance Manager account holder.
-2. Confirm the account holder's full name, official email address and username.
-3. Sign in as an authorized Admin for `CompanyID = 1`.
-4. Open `Admin -> Finance Managers -> Add Finance Manager`.
-5. Enter username, email and full name.
-6. Submit the form.
-7. The system inserts a `tblpassword` row with:
-   - `Level = 'Finance Manager'`
-   - `CompanyID` from the Admin session
-   - `Pword = NULL`
-   - `DateCreated = NOW()`
-8. The system sends a 30-minute set-password link to the account email when SMTP is enabled.
-9. If SMTP is disabled or delivery fails, the Admin may use the existing resend-link action after SMTP is configured.
-10. The account holder sets a password through `/admin/admins/set-password?token=...`.
-11. Verify sign-in redirects to `/finance-manager/dashboard`.
-12. Verify Finance Manager can view oversight/report pages but cannot invoke mutation routes.
-
-## Secure Password Handling
-
-The provisioning workflow does not store plaintext passwords.
-
-Password behavior:
-
-- New account is created with `Pword = NULL`.
-- Password is set only through a signed, expiring token.
-- Password is stored using bcrypt.
-- Legacy plaintext-compatible login upgrade remains available for older accounts, but new accounts should use bcrypt immediately.
-
-## Audit and Notification Notes
-
-Provisioning currently relies on Admin account creation flow and security logging around authentication. If WAEC requires a formal account-creation audit row for every new portal user, add that as a separate controlled enhancement before production go-live.
-
-## Required Authorization Before Provisioning
-
-Provisioning is awaiting:
-
-- Named Finance Manager account holder.
-- Official WAEC email address.
-- Confirmation that the Admin performing provisioning is authorized for `CompanyID = 1`.
-- SMTP decision for password-link delivery.
-
-## Final Recommendation
-
-Do not create a default Finance Manager account. Create the real account only after WAEC confirms the named holder and the Admin performs provisioning through the existing UI.
-
+Use the checklist in `WAEC-STAGING-DEPLOYMENT-CHECKLIST.md`. Account holder identity/sign-off is still awaited even though one account exists. Staff Self-Service remains deferred. Application security/dependency gates in the preparation guide must clear before externally accessible staging.

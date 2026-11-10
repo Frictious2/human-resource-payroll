@@ -426,11 +426,11 @@ const managerController = {
                     bg.Duration, bg.Monthly, bg.Bank, b.Bank as BankName,
                     bg.ExpiryDate, bg.Approved, bg.EntryDate
                 FROM tblbankguarantee bg
-                LEFT JOIN tblstaff s ON bg.PFNO = s.PFNo
+                LEFT JOIN tblstaff s ON bg.PFNO = s.PFNo AND s.CompanyID = bg.CompanyID
                 LEFT JOIN tblbanks b ON bg.Bank = b.Code
-                WHERE bg.Approved = 0
+                WHERE bg.Approved = 0 AND bg.CompanyID = ?
                 ORDER BY bg.LoanDate DESC
-            `);
+            `, [getCompanyId(req)]);
 
             res.render('manager/approve/guarantee', {
                 title: 'Approve Bank Guarantee',
@@ -447,6 +447,9 @@ const managerController = {
     postApproveGuarantee: async (req, res) => {
         try {
             const { refNo, action } = req.body;
+            const companyId = getCompanyId(req);
+            const [owned] = await pool.query('SELECT RefNo FROM tblbankguarantee WHERE RefNo = ? AND CompanyID = ?', [refNo, companyId]);
+            if (!owned.length) return res.status(404).json({ error: 'Record not found.' });
             // action: 'approve' or 'reject'
             const status = action === 'approve' ? 1 : 2;
             const user = req.session.user ? req.session.user.name : 'Manager';
@@ -456,12 +459,12 @@ const managerController = {
                 table: 'tblbankguarantee',
                 formName: 'manager/approve/guarantee',
                 recordId: refNo,
-                fetchQuery: 'SELECT * FROM tblbankguarantee WHERE RefNo = ?',
-                fetchParams: [refNo],
+                fetchQuery: 'SELECT * FROM tblbankguarantee WHERE RefNo = ? AND CompanyID = ?',
+                fetchParams: [refNo, companyId],
                 applyChange: async () => {
                     await pool.query(
-                        'UPDATE tblbankguarantee SET Approved = ?, Approvedby = ?, Dateapproved = ? WHERE RefNo = ?',
-                        [status, user, now, refNo]
+                        'UPDATE tblbankguarantee SET Approved = ?, Approvedby = ?, Dateapproved = ? WHERE RefNo = ? AND CompanyID = ?',
+                        [status, user, now, refNo, companyId]
                     );
                 }
             });
@@ -848,8 +851,8 @@ const managerController = {
                JOIN tblstaff st ON s.PFNo = st.PFNo
                LEFT JOIN tbldept d ON st.CDept = d.Code
                WHERE s.Approved = 0
-                 AND (s.CompanyID = ? OR s.CompanyID IS NULL)
-                 AND (st.CompanyID = ? OR st.CompanyID IS NULL)
+                 AND (s.CompanyID = ?)
+                 AND (st.CompanyID = ?)
                ORDER BY s.DateKeyed DESC
            `, [companyId, companyId]);
           res.render('manager/approve/salary_list', {
@@ -883,8 +886,8 @@ const managerController = {
                LEFT JOIN tblgrade g ON st.CGrade = g.GradeCode
                LEFT JOIN tbljobtitle j ON st.JobTitle = j.Code
                WHERE s.PFNo = ? AND DATE(s.PDate) = ?
-                 AND (s.CompanyID = ? OR s.CompanyID IS NULL)
-                 AND (st.CompanyID = ? OR st.CompanyID IS NULL)
+                 AND (s.CompanyID = ?)
+                 AND (st.CompanyID = ?)
                LIMIT 1`,
               [pfno, formattedPDate, companyId, companyId]
           );
@@ -935,8 +938,8 @@ const managerController = {
                   JOIN tblstaff st ON s.PFNo = st.PFNo
                   WHERE s.PFNo = ?
                     AND DATE(s.PDate) = ?
-                    AND (s.CompanyID = ? OR s.CompanyID IS NULL)
-                    AND (st.CompanyID = ? OR st.CompanyID IS NULL)
+                    AND (s.CompanyID = ?)
+                    AND (st.CompanyID = ?)
                   LIMIT 1
                   FOR UPDATE
               `,
@@ -949,8 +952,8 @@ const managerController = {
                        WHERE s.PFNo = ?
                          AND DATE(s.PDate) = ?
                          AND s.Approved = 0
-                         AND (s.CompanyID = ? OR s.CompanyID IS NULL)
-                         AND (st.CompanyID = ? OR st.CompanyID IS NULL)`,
+                         AND (s.CompanyID = ?)
+                         AND (st.CompanyID = ?)`,
                       [status, user, now, now, pfno, formattedPDate, companyId, companyId]
                   );
                   return result;
@@ -1206,14 +1209,14 @@ const managerController = {
                   re.Reason as ReasonText,
                   d.Reason as ReasonCode
               FROM tbldependant d
-              JOIN tblstaff s ON d.PFNo = s.PFNo
+              JOIN tblstaff s ON d.PFNo = s.PFNo AND s.CompanyID = d.CompanyID
               LEFT JOIN tblrelation r ON d.RCode = r.RCode
               LEFT JOIN tblreason re ON d.Reason = re.ReasonCode
-              WHERE d.Approved = 0
+              WHERE d.Approved = 0 AND d.CompanyID = ?
               ORDER BY d.PFNo, d.DepNo
           `;
           
-          const [dependants] = await pool.query(query);
+          const [dependants] = await pool.query(query, [getCompanyId(req)]);
 
           res.render('manager/approve/dependants', {
               title: 'Approve Dependants',
@@ -1230,24 +1233,27 @@ const managerController = {
   postApproveDependants: async (req, res) => {
       try {
           const { pfno, depNo, action } = req.body;
+          const companyId = getCompanyId(req);
+          const [owned] = await pool.query('SELECT DepNo FROM tbldependant WHERE PFNo = ? AND DepNo = ? AND CompanyID = ?', [pfno, depNo, companyId]);
+          if (!owned.length) return res.status(404).json({ error: 'Record not found.' });
           const user = req.user ? req.user.username : 'manager';
 
           if (action === 'approve') {
               const query = `
                   UPDATE tbldependant 
                   SET Approved = -1, ApprovedBy = ?, DateApproved = NOW()
-                  WHERE PFNo = ? AND DepNo = ?
+                  WHERE PFNo = ? AND DepNo = ? AND CompanyID = ?
               `;
-              await pool.query(query, [user, pfno, depNo]);
+              await pool.query(query, [user, pfno, depNo, companyId]);
               res.json({ success: true, message: 'Dependant approved.' });
 
           } else if (action === 'reject') {
               const query = `
                   UPDATE tbldependant 
                   SET Approved = 2, ApprovedBy = ?, DateApproved = NOW()
-                  WHERE PFNo = ? AND DepNo = ?
+                  WHERE PFNo = ? AND DepNo = ? AND CompanyID = ?
               `;
-              await pool.query(query, [user, pfno, depNo]);
+              await pool.query(query, [user, pfno, depNo, companyId]);
               res.json({ success: true, message: 'Dependant rejected.' });
           } else {
               res.status(400).json({ error: 'Invalid action' });
@@ -1303,8 +1309,8 @@ const managerController = {
               FROM tblentitle e
               LEFT JOIN tblstaff s ON e.PFNo = s.PFNo
               WHERE e.Approved = 0
-                AND (e.CompanyID = ? OR e.CompanyID IS NULL)
-                AND (s.CompanyID = ? OR s.CompanyID IS NULL)
+                AND (e.CompanyID = ?)
+                AND (s.CompanyID = ?)
               ORDER BY e.KeyedIn DESC
           `, [companyId, companyId]);
           res.render('manager/approve/entitlement', {
@@ -1328,7 +1334,7 @@ const managerController = {
           const [paythrough] = await pool.query('SELECT Code, PayThrough FROM tblpaythrough ORDER BY PayThrough');
           const [banks] = await pool.query('SELECT Code, Bank FROM tblbanks ORDER BY Bank');
           const [companyBBANs] = await pool.query(
-              'SELECT BBAN, Short, Bank FROM tblpayingbank WHERE CompanyID = ? OR CompanyID IS NULL ORDER BY Bank',
+              'SELECT BBAN, Short, Bank FROM tblpayingbank WHERE CompanyID = ? ORDER BY Bank',
               [companyId]
           );
           const [items] = await pool.query("SELECT Code, Income FROM tblpayrollitems WHERE Code BETWEEN '01' AND '20' ORDER BY Code");
@@ -1338,14 +1344,14 @@ const managerController = {
                 FROM tblentitle e
                 JOIN tblstaff s ON e.PFNo = s.PFNo
                 WHERE e.PFNo = ?
-                  AND (e.CompanyID = ? OR e.CompanyID IS NULL)
-                  AND (s.CompanyID = ? OR s.CompanyID IS NULL)
+                  AND (e.CompanyID = ?)
+                  AND (s.CompanyID = ?)
                 LIMIT 1
               `,
               [pfno, companyId, companyId]
           );
           const [sRows] = await pool.query(
-              'SELECT PFNo, SName FROM tblstaff WHERE PFNo = ? AND (CompanyID = ? OR CompanyID IS NULL) LIMIT 1',
+              'SELECT PFNo, SName FROM tblstaff WHERE PFNo = ? AND (CompanyID = ?) LIMIT 1',
               [pfno, companyId]
           );
           if (eRows.length === 0) return res.status(404).send('Entitlement not found');
@@ -1387,8 +1393,8 @@ const managerController = {
                   FROM tblentitle e
                   JOIN tblstaff s ON e.PFNo = s.PFNo
                   WHERE e.PFNo = ?
-                    AND (e.CompanyID = ? OR e.CompanyID IS NULL)
-                    AND (s.CompanyID = ? OR s.CompanyID IS NULL)
+                    AND (e.CompanyID = ?)
+                    AND (s.CompanyID = ?)
                   LIMIT 1
                   FOR UPDATE
               `,
@@ -1401,8 +1407,8 @@ const managerController = {
                         SET e.Approved = ?, e.ApprovedBy = ?, e.DateApproved = ?, e.TimeApproved = ?
                         WHERE e.PFNo = ?
                           AND e.Approved = 0
-                          AND (e.CompanyID = ? OR e.CompanyID IS NULL)
-                          AND (s.CompanyID = ? OR s.CompanyID IS NULL)
+                          AND (e.CompanyID = ?)
+                          AND (s.CompanyID = ?)
                       `,
                       [approvedStatus, user, now, now, pfno, companyId, companyId]
                   );
@@ -1999,7 +2005,7 @@ const managerController = {
                     LEFT JOIN tbljobtitle j ON s.JobTitle = j.Code
                     LEFT JOIN tbldept d ON s.CDept = d.Code
                     WHERE s.Approved = 0
-                      AND (s.CompanyID = ? OR s.CompanyID IS NULL)
+                      AND (s.CompanyID = ?)
                     ORDER BY s.KeyedIn DESC
                 `;
             const [staffList] = await pool.query(query, [companyId]);
@@ -2038,26 +2044,26 @@ const managerController = {
             const [qualifTypes] = await pool.query('SELECT Code, QType FROM tblqualiftype ORDER BY QType');
             const [vehicles] = await pool.query('SELECT VType FROM tblvehicle ORDER BY VType');
             const [staffRows] = await pool.query(
-                'SELECT * FROM tblstaff WHERE PFNo = ? AND (CompanyID = ? OR CompanyID IS NULL) LIMIT 1',
+                'SELECT * FROM tblstaff WHERE PFNo = ? AND (CompanyID = ?) LIMIT 1',
                 [pfno, companyId]
             );
             if (staffRows.length === 0) return res.status(404).send('Staff not found');
             const staff = staffRows[0];
-            const [lastLeaveRows] = await pool.query('SELECT DATE_FORMAT(MAX(StartDate), "%Y-%m-%d") as LastLeave FROM tblleave WHERE PFNO = ?', [pfno]);
+            const [lastLeaveRows] = await pool.query('SELECT DATE_FORMAT(MAX(StartDate), "%Y-%m-%d") as LastLeave FROM tblleave WHERE PFNO = ? AND CompanyID = ?', [pfno, companyId]);
             const lastLeave = lastLeaveRows[0] ? lastLeaveRows[0].LastLeave : null;
             const [depRows] = await pool.query(`
                 SELECT d.Dependant, r.Relation, DATE_FORMAT(d.DOB, '%Y-%m-%d') as Birthdate
                 FROM tbldependant d
                 LEFT JOIN tblrelation r ON d.RCode = r.RCode
-                WHERE d.PFNo = ? AND (d.Closed = 0 OR d.Closed IS NULL)
+                WHERE d.PFNo = ? AND d.CompanyID = ? AND (d.Closed = 0 OR d.Closed IS NULL)
                 ORDER BY d.DepNo
-            `, [pfno]);
+            `, [pfno, companyId]);
             const [qualifs] = await pool.query(`
                 SELECT q.Code, q.QName, qt.QType
                 FROM tblqualif q
                 LEFT JOIN tblqualiftype qt ON q.Code = qt.Code
-                WHERE q.PFNo = ?
-            `, [pfno]);
+                WHERE q.PFNo = ? AND q.CompanyID = ?
+            `, [pfno, companyId]);
             res.render('manager/approve/new_staff_view', {
                 title: 'View Staff',
                 path: '/manager/approve/new-staff/view',
@@ -2086,7 +2092,7 @@ const managerController = {
             if (action === 'approve') {
                 // Validate Notch before approving
                 const [staffRows] = await pool.query(
-                    'SELECT Notch, CGrade FROM tblstaff WHERE PFNo = ? AND (CompanyID = ? OR CompanyID IS NULL) LIMIT 1',
+                    'SELECT Notch, CGrade FROM tblstaff WHERE PFNo = ? AND (CompanyID = ?) LIMIT 1',
                     [pfno, companyId]
                 );
                 if (staffRows.length > 0) {
@@ -2106,11 +2112,11 @@ const managerController = {
                 table: 'tblstaff',
                 formName: 'manager/approve/new-staff',
                 recordId: pfno,
-                fetchQuery: 'SELECT * FROM tblstaff WHERE PFNo = ? AND (CompanyID = ? OR CompanyID IS NULL)',
+                fetchQuery: 'SELECT * FROM tblstaff WHERE PFNo = ? AND (CompanyID = ?)',
                 fetchParams: [pfno, companyId],
                 applyChange: async () => {
                     await pool.query(
-                        'UPDATE tblstaff SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE PFNo = ? AND (CompanyID = ? OR CompanyID IS NULL)',
+                        'UPDATE tblstaff SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE PFNo = ? AND (CompanyID = ?)',
                         [approvedStatus, user, now, now, pfno, companyId]
                     );
                 }
@@ -2121,11 +2127,11 @@ const managerController = {
                 table: 'tblpayroll',
                 formName: 'manager/approve/new-staff',
                 recordId: pfno,
-                fetchQuery: 'SELECT * FROM tblpayroll WHERE PFNo = ? AND PYear = 0 AND PMonth = 0 AND (CompanyID = ? OR CompanyID IS NULL)',
+                fetchQuery: 'SELECT * FROM tblpayroll WHERE PFNo = ? AND PYear = 0 AND PMonth = 0 AND (CompanyID = ?)',
                 fetchParams: [pfno, companyId],
                 applyChange: async () => {
                     await pool.query(
-                        'UPDATE tblpayroll SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE PFNo = ? AND PYear = 0 AND (CompanyID = ? OR CompanyID IS NULL)',
+                        'UPDATE tblpayroll SET Approved = ?, ApprovedBy = ?, DateApproved = ?, TimeApproved = ? WHERE PFNo = ? AND PYear = 0 AND (CompanyID = ?)',
                         [approvedStatus, user, now, now, pfno, companyId]
                     );
                 }

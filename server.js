@@ -2,8 +2,9 @@ const express = require('express');
 const session = require('express-session');
 const path = require('path');
 const fs = require('fs');
-// Deployment environment variables must take precedence over any local .env file.
-require('dotenv').config();
+// Deployment variables take precedence except SMTP, which is project .env-only.
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+require('./config/smtpEnvironment').loadSmtpEnvironment();
 
 const requestContextMiddleware = require('./middleware/requestContext');
 const { attachAuthenticatedUser, requireAuth, requireRoles, redirectAuthenticatedToDashboard } = require('./middleware/auth');
@@ -36,6 +37,7 @@ const {
     createCsrfViewMiddleware,
     createLoginRateLimiter,
     createSecurityHeadersMiddleware,
+    initializeSessionCsrfToken,
     isCsrfError
 } = require('./middleware/security');
 const { assertEnvironmentIsSafe } = require('./services/environmentValidationService');
@@ -95,6 +97,8 @@ async function handleLogin(req, res, options = {}) {
         req.session.user = authResult.user;
         req.session.companyId = authResult.user.companyId || null;
         req.session.CompanyID = authResult.user.companyId || null;
+        // Persist one token before redirects/assets can load the regenerated session concurrently.
+        initializeSessionCsrfToken(req);
         await new Promise((resolve, reject) => {
             req.session.save((sessionError) => {
                 if (sessionError) {
@@ -156,7 +160,15 @@ function createApp({ sessionStore } = {}) {
     app.disable('x-powered-by');
 
     app.use(createSecurityHeadersMiddleware({ isProduction }));
-    app.use(express.static(path.join(__dirname, 'public')));
+    const publicFiles = express.static(path.join(__dirname, 'public'));
+    app.use((req, res, next) => {
+        // Never let express.static fall through to a confidential upload.
+        let url;
+        try { url = decodeURIComponent(req.path).replace(/\\/g, '/').toLowerCase(); }
+        catch { return res.sendStatus(400); }
+        if (url.split('/').includes('uploads')) return next();
+        return publicFiles(req, res, next);
+    });
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
 
@@ -167,12 +179,21 @@ function createApp({ sessionStore } = {}) {
 
     app.use(requestContextMiddleware);
     app.use(attachAuthenticatedUser);
+    app.use(require('./middleware/installationCompany'));
+    app.use('/uploads', require('./services/privateFileService').createPrivateFileHandler());
     app.use(createCsrfProtectionMiddleware());
     app.use(createCsrfViewMiddleware());
     app.use(attachBranding);
     app.use(attachNotificationSummary);
 
     const loginRateLimiter = createLoginRateLimiter();
+    const accountRateLimiter = require('express-rate-limit').rateLimit({
+        windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false,
+        message: 'Too many account setup attempts. Please try again later.'
+    });
+    app.use((req, res, next) => (/\/set-password$|\/resend-link$|^\/profile\/password$/.test(req.path)
+        || (['POST','PATCH','DELETE'].includes(req.method) && /^\/(admin|developer)\/(api\/)?(admins|developers|managers|finance-managers|finance-officers|data-entry-officers|auditors|entity-heads)(\/[^/]+)?$/.test(req.path)))
+        ? accountRateLimiter(req, res, next) : next());
 
     app.get('/', (req, res) => {
         if (req.user) {
@@ -236,10 +257,10 @@ function createApp({ sessionStore } = {}) {
             const [rows] = await pool.query(
                 `SELECT LogoPath
                  FROM tblcominfo
-                 WHERE LogoPath IS NOT NULL
+                 WHERE CompanyID = ? AND LogoPath IS NOT NULL
                    AND LogoPath <> ''
                  ORDER BY CompanyID ASC
-                 LIMIT 1`
+                 LIMIT 1`, [require('./services/installationCompanyService').getInstallationCompanyId()]
             );
 
             const logoPath = rows[0] && rows[0].LogoPath ? String(rows[0].LogoPath).trim() : '';
@@ -336,7 +357,7 @@ function createApp({ sessionStore } = {}) {
 
         console.error('Unhandled request error:', {
             method: req.method,
-            path: req.originalUrl,
+            path: String(req.originalUrl || '').split('?')[0],
             message: error && error.message
         });
         const status = Number(error && error.status) >= 400 && Number(error.status) < 600
@@ -362,14 +383,11 @@ async function startServer() {
     assertEnvironmentIsSafe(process.env);
     const sessionStore = await initializeSessionStore();
     const app = createApp({ sessionStore });
-    const seedDeveloper = await authService.ensureSeedDeveloper();
-    if (seedDeveloper.created) {
-        console.log(`Seed developer created: ${seedDeveloper.username} / ${seedDeveloper.password}`);
-    }
 
     const PORT = process.env.PORT || 3001;
     return new Promise((resolve, reject) => {
-        const server = app.listen(PORT, () => {
+        const host = process.env.APP_HOST || (isProductionEnvironment() ? '127.0.0.1' : undefined);
+        const server = app.listen(PORT, host, () => {
             console.log(`Server running on http://localhost:${PORT}`);
             resolve({ app, server, sessionStore });
         });
@@ -378,8 +396,19 @@ async function startServer() {
     });
 }
 
+async function startManagedServer() {
+    const runtime = await startServer();
+    const { server, sessionStore } = runtime;
+        const shutdown = require('./services/shutdownService').createShutdownHandler({
+            server, sessionStore, pool: require('./config/db'), mailer: require('./config/mailer')
+        });
+        process.on('SIGTERM', shutdown);
+        process.on('SIGINT', shutdown);
+    return runtime;
+}
+
 if (require.main === module) {
-    startServer().catch((error) => {
+    startManagedServer().catch((error) => {
         console.error('Failed to start server:', error);
         process.exit(1);
     });
@@ -387,5 +416,6 @@ if (require.main === module) {
 
 module.exports = {
     createApp,
+    startManagedServer,
     startServer
 };

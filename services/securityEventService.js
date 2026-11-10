@@ -12,7 +12,7 @@ function logSecurityEvent(event, req, details = {}) {
         timestamp: new Date().toISOString(),
         event: normalize(event, 80),
         method: normalize(req && req.method, 12),
-        path: normalize(req && (req.originalUrl || req.path), 240),
+        path: normalize(req && String(req.originalUrl || req.path || '').split('?')[0], 240),
         ip: normalize(req && req.ip, 80),
         role: normalize(user && user.role, 80),
         userId: normalize(user && (user.id || user.PFNo || user.pfno), 80),

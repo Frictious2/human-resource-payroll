@@ -1,0 +1,95 @@
+{
+  "startedAt": "2026-11-09T21:28:00.538Z",
+  "database": "waec_acceptance_20261109_efe54d67",
+  "mode": "FULL",
+  "syntheticOnly": true,
+  "liveDatabase": "personnel_master",
+  "tests": [
+    {
+      "script": "scripts/testDisposableEmployeeSetup.js",
+      "status": "FAIL",
+      "exitCode": 1,
+      "failureTail": "<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Request could not be verified</title>\n  <link rel=\"st\n\n403 !== 302\n <html lang=\"en\">\n<head>\n"
+    },
+    {
+      "script": "scripts/testFinalSecurityHardening.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testSecurityHttpIsolated.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testSecurityPayrollRegression.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testCsrfProtection.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testLoginRateLimiting.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testPersistentSessionStore.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testPhase14PayrollReversalWorkflow.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testPhase15PayrollReopenWorkflow.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testYearlyPaymentWorkflow.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testPayrollWorkflowFoundation.js",
+      "status": "FAIL",
+      "exitCode": 1,
+      "failureTail": "Payroll workflow foundation verification failed.\nError: No payroll batch rows were found for workflow verification.\n    at getCandidatePayrollBatch (C:\\Users\\David M. Gegbai\\Documents\\trae_projects\\Human Resource Payroll\\private\\acceptance-work\\waec_acceptance_20261109_efe54d67\\scripts\\testPayrollWorkflowFoundation.js:50:15)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async run (C:\\Users\\David M. Gegbai\\Documents\\trae_projects\\Human Resource Payroll\\private\\acceptance-work\\waec_acceptance_20261109_efe54d67\\scripts\\testPayrollWorkflowFoundation.js:226:29)\n"
+    },
+    {
+      "script": "scripts/testPhase11RecordWorkflows.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testPayrollLiabilityReports.js",
+      "status": "FAIL",
+      "exitCode": 1,
+      "failureTail": "Error: Payroll Liability test requires at least one company-scoped staff record with PAYE payroll rows.\n    at resolveTestPfNo (C:\\Users\\David M. Gegbai\\Documents\\trae_projects\\Human Resource Payroll\\private\\acceptance-work\\waec_acceptance_20261109_efe54d67\\scripts\\testPayrollLiabilityReports.js:96:23)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async main (C:\\Users\\David M. Gegbai\\Documents\\trae_projects\\Human Resource Payroll\\private\\acceptance-work\\waec_acceptance_20261109_efe54d67\\scripts\\testPayrollLiabilityReports.js:106:18) {\n  statusCode: 404\n}\n"
+    },
+    {
+      "script": "scripts/auditPayrollItemTaxability.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/auditSierraLeonePayeCalculation.js",
+      "status": "PASS",
+      "exitCode": 0
+    }
+  ],
+  "status": "BLOCKED",
+  "liveAccessDenied": true,
+  "schemaOnlyTables": 148,
+  "sanitizedWorkspace": "private\\acceptance-work\\waec_acceptance_20261109_efe54d67",
+  "liveProtectedRecordsUnchanged": true,
+  "disposableDatabaseRemoved": true,
+  "restrictedDatabaseUsersRemoved": true,
+  "completedAt": "2026-11-09T21:31:48.118Z"
+}

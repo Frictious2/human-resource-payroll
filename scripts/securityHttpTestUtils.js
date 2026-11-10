@@ -1,4 +1,5 @@
 const bcrypt = require('bcrypt');
+require('./requireDisposableDatabase')();
 const pool = require('../config/db');
 const { initializeSessionStore } = require('../config/sessionStore');
 const { createApp } = require('../server');
@@ -33,6 +34,7 @@ function csrfFrom(html) {
 }
 
 async function seedUsers() {
+    process.env.INSTALLATION_COMPANY_ID = String(TEST_COMPANY_ID);
     assertSafe();
     const hash = await bcrypt.hash(TEST_PASSWORD, 10);
     for (const user of TEST_USERS) {
@@ -53,6 +55,7 @@ async function cleanupUsers() {
 }
 
 async function startTestServer(port) {
+    process.env.INSTALLATION_COMPANY_ID = String(TEST_COMPANY_ID);
     const store = await initializeSessionStore();
     const app = createApp({ sessionStore: store });
     const server = await new Promise((resolve, reject) => {
@@ -97,12 +100,20 @@ async function login(baseUrl, username, password = TEST_PASSWORD) {
     if (response.status !== 302 || !cookie) {
         throw new Error(`Login failed for ${username} with HTTP ${response.status}.`);
     }
+    const loginSigned = decodeURIComponent(cookie.slice(cookie.indexOf('=') + 1));
+    const loginId = loginSigned.slice(2, loginSigned.lastIndexOf('.'));
+    const [[loginState]] = await pool.execute('SELECT data FROM sessions WHERE session_id=?', [loginId]);
+    if (!loginState || !JSON.parse(loginState.data).csrfToken) throw new Error('Regenerated session must persist CSRF before redirect.');
 
     const dashboard = await request(baseUrl, '/dashboard', { headers: { cookie } });
     const destination = dashboard.headers.get('location');
     const pageResponse = await request(baseUrl, destination, { headers: { cookie } });
     const csrfToken = csrfFrom(await pageResponse.text());
     if (!csrfToken) throw new Error(`Authenticated page did not expose a CSRF token for ${username}.`);
+    const signed=decodeURIComponent(cookie.slice(cookie.indexOf('=')+1));
+    const sessionId=signed.slice(2,signed.lastIndexOf('.'));
+    const [[persisted]]=await pool.execute('SELECT data FROM sessions WHERE session_id=?',[sessionId]);
+    if(!persisted||JSON.parse(persisted.data).csrfToken!==csrfToken)throw new Error('Dashboard CSRF token does not match persisted session state.');
     return { cookie, csrfToken, destination };
 }
 

@@ -3,15 +3,9 @@ const router = express.Router();
 const dataEntryController = require('../controllers/dataEntryController');
 const benefitController = require('../controllers/benefitController');
 const recordWorkflowController = require('../controllers/recordWorkflowController');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const statementReportController = require('../controllers/statementReportController');
 
-const staffPhotoDirectory = path.join(process.cwd(), 'public', 'uploads', 'staff_photos');
-const medicalReceiptDirectory = path.join(process.cwd(), 'public', 'uploads', 'medical_receipts');
-fs.mkdirSync(staffPhotoDirectory, { recursive: true });
-fs.mkdirSync(medicalReceiptDirectory, { recursive: true });
+const { createImageUpload } = require('../services/privateFileService');
 
 function denyFinanceOnlyAccess(req, res) {
     const message = 'Payroll processing and GL posting are now restricted to Finance Officer accounts. Please use the Finance workspace for these actions.';
@@ -33,45 +27,8 @@ function denyFinanceOnlyAccess(req, res) {
     });
 }
 
-function imageFileFilter(req, file, cb) {
-    const filetypes = /jpeg|jpg|png|gif|webp/;
-    const mimetype = filetypes.test(String(file.mimetype || '').toLowerCase());
-    const extname = filetypes.test(path.extname(file.originalname || '').toLowerCase());
-    if (mimetype && extname) {
-        return cb(null, true);
-    }
-    return cb(new Error('Only image uploads are allowed.'));
-}
-
-// Multer Setup for Staff Photos
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, staffPhotoDirectory);
-    },
-    filename: function (req, file, cb) {
-        cb(null, req.body.pfno + '_' + Date.now() + path.extname(file.originalname));
-    }
-});
-const upload = multer({
-    storage,
-    fileFilter: imageFileFilter,
-    limits: { fileSize: 3 * 1024 * 1024 }
-});
-
-// Multer Setup for Medical Receipts
-const medicalStorage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, medicalReceiptDirectory);
-    },
-    filename: function (req, file, cb) {
-        cb(null, 'MED_' + req.body.pfno + '_' + Date.now() + path.extname(file.originalname));
-    }
-});
-const uploadMedical = multer({
-    storage: medicalStorage,
-    fileFilter: imageFileFilter,
-    limits: { fileSize: 3 * 1024 * 1024 }
-});
+const upload = createImageUpload('staff_photos');
+const uploadMedical = createImageUpload('medical_receipts');
 
 // Dashboard
 router.get('/', (req, res) => res.redirect('/data-entry/dashboard'));

@@ -327,18 +327,18 @@ async function main() {
         checks: { adminCreateStoresOneZero, adminUpdateBooleanFields, adminUiCheckbox }
     });
 
-    const companyScopedPayrollItems = /WHERE CompanyID = \? OR CompanyID IS NULL/.test(serviceText)
+    const companyScopedPayrollItems = /FROM tblpayrollitems\s+WHERE CompanyID = \?\s+ORDER BY/.test(serviceText)
         && /ORDER BY CASE WHEN CompanyID = \? THEN 0 ELSE 1 END/.test(serviceText);
-    const companyScopedManualSave = /FROM tblpayrollitems[\s\S]*WHERE CompanyID = \? OR CompanyID IS NULL[\s\S]*ORDER BY CASE WHEN CompanyID = \? THEN 0 ELSE 1 END/.test(dataEntryText);
+    const companyScopedManualSave = /FROM tblpayrollitems\s+WHERE CompanyID = \?\s+ORDER BY CASE WHEN CompanyID = \? THEN 0 ELSE 1 END/.test(dataEntryText);
     const companyScopedYearly = /FROM tblpayrollitems/.test(yearlyText)
-        && /WHERE \(CompanyID = \? OR CompanyID IS NULL\)/.test(yearlyText)
+        && /WHERE \(CompanyID = \?\)/.test(yearlyText)
         && /AND Code = \?/.test(yearlyText)
-        && /\(CompanyID = \? OR CompanyID IS NULL\)/.test(yearlyText)
+        && !/CompanyID = \? OR CompanyID IS NULL/.test(yearlyText)
         && /ORDER BY CompanyID DESC/.test(yearlyText);
     report.findings.push({
         area: 'COMPANY_ISOLATION',
         status: status(companyScopedPayrollItems && companyScopedManualSave && companyScopedYearly),
-        detail: 'Active monthly and yearly item lookup paths prefer company-specific Payroll Item rows and fall back to NULL company rows.',
+        detail: 'Standalone monthly/manual/yearly Payroll Item lookup paths require exact CompanyID and do not admit unowned NULL-company rows.',
         checks: { companyScopedPayrollItems, companyScopedManualSave, companyScopedYearly }
     });
 

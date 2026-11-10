@@ -1,14 +1,9 @@
 const bcrypt = require('bcrypt');
 const pool = require('../config/db');
+const { getInstallationCompanyId } = require('./installationCompanyService');
 
 const BCRYPT_PREFIXES = ['$2a$', '$2b$', '$2y$'];
 
-const DEFAULT_SEED_DEVELOPER = {
-    username: process.env.SEED_DEVELOPER_USERNAME || 'developer',
-    email: process.env.SEED_DEVELOPER_EMAIL || 'developer@hrpayroll.local',
-    password: process.env.SEED_DEVELOPER_PASSWORD || 'Developer@123',
-    fullName: process.env.SEED_DEVELOPER_FULLNAME || 'Seed Developer'
-};
 
 function isBcryptHash(value) {
     return typeof value === 'string' && BCRYPT_PREFIXES.some((prefix) => value.startsWith(prefix));
@@ -139,14 +134,14 @@ async function authenticatePortalUser(identifier, password) {
     const [rows] = await pool.execute(
         `SELECT PFNo, Username, FullName, Email, Pword, CompanyID, Level
          FROM tblpassword
-         WHERE LOWER(COALESCE(Email, '')) = ? OR LOWER(COALESCE(Username, '')) = ?
+         WHERE (LOWER(COALESCE(Email, '')) = ? OR LOWER(COALESCE(Username, '')) = ?) AND CompanyID = ?
          ORDER BY PFNo DESC`,
-        [identifier, identifier]
+        [identifier, identifier, getInstallationCompanyId()]
     );
 
     for (const row of rows) {
         const role = normalizeRole(row.Level, 'tblpassword');
-        if (!role) {
+        if (!role || role === 'developer') {
             continue;
         }
 
@@ -154,7 +149,7 @@ async function authenticatePortalUser(identifier, password) {
             storedPassword: row.Pword,
             password,
             onLegacyUpgrade: async (hash) => {
-                await pool.execute('UPDATE tblpassword SET Pword = ? WHERE PFNo = ?', [hash, row.PFNo]);
+                await pool.execute('UPDATE tblpassword SET Pword = ? WHERE PFNo = ? AND CompanyID = ?', [hash, row.PFNo, getInstallationCompanyId()]);
             }
         });
 
@@ -190,11 +185,7 @@ async function authenticateUser({ identifier, password }) {
         };
     }
 
-    const developer = await authenticateDeveloper(normalizedIdentifier, normalizedPassword);
-    if (developer) {
-        return { success: true, user: developer };
-    }
-
+    // Standalone customer installations expose only company-scoped portal roles.
     const portalUser = await authenticatePortalUser(normalizedIdentifier, normalizedPassword);
     if (portalUser) {
         return { success: true, user: portalUser };
@@ -207,39 +198,8 @@ async function authenticateUser({ identifier, password }) {
 }
 
 async function ensureSeedDeveloper() {
-    const [rows] = await pool.execute(
-        `SELECT ID
-         FROM developer
-         WHERE LOWER(COALESCE(username, '')) = ? OR LOWER(COALESCE(email, '')) = ?
-         LIMIT 1`,
-        [DEFAULT_SEED_DEVELOPER.username.toLowerCase(), DEFAULT_SEED_DEVELOPER.email.toLowerCase()]
-    );
-
-    if (rows.length) {
-        return {
-            created: false,
-            ...DEFAULT_SEED_DEVELOPER
-        };
-    }
-
-    const passwordHash = await bcrypt.hash(DEFAULT_SEED_DEVELOPER.password, 10);
-    const [result] = await pool.execute(
-        `INSERT INTO developer (FullName, username, email, password, createdBy)
-         VALUES (?, ?, ?, ?, ?)`,
-        [
-            DEFAULT_SEED_DEVELOPER.fullName,
-            DEFAULT_SEED_DEVELOPER.username,
-            DEFAULT_SEED_DEVELOPER.email,
-            passwordHash,
-            'system-seed'
-        ]
-    );
-
-    return {
-        created: true,
-        id: result.insertId,
-        ...DEFAULT_SEED_DEVELOPER
-    };
+    // Compatibility for older callers: automatic privileged provisioning is disabled.
+    return { created: false, disabled: true };
 }
 
 module.exports = {

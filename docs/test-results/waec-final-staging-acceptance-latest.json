@@ -1,0 +1,77 @@
+{
+  "date": "2026-11-09",
+  "stagingAcceptance": "BLOCKED",
+  "externalStagingDeployment": "BLOCKED",
+  "productionDeployment": "NOT READY",
+  "deployed": false,
+  "smtp": {
+    "status": "PASS",
+    "messagesSent": 1,
+    "recipientApproved": true,
+    "recipientConfirmedInbox": true,
+    "evidence": "docs/test-results/staging-acceptance-email-attempt.json"
+  },
+  "privateFileRehearsal": {
+    "status": "PASS",
+    "scope": "copy-only rehearsal, one database-referenced employee photo",
+    "inventoryFiles": 6,
+    "databaseReferences": 1,
+    "originalFilesUnchanged": true,
+    "databaseReferencesUnchanged": true,
+    "actualMigrationPerformed": false,
+    "evidence": "docs/test-results/private-file-migration-rehearsal-latest.json"
+  },
+  "regression": {
+    "uniqueSuitesPassed": 15,
+    "uniqueSuitesFailed": 1,
+    "fullPassingRun": "docs/test-results/waec_acceptance_20261109_2f0c1018-results.json",
+    "additionalFailingRun": "docs/test-results/waec_acceptance_20261109_03b1af90-results.json",
+    "earlierIntermittentCsrfFailures": "Retained diagnostic observation; latest full and repeated employee runs passed; root cause not established",
+    "javascriptFilesSyntaxChecked": 40,
+    "ejsTemplatesCompiled": 276
+  },
+  "companyIsolation": {
+    "status": "FAIL",
+    "defect": "STG-ISO-001",
+    "severity": "HIGH",
+    "route": "POST /data-entry/staff/new-edit",
+    "syntheticAttackerCompany": 2,
+    "syntheticRecordCompany": 1,
+    "httpStatus": 302,
+    "foreignSyntheticRecordChanged": true,
+    "liveRecordsUsedForMutation": false
+  },
+  "linux": {
+    "status": "NOT EXECUTED",
+    "installedWslDistributions": 0,
+    "dockerService": "STOPPED",
+    "linuxEngineAvailable": false,
+    "literalRelativeImportsStaticallyChecked": 306,
+    "staticChecksAreRuntimeAcceptance": false
+  },
+  "dependencyAudit": {
+    "command": "npm audit --omit=dev --json",
+    "exitCode": 0,
+    "critical": 0,
+    "high": 0,
+    "moderate": 0,
+    "low": 0
+  },
+  "dataSafety": {
+    "schemaOnlyTablesCopied": 148,
+    "liveRowsCopied": false,
+    "restrictedTestIdentityDeniedLiveDatabase": true,
+    "protectedLiveTableFingerprintsUnchanged": true,
+    "batch161Changed": false,
+    "liveAccountsChanged": false,
+    "acceptanceDatabasesRemaining": 0,
+    "acceptanceUserHostEntriesRemaining": 0
+  },
+  "remainingRequirements": [
+    "Fix company ownership checks across the staff-save handler and related writes; rerun strict disposable regressions",
+    "Provide an approved isolated Linux environment and execute actual runtime, permissions, PDF/Excel and private HTTPS proxy acceptance",
+    "Complete repeated browser/session testing and investigate earlier CSRF failures if reproducible",
+    "Obtain authorization for any real private-file migration and deployment",
+    "Complete staging/client sign-off and production operational prerequisites"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "startedAt": "2026-11-10T09:12:45.802Z",
+  "database": "waec_acceptance_20261110_b40c63cb",
+  "mode": "PACKAGE_VERIFICATION",
+  "syntheticOnly": true,
+  "liveDatabase": "personnel_master",
+  "tests": [
+    {
+      "script": "scripts/testCpanelStagingPackage.js",
+      "status": "PASS",
+      "exitCode": 0
+    }
+  ],
+  "status": "PASS",
+  "liveAccessDenied": true,
+  "sanitizedWorkspace": "private\\acceptance-work\\waec_acceptance_20261110_b40c63cb",
+  "liveProtectedRecordsUnchanged": true,
+  "disposableDatabaseRemoved": true,
+  "restrictedDatabaseUsersRemoved": true,
+  "completedAt": "2026-11-10T09:15:31.835Z"
+}

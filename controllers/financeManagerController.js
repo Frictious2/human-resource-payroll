@@ -6,13 +6,9 @@ const payrollReopenService = require('../services/payrollReopenService');
 const { getWorkspaceContext } = require('../utils/workspaceContext');
 
 function getCompanyId(req) {
-    return Number(
-        req.user?.companyId ||
-        req.user?.company_id ||
-        req.session?.companyId ||
-        req.session?.CompanyID ||
-        1
-    ) || 1;
+    const companyId = Number(req.user?.companyId);
+    if (!Number.isSafeInteger(companyId) || companyId < 1) throw Object.assign(new Error('Company scope is required.'), { status: 403 });
+    return companyId;
 }
 
 function getViewUser(req) {

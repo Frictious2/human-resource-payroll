@@ -1,0 +1,107 @@
+{
+  "startedAt": "2026-11-10T09:16:51.461Z",
+  "database": "waec_acceptance_20261110_15fd3dac",
+  "mode": "FULL",
+  "syntheticOnly": true,
+  "liveDatabase": "personnel_master",
+  "tests": [
+    {
+      "script": "scripts/testDisposableEmployeeSetup.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testFinalSecurityHardening.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testSecurityHttpIsolated.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testSecurityPayrollRegression.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testCsrfProtection.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testLoginRateLimiting.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testPersistentSessionStore.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testPhase14PayrollReversalWorkflow.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testPhase15PayrollReopenWorkflow.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testYearlyPaymentWorkflow.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testPayrollWorkflowFoundation.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testPhase11RecordWorkflows.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testPayrollLiabilityReports.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/auditPayrollItemTaxability.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/auditSierraLeonePayeCalculation.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testDisposableStaffCompanyIsolation.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testFinanceManagerOversight.js",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "script": "scripts/testStandaloneConfiguration.js",
+      "status": "PASS",
+      "exitCode": 0
+    }
+  ],
+  "status": "PASS",
+  "liveAccessDenied": true,
+  "schemaOnlyTables": 148,
+  "sanitizedWorkspace": "private\\acceptance-work\\waec_acceptance_20261110_15fd3dac",
+  "liveProtectedRecordsUnchanged": true,
+  "disposableDatabaseRemoved": true,
+  "restrictedDatabaseUsersRemoved": true,
+  "completedAt": "2026-11-10T09:21:06.315Z"
+}

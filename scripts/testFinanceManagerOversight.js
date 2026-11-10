@@ -249,7 +249,7 @@ async function main() {
                 `/finance-manager/reports/payroll-liabilities/staff-preview?pfNo=${encodeURIComponent(otherCompanyStaff[0].PFNo)}&fromDate=2026-01-01&toDate=2026-01-31`,
                 { headers: fmHeaders }
             );
-            await expectStatus(response, [400], 'Cross-company staff PAYE statement access');
+            await expectStatus(response, [404], 'Cross-company staff PAYE statement access');
         }
 
         console.log('Finance Manager oversight verification passed.');
